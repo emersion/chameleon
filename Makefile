@@ -1,0 +1,44 @@
+# Copyright (c) 2013 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+SHELL := bash
+
+PYLINTRC=$(CROS_WORKON_SRCROOT)/chromite/pylintrc
+PYLINT_OPTIONS=\
+	--rcfile=$(PYLINTRC) \
+	--disable=R0921,R0922
+
+LINT_FILES=$(shell find -name '*.py' -type f | sort)
+LINT_BLACKLIST=
+LINT_WHITELIST=$(filter-out $(LINT_BLACKLIST),$(LINT_FILES))
+
+lint:
+	@set -e -o pipefail; \
+	out=$$(mktemp); \
+	echo Linting $(shell echo $(LINT_WHITELIST) | wc -w) files...; \
+	if [ -n "$(LINT_WHITELIST)" ] && \
+	    ! env \
+	    PYTHONPATH=chameleond:../chameleon-private:../video-chameleon \
+	    pylint $(PYLINT_OPTIONS) $(LINT_WHITELIST) \
+	    |& tee $$out; then \
+	  echo; \
+	  echo To re-lint failed files, run:; \
+	  echo make lint LINT_WHITELIST=\""$$( \
+	    grep '^\*' $$out | cut -c22- | tr . / | \
+	    sed 's/$$/.py/' | tr '\n' ' ' | sed -e 's/ $$//')"\"; \
+	  echo; \
+	  rm -f $$out; \
+	  exit 1; \
+	fi; \
+	echo ...no lint errors! You are awesome!; \
+	rm -f $$out
+
+PRESUBMIT_FILES := $(if $(PRESUBMIT_FILES),\
+	             $(shell realpath --relative-to=. $$PRESUBMIT_FILES))
+
+lint-presubmit:
+	$(MAKE) lint \
+	    LINT_FILES="$(filter %.py,$(PRESUBMIT_FILES))" \
+	    2>/dev/null
+
