@@ -13,7 +13,7 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer
 class Chameleond(object):
   """A class to start a Chameleon daemon."""
 
-  def __init__(self, driver='pygprobe', *args, **kwargs):
+  def __init__(self, driver='fpga', *args, **kwargs):
     """Initializes Chameleond object.
 
     Args:
@@ -38,18 +38,19 @@ class Chameleond(object):
     class_name = ''.join([s.capitalize() for s in module_name.split('_')])
     return getattr(module, class_name)
 
-  def RunServer(self, port=9992):
+  def RunServer(self, host='0.0.0.0', port=9992):
     """Runs Chameleond server.
 
     Args:
+      host: host address to serve the service.
       port: port number of RPC server.
     """
     # Launch the XMLRPC server to serve Chameleond APIs.
-    server = SimpleXMLRPCServer(('localhost', port), allow_none=True,
+    server = SimpleXMLRPCServer((host, port), allow_none=True,
                                 logRequests=True)
     server.register_introspection_functions()
     server.register_instance(self._driver)
-    logging.info('Listening on localhost port %d...', port)
+    logging.info('Listening on %s port %d...', host, port)
     server.serve_forever()
 
 
@@ -58,8 +59,10 @@ def main():
   parser = argparse.ArgumentParser(
       description='Launch a Chameleon daemon.',
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument('--driver', type=str, dest='driver', default='pygprobe',
+  parser.add_argument('--driver', type=str, dest='driver', default='fpga',
                       help='driver of Chameleond')
+  parser.add_argument('--host', type=str, dest='host', default='0.0.0.0',
+                      help='host address of RPC server')
   parser.add_argument('--port', type=int, dest='port', default=9992,
                       help='port number of RPC server')
   parser.add_argument('-v', '--verbose', action='count', dest='verbose',
@@ -80,7 +83,8 @@ def main():
   log_format += '%(message)s'
   logging.basicConfig(level=verbosity, format=log_format)
 
-  Chameleond(options.driver, *args, **kwargs).RunServer(options.port)
+  Chameleond(options.driver, *args, **kwargs).RunServer(
+      options.host, options.port)
 
 
 if __name__ == '__main__':
