@@ -105,8 +105,10 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('FireHpdPulse')
 
-  def DumpPixels(self, input_id, x, y, width, height):
+  def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
+
+    If not given the area, default to capture the whole screen.
 
     Args:
       input_id: The ID of the input connector.
@@ -120,8 +122,11 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DumpPixels')
 
-  def ComputePixelChecksum(self, input_id, x, y, width, height):
+  def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
+        height=None):
     """Computes the checksum of pixels in the selected area.
+
+    If not given the area, default to compute the whole screen.
 
     Args:
       input_id: The ID of the input connector.

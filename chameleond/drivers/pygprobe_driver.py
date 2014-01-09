@@ -218,8 +218,10 @@ class PygprobeDriver(ChameleondInterface):
     else:
       raise NotImplementedError('FireHpdPulse')
 
-  def DumpPixels(self, input_id, x, y, width, height):
+  def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
+
+    If not given the area, default to capture the whole screen.
 
     Args:
       input_id: The ID of the input connector.
@@ -231,14 +233,20 @@ class PygprobeDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    self._SelectInput(input_id)
-    self._serial_device.Flush()
-    pixels, _ = cmdline_commands.DumpPixels(
-        self._serial_device, x, y, width, height)
-    return xmlrpclib.Binary(pixels)
+    if x is not None and y is not None and width and height:
+      self._SelectInput(input_id)
+      self._serial_device.Flush()
+      pixels, _ = cmdline_commands.DumpPixels(
+          self._serial_device, x, y, width, height)
+      return xmlrpclib.Binary(pixels)
+    else:
+      raise NotImplementedError('DumpPixels')
 
-  def ComputePixelChecksum(self, input_id, x, y, width, height):
+  def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
+        height=None):
     """Computes the checksum of pixels in the selected area.
+
+    If not given the area, default to compute the whole screen.
 
     Args:
       input_id: The ID of the input connector.
@@ -250,11 +258,14 @@ class PygprobeDriver(ChameleondInterface):
     Returns:
       The checksum of the pixels.
     """
-    self._SelectInput(input_id)
-    self._serial_device.Flush()
-    _, checksum = cmdline_commands.DumpPixels(
-        self._serial_device, x, y, width, height)
-    return checksum
+    if x is not None and y is not None and width and height:
+      self._SelectInput(input_id)
+      self._serial_device.Flush()
+      _, checksum = cmdline_commands.DumpPixels(
+          self._serial_device, x, y, width, height)
+      return checksum
+    else:
+      raise NotImplementedError('ComputePixelChecksum')
 
   def DetectResolution(self, input_id):
     """Detects the source resolution.
