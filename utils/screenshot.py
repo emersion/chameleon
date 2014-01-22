@@ -30,7 +30,7 @@ def main():
       'http://%s:%d' % (options.host, options.port))
   inputs = chameleon.ProbeInputs()
   main_input = inputs[0]
-  print 'Use the main port:', chameleon.GetInputName(main_input)
+  print 'Use the main port:', chameleon.GetConnectorType(main_input)
   if options.replug:
     print 'Replugging...'
     chameleon.FireHpdPulse(main_input, 1000000)
