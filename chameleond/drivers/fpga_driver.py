@@ -4,6 +4,7 @@
 """Chameleond Driver for FPGA customized platform."""
 
 import array
+import logging
 import re
 import subprocess
 import tempfile
@@ -15,8 +16,8 @@ from interface import ChameleondInterface
 
 
 class FpgaDriverError(Exception):
-    """Exception raised when any error on FPGA driver."""
-    pass
+  """Exception raised when any error on FPGA driver."""
+  pass
 
 
 class FpgaDriver(ChameleondInterface):
@@ -33,17 +34,99 @@ class FpgaDriver(ChameleondInterface):
 
   _MAIN_I2C_BUS = 0
   _EEPROM_I2C_SLAVE = 0x50
+  _HDMIRX_I2C_SLAVE = 0x48
+
+  _HDMIRX_REG_RST_CTRL = 0x05
+  _HDMIRX_MASK_SWRST = 0x01
+  _HDMIRX_MASK_CDRRST = 0x80
+
+  _HDMIRX_REG_VIDEO_MODE = 0x58
+  _HDMIRX_MASK_MODE_CHANGED = 0x01
+  _HDMIRX_MASK_VIDEO_STABLE = 0x08
+
+  _DELAY_REG_SET = 0.001
+  _DELAY_VIDEO_MODE_PROBE = 0.02
+  _TIMEOUT_VIDEO_MODE_PROBE = 5
 
   def __init__(self, *args, **kwargs):
     super(FpgaDriver, self).__init__(*args, **kwargs)
+    self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
     self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
     self._all_edids = ["RESERVED"]
 
+  def _IsModeChanged(self):
+    """Returns whether the video mode is changed.
+
+    Returns:
+      True if the video mode is changed; otherwsie, False.
+    """
+    video_mode = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                              self._HDMIRX_REG_VIDEO_MODE)
+    return bool(video_mode & self._HDMIRX_MASK_MODE_CHANGED)
+
+  def _IsVideoStable(self):
+    """Returns whether the video is stable.
+
+    Returns:
+      True if the video mode is stable; otherwise, False.
+    """
+    video_mode = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                              self._HDMIRX_REG_VIDEO_MODE)
+    return bool(video_mode & self._HDMIRX_MASK_VIDEO_STABLE)
+
+  def _RestartReceiverIfModeChanged(self):
+    """Restarts the HDMI receiver if the mode is changed.
+
+    The HDMI receiver should be restarted after mode changed. Calling this
+    method will trigger the restart process for the HDMI receiver when
+    issuing a related command, like capturing a frame.
+    """
+    if self._IsModeChanged():
+      logging.info('Video mode is changed.')
+      self._RestartReceiver()
+
+  def _WaitForCondition(self, func, value, timeout):
+    """Waits for the given function matches the given value.
+
+    Args:
+      func: The function to be tested.
+      value: The value to fit the condition.
+      timeout: The timeout in second to break the check.
+
+    Raise:
+      FpgaDriverError if timeout.
+    """
+    end_time = start_time = time.time()
+    while end_time - start_time < timeout:
+      if func() == value:
+        break
+      logging.info('Waiting for condition %s == %s', str(func), str(value))
+      time.sleep(self._DELAY_VIDEO_MODE_PROBE)
+      end_time = time.time()
+    else:
+      raise FpgaDriverError('Timeout on waiting for condition %s == %s' %
+                            (str(func), str(value)))
+
+  def _RestartReceiver(self):
+    """Restarts the HDMI receiver."""
+    logging.info('Resetting HDMI receiver...')
+    self._SetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                 self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST,
+                 self._HDMIRX_REG_RST_CTRL)
+    time.sleep(self._DELAY_REG_SET)
+    self._SetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                 0, self._HDMIRX_REG_RST_CTRL)
+
+    self._WaitForCondition(self._IsModeChanged, False,
+                           self._TIMEOUT_VIDEO_MODE_PROBE)
+    self._WaitForCondition(self._IsVideoStable, True,
+                           self._TIMEOUT_VIDEO_MODE_PROBE)
+    logging.info('Video is stable.')
+
   def Reset(self):
     """Resets Chameleon board."""
-    # TODO(waihong): Add the procedure to reset the board.
-    pass
+    self._RestartReceiver()
 
   def ProbeInputs(self):
     """Probes all the display connectors on Chameleon board.
@@ -115,18 +198,43 @@ class FpgaDriver(ChameleondInterface):
     return array.array(
         'B', [int(s, 16) for match in matches for s in match]).tostring()
 
-  def _SetI2C(self, bus, slave, data):
+  def _GetI2C(self, bus, slave, offset):
+    """Gets the byte value of the given I2C bus, slave, and offset address.
+
+    Args:
+      bus: The number of bus.
+      slave: The number of slave address.
+      offset: The offset address to read.
+
+    Returns:
+      An integer of the byte value.
+    """
+    command = ['i2cget', '-f', '-y', str(bus), str(slave), str(offset)]
+    message = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    matches = self._i2cget_pattern.match(message)
+    if matches:
+      return int(matches.group(0), 0)
+    else:
+      raise FpgaDriverError('The output format of i2cget is not matched.')
+
+  def _SetI2C(self, bus, slave, data, offset=0):
     """Sets the given I2C content on the given bus and slave address.
 
     Args:
       bus: The number of bus.
       slave: The number of slave address.
-      data: The byte-array of content to set.
+      data: A byte or a byte-array of content to set.
+      offset: The offset which the data starts from this address.
     """
     command = ['i2cset', '-f', '-y', str(bus), str(slave)]
-    for index in xrange(0, len(data), 8):
-      subprocess.check_call(command + [str(index)] +
-          [str(ord(d)) for d in data[index:index+8]] + ['i'])
+    if isinstance(data, str):
+      for index in xrange(0, len(data), 8):
+        subprocess.check_call(command + [str(offset + index)] +
+            [str(ord(d)) for d in data[index:index+8]] + ['i'])
+    elif isinstance(data, int) and 0 <= data <= 0xff:
+      subprocess.check_call(command + [str(offset), str(data)])
+    else:
+      raise FpgaDriverError('The argument data is not a valid type.')
 
   # TODO(waihong): Move to some Python native library for memory access.
   def _ReadMem(self, address):
@@ -257,6 +365,7 @@ class FpgaDriver(ChameleondInterface):
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
     if input_id == self._HDMI_ID:
+      self._RestartReceiverIfModeChanged()
       byte_per_pixel = 4
       # Capture the whole screen first.
       total_width, total_height = self.DetectResolution(input_id)
@@ -309,6 +418,7 @@ class FpgaDriver(ChameleondInterface):
       A (width, height) tuple.
     """
     if input_id == self._HDMI_ID:
+      self._RestartReceiverIfModeChanged()
       width = self._ReadMem(self._FRAME_WIDTH_ADDRESS)
       height = self._ReadMem(self._FRAME_HEIGHT_ADDRESS)
       return (width, height)
