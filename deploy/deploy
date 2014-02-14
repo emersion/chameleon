@@ -1,0 +1,24 @@
+#!/bin/sh
+# Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+SCRIPT="$(readlink -f $0)"
+SCRIPT_DIR="$(dirname ${SCRIPT})"
+
+DAEMON_NAME='chameleond'
+INITD_FILE="/etc/init.d/${DAEMON_NAME}"
+CONFIG_FILE="/etc/default/${DAEMON_NAME}"
+
+update-rc.d -f ${DAEMON_NAME} remove
+
+CONFIG_TMP="$(mktemp /tmp/${DAEMON_NAME}.XXXXXX)"
+cat <<END >${CONFIG_TMP}
+CHAMELEOND_DIR="$(dirname ${SCRIPT_DIR})/chameleond"
+END
+mv -f "${CONFIG_TMP}" "${CONFIG_FILE}"
+
+cp -f "${SCRIPT_DIR}/chameleond" "${INITD_FILE}"
+update-rc.d "${DAEMON_NAME}" defaults 92 8
+
+"${INITD_FILE}" restart
