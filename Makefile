@@ -3,15 +3,50 @@
 # found in the LICENSE file.
 
 SHELL := bash
+CC := armv7a-cros-linux-gnueabi-gcc
+CFLAGS := -g -Wall
+INCLUDES := -Iinclude
+DESTDIR := /usr/bin
+BINDIR := ./bin
+SRCDIR := ./src
 
-PYLINTRC=$(CROS_WORKON_SRCROOT)/chromite/pylintrc
-PYLINT_OPTIONS=\
+TARGETS = directories binaries
+
+.PHONY: all
+all: $(TARGETS)
+
+.PHONY: directories
+directories:
+	@mkdir -p $(BINDIR)
+
+BINARIES = $(BINDIR)/hpd_control
+
+.PHONY: binaries
+binaries: $(BINARIES)
+
+$(BINDIR)/hpd_control.o: $(SRCDIR)/hpd_control.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BINDIR)/hpd_control: $(BINDIR)/hpd_control.o
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
+
+.PHONY: install
+install:
+	@mkdir -p $(DESTDIR)
+	@cp -f $(BINARIES) "$(DESTDIR)"
+
+.PHONY: clean
+clean:
+	@rm -rf $(BINDIR)
+
+PYLINTRC = $(CROS_WORKON_SRCROOT)/chromite/pylintrc
+PYLINT_OPTIONS = \
 	--rcfile=$(PYLINTRC) \
 	--disable=R0921,R0922
 
-LINT_FILES=$(shell find -name '*.py' -type f | sort)
-LINT_BLACKLIST=
-LINT_WHITELIST=$(filter-out $(LINT_BLACKLIST),$(LINT_FILES))
+LINT_FILES = $(shell find -name '*.py' -type f | sort)
+LINT_BLACKLIST =
+LINT_WHITELIST = $(filter-out $(LINT_BLACKLIST),$(LINT_FILES))
 
 lint:
 	@set -e -o pipefail; \
