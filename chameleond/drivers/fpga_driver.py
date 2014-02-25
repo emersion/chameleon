@@ -12,7 +12,7 @@ import time
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
-from interface import ChameleondInterface
+from chameleond.interface import ChameleondInterface
 
 
 class FpgaDriverError(Exception):

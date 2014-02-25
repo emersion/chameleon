@@ -18,7 +18,7 @@ DAEMON_NAME='chameleond'
 CONFIG_FILE="/etc/default/${DAEMON_NAME}"
 . "${CONFIG_FILE}"
 
-DAEMON="${CHAMELEOND_DIR}/chameleond.py"
+DAEMON="${CHAMELEOND_DIR}/run_chameleond"
 DAEMON_USER='root'
 PIDFILE="/var/run/${DAEMON_NAME}.pid"
 

@@ -14,7 +14,7 @@ update-rc.d -f ${DAEMON_NAME} remove
 
 CONFIG_TMP="$(mktemp /tmp/${DAEMON_NAME}.XXXXXX)"
 cat <<END >${CONFIG_TMP}
-CHAMELEOND_DIR="$(dirname ${SCRIPT_DIR})/chameleond"
+CHAMELEOND_DIR="$(dirname ${SCRIPT_DIR})/utils"
 END
 mv -f "${CONFIG_TMP}" "${CONFIG_FILE}"
 

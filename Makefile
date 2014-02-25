@@ -19,7 +19,7 @@ lint:
 	echo Linting $(shell echo $(LINT_WHITELIST) | wc -w) files...; \
 	if [ -n "$(LINT_WHITELIST)" ] && \
 	    ! env \
-	    PYTHONPATH=chameleond:../chameleon-private:../video-chameleon \
+	    PYTHONPATH=.:../chameleon-private:../video-chameleon \
 	    pylint $(PYLINT_OPTIONS) $(LINT_WHITELIST) \
 	    |& tee $$out; then \
 	  echo; \
