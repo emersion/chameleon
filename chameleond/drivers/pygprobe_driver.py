@@ -11,7 +11,7 @@ import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
 from interface import ChameleondInterface
-from pygprobe import cmdline_commands, common
+from pygprobe import cmdline_commands, common  # pylint: disable=F0401
 
 
 class PygprobeDriver(ChameleondInterface):

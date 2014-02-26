@@ -94,7 +94,7 @@ class FpgaDriver(ChameleondInterface):
       value: The value to fit the condition.
       timeout: The timeout in second to break the check.
 
-    Raise:
+    Raises:
       FpgaDriverError if timeout.
     """
     end_time = start_time = time.time()
