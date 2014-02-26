@@ -3,14 +3,16 @@
 # found in the LICENSE file.
 
 SHELL := bash
+VERSION := 0.0.1
 CC := armv7a-cros-linux-gnueabi-gcc
 CFLAGS := -g -Wall
 INCLUDES := -Iinclude
 DESTDIR := /usr/bin
 BINDIR := ./bin
 SRCDIR := ./src
+DISTDIR := ./dist
 
-TARGETS = directories binaries
+TARGETS = directories binaries chameleond
 
 .PHONY: all
 all: $(TARGETS)
@@ -24,6 +26,10 @@ BINARIES = $(BINDIR)/hpd_control
 .PHONY: binaries
 binaries: $(BINARIES)
 
+.PHONY: chameleond
+chameleond:
+	@python setup.py sdist
+
 $(BINDIR)/hpd_control.o: $(SRCDIR)/hpd_control.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -34,10 +40,26 @@ $(BINDIR)/hpd_control: $(BINDIR)/hpd_control.o
 install:
 	@mkdir -p $(DESTDIR)
 	@cp -f $(BINARIES) "$(DESTDIR)"
+	@python setup.py install -f
+	@deploy/deploy
+
+CHAMELEON_USER ?= root
+BUNDLE = chameleond-$(VERSION).tar.gz
+BUNDLEDIR = chameleond-$(VERSION)
+
+.PHONY: remote-install
+remote-install:
+ifdef CHAMELEON_HOST
+	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
+	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
+	    "cd /tmp && tar zxf $(BUNDLE) && cd $(BUNDLEDIR) && make install"
+else
+	$(error CHAMELEON_HOST is undefined)
+endif
 
 .PHONY: clean
 clean:
-	@rm -rf $(BINDIR)
+	@rm -rf $(BINDIR) $(DISTDIR)
 
 PYLINTRC = $(CROS_WORKON_SRCROOT)/chromite/pylintrc
 PYLINT_OPTIONS = \

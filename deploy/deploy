@@ -9,12 +9,19 @@ SCRIPT_DIR="$(dirname ${SCRIPT})"
 DAEMON_NAME='chameleond'
 INITD_FILE="/etc/init.d/${DAEMON_NAME}"
 CONFIG_FILE="/etc/default/${DAEMON_NAME}"
+CHAMELEOND_DIR='/usr/bin'
+DAEMON="${CHAMELEOND_DIR}/run_chameleond"
+
+if [[ ! -x ${DAEMON} ]]; then
+    echo "Executable ${DAEMON} not existed. Install it first." 1>&2
+    exit 1
+fi
 
 update-rc.d -f ${DAEMON_NAME} remove
 
 CONFIG_TMP="$(mktemp /tmp/${DAEMON_NAME}.XXXXXX)"
 cat <<END >${CONFIG_TMP}
-CHAMELEOND_DIR="$(dirname ${SCRIPT_DIR})/utils"
+CHAMELEOND_DIR="${CHAMELEOND_DIR}"
 END
 mv -f "${CONFIG_TMP}" "${CONFIG_FILE}"
 
