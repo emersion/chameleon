@@ -18,6 +18,9 @@ def main():
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('--driver', type=str, dest='driver', default='fpga',
                       help='driver of Chameleond')
+  parser.add_argument('--log', type=str, dest='log', metavar='PATH',
+                      default='/var/log/chameleond',
+                      help='write log to this file or - to stderr')
   parser.add_argument('--host', type=str, dest='host', default='0.0.0.0',
                       help='host address of RPC server')
   parser.add_argument('--port', type=int, dest='port', default=9992,
@@ -38,7 +41,12 @@ def main():
   if options.verbose > 0:
     log_format += '(%(filename)s:%(lineno)d) '
   log_format += '%(message)s'
-  logging.basicConfig(level=verbosity, format=log_format)
+
+  log_config = {'level': verbosity,
+                'format': log_format}
+  if options.log != '-':
+    log_config.update({'filename': options.log})
+  logging.basicConfig(**log_config)
 
   ChameleonServer(options.driver, *args, **kwargs).RunServer(
       options.host, options.port)
