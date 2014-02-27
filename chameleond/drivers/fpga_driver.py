@@ -54,6 +54,9 @@ class FpgaDriver(ChameleondInterface):
     self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
     self._all_edids = ["RESERVED"]
+    # Set all ports unplugged on initialization.
+    for input_id in self.ProbeInputs():
+      self.Unplug(input_id)
 
   def _IsModeChanged(self):
     """Returns whether the video mode is changed.
