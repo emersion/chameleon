@@ -22,9 +22,6 @@ DAEMON="${CHAMELEOND_DIR}/run_chameleond"
 DAEMON_USER='root'
 PIDFILE="/var/run/${DAEMON_NAME}.pid"
 
-# Append paths of the required tools.
-PATH="${PATH}:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin"
-
 do_start () {
     start-stop-daemon --start --background --pidfile "${PIDFILE}" \
         --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \

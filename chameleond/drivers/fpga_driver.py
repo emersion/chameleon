@@ -5,6 +5,7 @@
 
 import array
 import logging
+import os
 import re
 import subprocess
 import tempfile
@@ -48,15 +49,35 @@ class FpgaDriver(ChameleondInterface):
   _DELAY_VIDEO_MODE_PROBE = 0.02
   _TIMEOUT_VIDEO_MODE_PROBE = 5
 
+  _TOOL_PATHS = {
+    'i2cdump': '/usr/local/sbin/i2cdump',
+    'i2cget': '/usr/local/sbin/i2cget',
+    'i2cset': '/usr/local/sbin/i2cset',
+    'memdump2file': '/usr/local/sbin/memdump2file',
+    'memtool': '/usr/bin/memtool',
+  }
+
   def __init__(self, *args, **kwargs):
     super(FpgaDriver, self).__init__(*args, **kwargs)
     self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
     self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
     self._all_edids = ["RESERVED"]
+
+    self._CheckRequiredTools()
     # Set all ports unplugged on initialization.
     for input_id in self.ProbeInputs():
       self.Unplug(input_id)
+
+  def _CheckRequiredTools(self):
+    """Checks all the required tools exist.
+
+    Raises:
+      FpgaDriverError if missing a tool.
+    """
+    for path in self._TOOL_PATHS.itervalues():
+      if not os.path.isfile(path):
+        raise FpgaDriverError('Required tool %s not existed' % path)
 
   def _IsModeChanged(self):
     """Returns whether the video mode is changed.
@@ -195,7 +216,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       A byte-array of the I2C content.
     """
-    command = ['i2cdump', '-f', '-y', str(bus), str(slave)]
+    command = [self._TOOL_PATHS['i2cdump'], '-f', '-y', str(bus), str(slave)]
     message = subprocess.check_output(command, stderr=subprocess.STDOUT)
     matches = self._i2cdump_pattern.findall(message)
     return array.array(
@@ -212,7 +233,8 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       An integer of the byte value.
     """
-    command = ['i2cget', '-f', '-y', str(bus), str(slave), str(offset)]
+    command = [self._TOOL_PATHS['i2cget'], '-f', '-y', str(bus),
+               str(slave), str(offset)]
     message = subprocess.check_output(command, stderr=subprocess.STDOUT)
     matches = self._i2cget_pattern.match(message)
     if matches:
@@ -229,7 +251,7 @@ class FpgaDriver(ChameleondInterface):
       data: A byte or a byte-array of content to set.
       offset: The offset which the data starts from this address.
     """
-    command = ['i2cset', '-f', '-y', str(bus), str(slave)]
+    command = [self._TOOL_PATHS['i2cset'], '-f', '-y', str(bus), str(slave)]
     if isinstance(data, str):
       for index in xrange(0, len(data), 8):
         subprocess.check_call(command + [str(offset + index)] +
@@ -249,7 +271,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       An integer.
     """
-    command = ['memtool', '-32', '%#x' % address, '1']
+    command = [self._TOOL_PATHS['memtool'], '-32', '%#x' % address, '1']
     message = subprocess.check_output(command, stderr=subprocess.STDOUT)
     matches = self._memtool_pattern.search(message)
     if matches:
@@ -262,7 +284,7 @@ class FpgaDriver(ChameleondInterface):
       address: The memory address.
       data: The 32-bit integer to write.
     """
-    command = ['memtool', '-32', '%#x=%#x' % (address, data)]
+    command = [self._TOOL_PATHS['memtool'], '-32', '%#x=%#x' % (address, data)]
     subprocess.check_output(command, stderr=subprocess.STDOUT)
 
   def ReadEdid(self, input_id):
@@ -376,7 +398,8 @@ class FpgaDriver(ChameleondInterface):
       with tempfile.NamedTemporaryFile() as f:
         # TODO(waihong): Direct memory dump instead of calling memdump2file.
         # XXX: memdump2file bug, should unconditional plus 1
-        command = ['memdump2file', str(total_size / 1024 + 1), f.name]
+        command = [self._TOOL_PATHS['memdump2file'],
+                   str(total_size / 1024 + 1), f.name]
         subprocess.call(command)
         screen = f.read()[:total_size]
 
