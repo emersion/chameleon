@@ -48,9 +48,14 @@ class FpgaDriver(ChameleondInterface):
   _HDMIRX_MASK_MODE_CHANGED = 0x01
   _HDMIRX_MASK_VIDEO_STABLE = 0x08
 
+  _HDMIRX_REG_HACTIVE_H = 0x5a
+  _HDMIRX_REG_HACTIVE_L = 0x5b
+  _HDMIRX_REG_VACTIVE_H = 0x60
+  _HDMIRX_REG_VACTIVE_L = 0x61
+
   _DELAY_REG_SET = 0.001
-  _DELAY_VIDEO_MODE_PROBE = 0.02
-  _TIMEOUT_VIDEO_MODE_PROBE = 5
+  _DELAY_VIDEO_MODE_PROBE = 0.1
+  _TIMEOUT_VIDEO_STABLE_PROBE = 10
 
   _TOOL_PATHS = {
     'i2cdump': '/usr/local/sbin/i2cdump',
@@ -104,6 +109,16 @@ class FpgaDriver(ChameleondInterface):
                               self._HDMIRX_REG_VIDEO_MODE)
     return bool(video_mode & self._HDMIRX_MASK_VIDEO_STABLE)
 
+  def _IsFrameLocked(self):
+    """Returns whether the FPGA frame is locked.
+
+    It compares the resolution reported from the HDMI receiver with the FPGA.
+
+    Returns:
+      True if the frame is locked; otherwise, False.
+    """
+    return self._GetResolutionFromFpga() == self._GetResolutionFromReceiver()
+
   def _RestartReceiverIfModeChanged(self):
     """Restarts the HDMI receiver if the mode is changed.
 
@@ -147,7 +162,7 @@ class FpgaDriver(ChameleondInterface):
     while end_time - start_time < timeout:
       if func() == value:
         break
-      logging.info('Waiting for condition %s == %s', str(func), str(value))
+      logging.info('Waiting for condition %s == %s', func.__name__, str(value))
       time.sleep(self._DELAY_VIDEO_MODE_PROBE)
       end_time = time.time()
     else:
@@ -162,9 +177,11 @@ class FpgaDriver(ChameleondInterface):
         self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
 
     self._WaitForCondition(self._IsModeChanged, False,
-                           self._TIMEOUT_VIDEO_MODE_PROBE)
+                           self._TIMEOUT_VIDEO_STABLE_PROBE)
     self._WaitForCondition(self._IsVideoStable, True,
-                           self._TIMEOUT_VIDEO_MODE_PROBE)
+                           self._TIMEOUT_VIDEO_STABLE_PROBE)
+    self._WaitForCondition(self._IsFrameLocked, True,
+                           self._TIMEOUT_VIDEO_STABLE_PROBE)
     logging.info('Video is stable.')
 
   def Reset(self):
@@ -522,6 +539,34 @@ class FpgaDriver(ChameleondInterface):
     """
     raise NotImplementedError('ComputePixelChecksum')
 
+  def _GetResolutionFromFpga(self):
+    """Gets the resolution reported from the FPGA.
+
+    Returns:
+      A (width, height) tuple.
+    """
+    width = self._ReadMem(self._FRAME_WIDTH_ADDRESS)
+    height = self._ReadMem(self._FRAME_HEIGHT_ADDRESS)
+    return (width, height)
+
+  def _GetResolutionFromReceiver(self):
+    """Gets the resolution reported from the HDMI receiver.
+
+    Returns:
+      A (width, height) tuple.
+    """
+    hactive_h = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                             self._HDMIRX_REG_HACTIVE_H)
+    hactive_l = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                             self._HDMIRX_REG_HACTIVE_L)
+    vactive_h = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                             self._HDMIRX_REG_VACTIVE_H)
+    vactive_l = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                             self._HDMIRX_REG_VACTIVE_L)
+    width = (hactive_h & 0xf0) << 4 | hactive_l
+    height = (vactive_h & 0xf0) << 4 | vactive_l
+    return (width, height)
+
   def DetectResolution(self, input_id):
     """Detects the source resolution.
 
@@ -536,8 +581,6 @@ class FpgaDriver(ChameleondInterface):
 
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfModeChanged()
-      width = self._ReadMem(self._FRAME_WIDTH_ADDRESS)
-      height = self._ReadMem(self._FRAME_HEIGHT_ADDRESS)
-      return (width, height)
+      return self._GetResolutionFromFpga()
     else:
       raise FpgaDriverError('Not a valid input_id.')
