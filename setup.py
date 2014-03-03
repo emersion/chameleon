@@ -9,6 +9,7 @@ setup(
   name = 'chameleond',
   version = '0.0.1',
   packages = ['chameleond', 'chameleond.drivers'],
+  package_data = {'chameleond': ['data/*.bin']},
   url = 'http://www.chromium.org',
   maintainer = 'chromium os',
   maintainer_email = 'chromium-os-dev@chromium.org',

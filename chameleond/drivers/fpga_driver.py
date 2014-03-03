@@ -62,7 +62,9 @@ class FpgaDriver(ChameleondInterface):
     self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
     self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
-    self._all_edids = ["RESERVED"]
+    # Reserve index 0 as the default EDID.
+    self._all_edids = [self._ReadDefaultEdid()]
+    self.Reset()
 
     self._CheckRequiredTools()
     # Set all ports unplugged on initialization.
@@ -150,7 +152,9 @@ class FpgaDriver(ChameleondInterface):
 
   def Reset(self):
     """Resets Chameleon board."""
-    self._RestartReceiver()
+    logging.info('Execute the reset process.')
+    self._ApplyDefaultEdid()
+    self._RestartReceiverIfModeChanged()
 
   def ProbeInputs(self):
     """Probes all the display connectors on Chameleon board.
@@ -203,7 +207,10 @@ class FpgaDriver(ChameleondInterface):
     Args:
       edid_id: The ID of the EDID, which was created by CreateEdid().
     """
-    self._all_edids[edid_id] = None
+    if edid_id > 0:
+      self._all_edids[edid_id] = None
+    else:
+      raise FpgaDriverError('Not a valid edid_id.')
 
   # TODO(waihong): Move to some Python native library for I2C communication.
   def _DumpI2C(self, bus, slave):
@@ -302,6 +309,23 @@ class FpgaDriver(ChameleondInterface):
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
+  def _ApplyHdmiEdid(self, edid_id):
+    """Applies the EDID to the HDMI input.
+
+    This method does not check edid_id valid.
+
+    Args:
+      edid_id: The ID of the EDID.
+    """
+    # TODO(waihong): Implement I2C slave for EDID response.
+    gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
+    # Disable EEPROM write-protection.
+    self._WriteMem(self._GPIO_MEM_ADDRESS,
+                   gpio_value | self._GPIO_EEPROM_WP_N_MASK)
+    self._SetI2C(self._MAIN_I2C_BUS, self._EEPROM_I2C_SLAVE,
+                 self._all_edids[edid_id])
+    self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value)
+
   def ApplyEdid(self, input_id, edid_id):
     """Applies the EDID to the selected input.
 
@@ -313,16 +337,28 @@ class FpgaDriver(ChameleondInterface):
       edid_id: The ID of the EDID.
     """
     if input_id == self._HDMI_ID:
-      # TODO(waihong): Implement I2C slave for EDID response.
-      gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
-      # Disable EEPROM write-protection.
-      self._WriteMem(self._GPIO_MEM_ADDRESS,
-                     gpio_value | self._GPIO_EEPROM_WP_N_MASK)
-      self._SetI2C(self._MAIN_I2C_BUS, self._EEPROM_I2C_SLAVE,
-                   self._all_edids[edid_id])
-      self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value)
+      if edid_id > 0:
+        self._ApplyHdmiEdid(edid_id)
+      else:
+        raise FpgaDriverError('Not a valid edid_id.')
     else:
       raise FpgaDriverError('Not a valid input_id.')
+
+  def _ReadDefaultEdid(self):
+    """Reads the default EDID from file.
+
+    Returns:
+      A byte array of EDID data.
+    """
+    driver_dir = os.path.dirname(os.path.realpath(__file__))
+    edid_path = os.path.join(driver_dir, '..', 'data', 'default_edid.bin')
+    return open(edid_path).read()
+
+  def _ApplyDefaultEdid(self):
+    """Applies the default EDID to the HDMI input."""
+    if self.ReadEdid(self._HDMI_ID).data != self._all_edids[0]:
+      logging.info('Apply the default EDID.')
+      self._ApplyHdmiEdid(0)
 
   def Plug(self, input_id):
     """Asserts HPD line to high, emulating plug.
