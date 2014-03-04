@@ -112,6 +112,23 @@ class FpgaDriver(ChameleondInterface):
       logging.info('Video mode is changed.')
       self._RestartReceiver()
 
+  def _SetAndClearI2CRegister(self, bus, slave, offset, bitmask, delay=None):
+    """Sets I2C registers with the bitmask and then clear it.
+
+    Args:
+      bus: The number of bus.
+      slave: The number of slave address.
+      offset: The offset of the register.
+      bitmask: The bitmask to set and clear.
+      delay: The time between set and clear. Default: self._DELAY_REG_SET
+    """
+    byte = self._GetI2C(bus, slave, offset)
+    self._SetI2C(bus, slave, byte | bitmask, offset)
+    if delay is None:
+      delay = self._DELAY_REG_SET
+    time.sleep(delay)
+    self._SetI2C(bus, slave, byte & ~bitmask, offset)
+
   def _WaitForCondition(self, func, value, timeout):
     """Waits for the given function matches the given value.
 
@@ -137,12 +154,9 @@ class FpgaDriver(ChameleondInterface):
   def _RestartReceiver(self):
     """Restarts the HDMI receiver."""
     logging.info('Resetting HDMI receiver...')
-    self._SetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                 self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST,
-                 self._HDMIRX_REG_RST_CTRL)
-    time.sleep(self._DELAY_REG_SET)
-    self._SetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                 0, self._HDMIRX_REG_RST_CTRL)
+    self._SetAndClearI2CRegister(
+        self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE, self._HDMIRX_REG_RST_CTRL,
+        self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
 
     self._WaitForCondition(self._IsModeChanged, False,
                            self._TIMEOUT_VIDEO_MODE_PROBE)
