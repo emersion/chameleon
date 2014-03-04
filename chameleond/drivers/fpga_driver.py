@@ -111,7 +111,7 @@ class FpgaDriver(ChameleondInterface):
     method will trigger the restart process for the HDMI receiver when
     issuing a related command, like capturing a frame.
     """
-    if self._IsModeChanged():
+    if self._IsPlugged(self._HDMI_ID) and self._IsModeChanged():
       logging.info('Video mode is changed.')
       self._RestartReceiver()
 
@@ -394,6 +394,21 @@ class FpgaDriver(ChameleondInterface):
       logging.info('Apply the default EDID.')
       self._ApplyHdmiEdid(0)
 
+  def _IsPlugged(self, input_id):
+    """Returns if the HPD line is plugged.
+
+    Returns:
+      True if the HPD line is plugged; otherwise, False.
+    """
+    if not self._IsPhysicalPlugged(input_id):
+      return False
+
+    if input_id == self._HDMI_ID:
+      gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
+      return not (gpio_value & self._GPIO_HPD_MASK)
+    else:
+      raise FpgaDriverError('Not a valid input_id.')
+
   def Plug(self, input_id):
     """Asserts HPD line to high, emulating plug.
 
@@ -459,6 +474,9 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
+    if not self._IsPlugged(input_id):
+      raise FpgaDriverError('HPD is unplugged. No signal is expected.')
+
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfModeChanged()
       byte_per_pixel = 4
@@ -513,6 +531,9 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
+    if not self._IsPlugged(input_id):
+      raise FpgaDriverError('HPD is unplugged. No signal is expected.')
+
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfModeChanged()
       width = self._ReadMem(self._FRAME_WIDTH_ADDRESS)
