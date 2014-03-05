@@ -3,3 +3,4 @@ include *.txt
 include bin/hpd_control
 include deploy/deploy
 include deploy/chameleond
+include deploy/chameleon-updater

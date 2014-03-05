@@ -36,12 +36,14 @@ $(BINDIR)/hpd_control.o: $(SRCDIR)/hpd_control.c
 $(BINDIR)/hpd_control: $(BINDIR)/hpd_control.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
+BUNDLE_VERSION ?= '9999'
+
 .PHONY: install
 install:
 	@mkdir -p $(DESTDIR)
 	@cp -f $(BINARIES) "$(DESTDIR)"
 	@python setup.py install -f
-	@deploy/deploy
+	@BUNDLE_VERSION=$(BUNDLE_VERSION) deploy/deploy
 
 CHAMELEON_USER ?= root
 BUNDLE = chameleond-$(VERSION).tar.gz
@@ -49,10 +51,12 @@ BUNDLEDIR = chameleond-$(VERSION)
 
 .PHONY: remote-install
 remote-install:
+	@echo "Set bundle version to $(BUNDLE_VERSION)"
 ifdef CHAMELEON_HOST
 	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
 	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
-	    "cd /tmp && tar zxf $(BUNDLE) && cd $(BUNDLEDIR) && make install"
+	    "cd /tmp && tar zxf $(BUNDLE) && cd $(BUNDLEDIR) &&" \
+	    "make install BUNDLE_VERSION=$(BUNDLE_VERSION)"
 else
 	$(error CHAMELEON_HOST is undefined)
 endif
