@@ -99,11 +99,11 @@ class FpgaDriver(ChameleondInterface):
                               self._HDMIRX_REG_VIDEO_MODE)
     return bool(video_mode & self._HDMIRX_MASK_MODE_CHANGED)
 
-  def _IsVideoStable(self):
-    """Returns whether the video is stable.
+  def _IsVideoInputStable(self):
+    """Returns whether the video input is stable.
 
     Returns:
-      True if the video mode is stable; otherwise, False.
+      True if the video input is stable; otherwise, False.
     """
     video_mode = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                               self._HDMIRX_REG_VIDEO_MODE)
@@ -119,16 +119,31 @@ class FpgaDriver(ChameleondInterface):
     """
     return self._GetResolutionFromFpga() == self._GetResolutionFromReceiver()
 
-  def _RestartReceiverIfModeChanged(self):
-    """Restarts the HDMI receiver if the mode is changed.
+  def _RestartReceiverIfNeeded(self):
+    """Restarts the HDMI receiver if needed.
 
-    The HDMI receiver should be restarted after mode changed. Calling this
-    method will trigger the restart process for the HDMI receiver when
-    issuing a related command, like capturing a frame.
+    The HDMI receiver should be restarted by checking the following conditions:
+     - Video mode is changed, reported by the HDMI receiver;
+     - Frame is not locked in FPGA.
+
+    This method will be called when issuing a related command, like capturing
+    a frame.
     """
-    if self._IsPlugged(self._HDMI_ID) and self._IsModeChanged():
-      logging.info('Video mode is changed.')
-      self._RestartReceiver()
+    if self._IsPlugged(self._HDMI_ID):
+      # Wait the vidoe input stable before the check.
+      self._WaitForCondition(self._IsVideoInputStable, True,
+                             self._TIMEOUT_VIDEO_STABLE_PROBE)
+
+      need_restart = False
+      if self._IsModeChanged():
+        logging.info('Checked that the video mode is changed.')
+        need_restart = True
+      elif not self._IsFrameLocked():
+        logging.info('Checked that the FPGA frame is not locked.')
+        need_restart = True
+
+      if need_restart:
+        self._RestartReceiver()
 
   def _SetAndClearI2CRegister(self, bus, slave, offset, bitmask, delay=None):
     """Sets I2C registers with the bitmask and then clear it.
@@ -178,8 +193,6 @@ class FpgaDriver(ChameleondInterface):
 
     self._WaitForCondition(self._IsModeChanged, False,
                            self._TIMEOUT_VIDEO_STABLE_PROBE)
-    self._WaitForCondition(self._IsVideoStable, True,
-                           self._TIMEOUT_VIDEO_STABLE_PROBE)
     self._WaitForCondition(self._IsFrameLocked, True,
                            self._TIMEOUT_VIDEO_STABLE_PROBE)
     logging.info('Video is stable.')
@@ -188,7 +201,7 @@ class FpgaDriver(ChameleondInterface):
     """Resets Chameleon board."""
     logging.info('Execute the reset process.')
     self._ApplyDefaultEdid()
-    self._RestartReceiverIfModeChanged()
+    self._RestartReceiverIfNeeded()
 
   def _IsPhysicalPlugged(self, input_id):
     """Returns if the physical cable is plugged.
@@ -495,7 +508,7 @@ class FpgaDriver(ChameleondInterface):
       raise FpgaDriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
-      self._RestartReceiverIfModeChanged()
+      self._RestartReceiverIfNeeded()
       byte_per_pixel = 4
       # Capture the whole screen first.
       total_width, total_height = self.DetectResolution(input_id)
@@ -580,7 +593,7 @@ class FpgaDriver(ChameleondInterface):
       raise FpgaDriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
-      self._RestartReceiverIfModeChanged()
+      self._RestartReceiverIfNeeded()
       return self._GetResolutionFromFpga()
     else:
       raise FpgaDriverError('Not a valid input_id.')
