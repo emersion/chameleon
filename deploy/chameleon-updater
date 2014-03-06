@@ -31,11 +31,12 @@ do_start () {
 
     BUNDLE_DIR=${LATEST_BUNDLE%%-r*}
     LATEST_VERSION=${LATEST_BUNDLE#*-}
+    LATEST_VERSION=${LATEST_VERSION%%.tar.gz}
     if [[ ${LATEST_VERSION} > ${BUNDLE_VERSION} ]]; then
-        echo 'Update Chameleon daemon...'
+        echo "Update Chameleon daemon: ${BUNDLE_VERSION} -> ${LATEST_VERSION}"
         tar zxf ${LATEST_BUNDLE}
         cd ${BUNDLE_DIR}
-        make install BUNDLE_VERSION=${BUNDLE_VERSION}
+        make install BUNDLE_VERSION=${LATEST_VERSION}
         popd > /dev/null
     else
         echo 'No new update.'
