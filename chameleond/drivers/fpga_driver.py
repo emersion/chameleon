@@ -41,6 +41,9 @@ class FpgaDriver(ChameleondInterface):
   _HDMIRX_MASK_SWRST = 0x01
   _HDMIRX_MASK_CDRRST = 0x80
 
+  _HDMIRX_REG_SYS_STATE = 0x10
+  _HDMIRX_MASK_PWR5V_DETECT = 0x01
+
   _HDMIRX_REG_VIDEO_MODE = 0x58
   _HDMIRX_MASK_MODE_CHANGED = 0x01
   _HDMIRX_MASK_VIDEO_STABLE = 0x08
@@ -170,18 +173,35 @@ class FpgaDriver(ChameleondInterface):
     self._ApplyDefaultEdid()
     self._RestartReceiverIfModeChanged()
 
+  def _IsPhysicalPlugged(self, input_id):
+    """Returns if the physical cable is plugged.
+
+    It checks the source power +5V/+3.3V pin.
+
+    Returns:
+      True if the physical cable is plugged; otherwise, False.
+    """
+    if input_id == self._HDMI_ID:
+      sys_state = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+                               self._HDMIRX_REG_SYS_STATE)
+      return bool(sys_state & self._HDMIRX_MASK_PWR5V_DETECT)
+    else:
+      raise FpgaDriverError('Not a valid input_id.')
+
   def ProbeInputs(self):
     """Probes all the display connectors on Chameleon board.
 
     Returns:
       A tuple of input_id, for the connectors connected to DUT.
     """
-    # TODO(waihong): Add the +5V pin detection.
     # TODO(waihong): Probe the daughter card to see if it is a HDMI card.
     # TODO(waihong): Support more cards, like DVI and DP.
-
+    input_ids = []
     # So far, only HDMI (index: 1) supported.
-    return (self._HDMI_ID, )
+    for input_id in (self._HDMI_ID, ):
+      if self._IsPhysicalPlugged(input_id):
+        input_ids.append(input_id)
+    return tuple(input_ids)
 
   def GetConnectorType(self, input_id):
     """Returns the human readable string for the connector type.
