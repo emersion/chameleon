@@ -22,17 +22,38 @@ DAEMON="${CHAMELEOND_DIR}/run_chameleond"
 DAEMON_USER='root'
 PIDFILE="/var/run/${DAEMON_NAME}.pid"
 
-do_start () {
-    start-stop-daemon --start --background --pidfile "${PIDFILE}" \
-        --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \
-        --startas "${DAEMON}"
+is_already_running () {
+    start-stop-daemon --stop --test --quiet --pidfile "${PIDFILE}"
 }
+
+do_start () {
+    if ! is_already_running; then
+        start-stop-daemon --start --background --pidfile "${PIDFILE}" \
+            --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \
+            --startas "${DAEMON}"
+        do_status
+    else
+        echo "${DAEMON_NAME} is already running."
+    fi
+}
+
 do_stop () {
-    start-stop-daemon --stop --pidfile "${PIDFILE}" --retry 10
+    if is_already_running; then
+        start-stop-daemon --stop --pidfile "${PIDFILE}" --retry 10
+        rm -f "${PIDFILE}"
+    else
+        echo "${DAEMON_NAME} is already stopped"
+    fi
+}
+
+do_status () {
+    is_already_running &&
+        echo "${DAEMON_NAME} is running." ||
+        echo "${DAEMON_NAME} is not running"
 }
 
 case "$1" in
-    start|stop)
+    start|stop|status)
         do_${1}
         ;;
 
@@ -42,7 +63,7 @@ case "$1" in
         ;;
 
     *)
-        echo "Usage: /etc/init.d/${DAEMON_NAME} {start|stop|restart}"
+        echo "Usage: /etc/init.d/${DAEMON_NAME} {start|stop|restart|status}"
         exit 1
         ;;
 esac
