@@ -122,7 +122,7 @@ class PygprobeDriver(ChameleondInterface):
     self._LoadEdidToBuffer(last)
     return last
 
-  def DestoryEdid(self, edid_id):
+  def DestroyEdid(self, edid_id):
     """Destroys the internal record of EDID. The internal data will be freed.
 
     Args:

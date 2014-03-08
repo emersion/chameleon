@@ -46,13 +46,13 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('CreateEdid')
 
-  def DestoryEdid(self, edid_id):
+  def DestroyEdid(self, edid_id):
     """Destroys the internal record of EDID. The internal data will be freed.
 
     Args:
       edid_id: The ID of the EDID, which was created by CreateEdid().
     """
-    raise NotImplementedError('DestoryEdid')
+    raise NotImplementedError('DestroyEdid')
 
   def ReadEdid(self, input_id):
     """Reads the EDID content of the selected input on Chameleon.
