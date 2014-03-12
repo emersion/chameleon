@@ -33,7 +33,8 @@ class FpgaDriver(ChameleondInterface):
   _GPIO_EEPROM_WP_N_MASK = 0x1
   _GPIO_HPD_MASK = 0x2
 
-  _MAIN_I2C_BUS = 0
+  _RX_I2C_BUS = 0
+  _DDC_I2C_BUS = 1
   _EEPROM_I2C_SLAVE = 0x50
   _HDMIRX_I2C_SLAVE = 0x48
 
@@ -97,7 +98,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       True if the video mode is changed; otherwsie, False.
     """
-    video_mode = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+    video_mode = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                               self._HDMIRX_REG_VIDEO_MODE)
     return bool(video_mode & self._HDMIRX_MASK_MODE_CHANGED)
 
@@ -107,7 +108,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       True if the video input is stable; otherwise, False.
     """
-    video_mode = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+    video_mode = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                               self._HDMIRX_REG_VIDEO_MODE)
     return bool(video_mode & self._HDMIRX_MASK_VIDEO_STABLE)
 
@@ -201,7 +202,7 @@ class FpgaDriver(ChameleondInterface):
     """Restarts the HDMI receiver."""
     logging.info('Resetting HDMI receiver...')
     self._SetAndClearI2CRegister(
-        self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE, self._HDMIRX_REG_RST_CTRL,
+        self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE, self._HDMIRX_REG_RST_CTRL,
         self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
 
     self._WaitForCondition(self._IsModeChanged, False,
@@ -225,7 +226,7 @@ class FpgaDriver(ChameleondInterface):
       True if the physical cable is plugged; otherwise, False.
     """
     if input_id == self._HDMI_ID:
-      sys_state = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+      sys_state = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                                self._HDMIRX_REG_SYS_STATE)
       return bool(sys_state & self._HDMIRX_MASK_PWR5V_DETECT)
     else:
@@ -382,7 +383,7 @@ class FpgaDriver(ChameleondInterface):
     """
     if input_id == self._HDMI_ID:
       return xmlrpclib.Binary(
-          self._DumpI2C(self._MAIN_I2C_BUS, self._EEPROM_I2C_SLAVE))
+          self._DumpI2C(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE))
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
@@ -399,7 +400,7 @@ class FpgaDriver(ChameleondInterface):
     # Disable EEPROM write-protection.
     self._WriteMem(self._GPIO_MEM_ADDRESS,
                    gpio_value | self._GPIO_EEPROM_WP_N_MASK)
-    self._SetI2C(self._MAIN_I2C_BUS, self._EEPROM_I2C_SLAVE,
+    self._SetI2C(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE,
                  self._all_edids[edid_id])
     self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value)
 
@@ -582,13 +583,13 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    hactive_h = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+    hactive_h = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                              self._HDMIRX_REG_HACTIVE_H)
-    hactive_l = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+    hactive_l = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                              self._HDMIRX_REG_HACTIVE_L)
-    vactive_h = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+    vactive_h = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                              self._HDMIRX_REG_VACTIVE_H)
-    vactive_l = self._GetI2C(self._MAIN_I2C_BUS, self._HDMIRX_I2C_SLAVE,
+    vactive_l = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
                              self._HDMIRX_REG_VACTIVE_L)
     width = (hactive_h & 0xf0) << 4 | hactive_l
     height = (vactive_h & 0xf0) << 4 | vactive_l
