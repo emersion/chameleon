@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 SCRIPT="$(readlink -f $0)"
-SCRIPT_DIR="$(dirname ${SCRIPT})"
+SCRIPT_DIR="$(dirname ${SCRIPT})/init.d"
 
 DAEMON_NAME='chameleond'
 UPDATER_NAME='chameleon-updater'
