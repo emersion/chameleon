@@ -61,6 +61,7 @@ class FpgaDriver(ChameleondInterface):
     'i2cdump': '/usr/local/sbin/i2cdump',
     'i2cget': '/usr/local/sbin/i2cget',
     'i2cset': '/usr/local/sbin/i2cset',
+    'hpd_control': '/usr/bin/hpd_control',
     'memdump2file': '/usr/local/sbin/memdump2file',
     'memtool': '/usr/bin/memtool',
   }
@@ -70,6 +71,7 @@ class FpgaDriver(ChameleondInterface):
     self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
     self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
+    self._hpd_control_pattern = re.compile(r'HPD=([01])')
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
     self.Reset()
@@ -445,8 +447,13 @@ class FpgaDriver(ChameleondInterface):
       return False
 
     if input_id == self._HDMI_ID:
-      gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
-      return not (gpio_value & self._GPIO_HPD_MASK)
+      command = [self._TOOL_PATHS['hpd_control'], 'status']
+      message = subprocess.check_output(command)
+      matches = self._hpd_control_pattern.match(message)
+      if matches:
+        return bool(matches.group(1) == '1')
+      else:
+        raise FpgaDriverError('hpd_control has wrong format.')
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
@@ -457,8 +464,8 @@ class FpgaDriver(ChameleondInterface):
       input_id: The ID of the input connector.
     """
     if input_id == self._HDMI_ID:
-      gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
-      self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value & ~self._GPIO_HPD_MASK)
+      command = [self._TOOL_PATHS['hpd_control'], 'plug']
+      subprocess.check_call(command)
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
@@ -469,8 +476,8 @@ class FpgaDriver(ChameleondInterface):
       input_id: The ID of the input connector.
     """
     if input_id == self._HDMI_ID:
-      gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
-      self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value | self._GPIO_HPD_MASK)
+      command = [self._TOOL_PATHS['hpd_control'], 'unplug']
+      subprocess.check_call(command)
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
@@ -491,12 +498,12 @@ class FpgaDriver(ChameleondInterface):
       else:
         # Fall back to use the same value as deassertion if not given.
         assert_in_sec = deassert_in_sec
-      for i in range(repeat_count):
-        self.Unplug(input_id)
-        time.sleep(deassert_in_sec)
-        self.Plug(input_id)
-        if i < repeat_count - 1:
-          time.sleep(assert_in_sec)
+
+      command = [self._TOOL_PATHS['hpd_control'], 'repeat_pulse',
+                 '%f' % deassert_interval_usec,
+                 '%f' % assert_interval_usec,
+                 str(repeat_count)]
+      subprocess.check_call(command)
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
