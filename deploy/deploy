@@ -34,4 +34,32 @@ update-rc.d "${DAEMON_NAME}" defaults 92 8
 cp -f "${SCRIPT_DIR}/${UPDATER_NAME}" "${INITD_DIR}"
 update-rc.d "${UPDATER_NAME}" defaults 90 10
 
-"${INITD_DIR}/${DAEMON_NAME}" restart
+FPGA_DIR="$(dirname ${SCRIPT})/../fpga"
+FPGA_BOOT_PART=$(fdisk -l /dev/mmcblk0 | grep 'a2  Unknown' | cut -f1 -d' ')
+FPGA_FAT_PART=$(fdisk -l /dev/mmcblk0 | grep ' b  W95 FAT32' | cut -f1 -d' ')
+MOUNT_DIR='/media/mmc1'
+
+mount "${FPGA_FAT_PART}" "${MOUNT_DIR}"
+for file in 'fpga.rbf' 'socfpga.dtb'; do
+    if ! diff -q "${FPGA_DIR}/${file}" "${MOUNT_DIR}/${file}"; then
+        echo "Updating ${file}"
+        cp -f "${FPGA_DIR}/${file}" "${MOUNT_DIR}"
+        need_reboot=1
+    fi
+done
+umount "${MOUNT_DIR}"
+
+file='boot-partition.img'
+if ! diff -q "${FPGA_DIR}/${file}" "${FPGA_BOOT_PART}"; then
+    echo "Updating ${file}"
+    dd if="${FPGA_DIR}/${file}" of="${FPGA_BOOT_PART}" bs=512
+    sync
+    need_reboot=1
+fi
+
+if [[ -n "${need_reboot}" ]]; then
+    echo 'Reboot the board to validate the FPGA configuration...'
+    reboot
+else
+    "${INITD_DIR}/${DAEMON_NAME}" restart
+fi

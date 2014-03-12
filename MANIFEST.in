@@ -4,3 +4,6 @@ include bin/hpd_control
 include deploy/deploy
 include deploy/init.d/chameleond
 include deploy/init.d/chameleon-updater
+include fpga/boot-partition.img
+include fpga/fpga.rbf
+include fpga/socfpga.dtb
