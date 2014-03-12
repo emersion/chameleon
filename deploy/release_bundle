@@ -1,0 +1,41 @@
+#!/bin/sh
+# Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+GS_MIRROR_URL='gs://chromeos-localmirror'
+HTTP_MIRROR_URL='http://commondatastorage.googleapis.com/chromeos-localmirror'
+BUNDLE_PATH='distfiles/chameleon-bundle'
+GS_BUNDLE_URL="${GS_MIRROR_URL}/${BUNDLE_PATH}"
+HTTP_BUNDLE_URL="${HTTP_MIRROR_URL}/${BUNDLE_PATH}"
+
+die() {
+  if [[ -n "$1" ]]; then
+    echo "ERROR: $1" >&2
+  fi
+  echo "Usage: $0 PATH_TO_BUNDLE" >&2
+  exit 1
+}
+
+bundle_path=$1
+[[ -f "${bundle_path}" ]] || die 'Invalid bundle file'
+bundle_name="$(basename ${bundle_path})"
+
+# Upload the bundle and enable public-read access.
+gsutil cp -a public-read "${bundle_path}" "${GS_BUNDLE_URL}"
+wget --spider -q "${HTTP_BUNDLE_URL}/${bundle_name}" ||
+    die "Failed to access ${bundle_name} from GS"
+
+# Update the LATEST file pointing to the bundle and enable public-read access.
+latest_file="$(mktemp LATEST.XXXXX)"
+echo "${bundle_name}" > "${latest_file}"
+gsutil cp -a public-read "${latest_file}" "${GS_BUNDLE_URL}/LATEST"
+rm -f "${latest_file}"
+
+wget --spider -q "${HTTP_BUNDLE_URL}/LATEST" ||
+    die "Failed to access LATEST file from GS"
+
+latest_bundle=$(wget -qO - "${HTTP_BUNDLE_URL}/LATEST")
+[[ "${latest_bundle}" = "${bundle_name}" ]] ||
+    die "Failed to update LATEST file"
+echo "The latest bundle is updated to ${latest_bundle}"
