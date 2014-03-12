@@ -119,7 +119,7 @@ class FpgaDriver(ChameleondInterface):
     """
     return self._GetResolutionFromFpga() == self._GetResolutionFromReceiver()
 
-  def _RestartReceiverIfNeeded(self):
+  def _RestartReceiverIfNeeded(self, raise_error_if_no_input):
     """Restarts the HDMI receiver if needed.
 
     The HDMI receiver should be restarted by checking the following conditions:
@@ -128,11 +128,22 @@ class FpgaDriver(ChameleondInterface):
 
     This method will be called when issuing a related command, like capturing
     a frame.
+
+    Args:
+      raise_error_if_no_input: The flag to control whether to raise an error
+          if no video input is detected.
     """
     if self._IsPlugged(self._HDMI_ID):
       # Wait the vidoe input stable before the check.
-      self._WaitForCondition(self._IsVideoInputStable, True,
-                             self._TIMEOUT_VIDEO_STABLE_PROBE)
+      try:
+        self._WaitForCondition(self._IsVideoInputStable, True,
+                               self._TIMEOUT_VIDEO_STABLE_PROBE)
+      except FpgaDriverError:
+        if raise_error_if_no_input:
+          raise FpgaDriverError('no video input detected')
+        else:
+          logging.info('no video input?')
+          return
 
       need_restart = False
       if self._IsModeChanged():
@@ -201,7 +212,7 @@ class FpgaDriver(ChameleondInterface):
     """Resets Chameleon board."""
     logging.info('Execute the reset process.')
     self._ApplyDefaultEdid()
-    self._RestartReceiverIfNeeded()
+    self._RestartReceiverIfNeeded(raise_error_if_no_input=False)
 
   def _IsPhysicalPlugged(self, input_id):
     """Returns if the physical cable is plugged.
@@ -508,7 +519,7 @@ class FpgaDriver(ChameleondInterface):
       raise FpgaDriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
-      self._RestartReceiverIfNeeded()
+      self._RestartReceiverIfNeeded(raise_error_if_no_input=True)
       byte_per_pixel = 4
       # Capture the whole screen first.
       total_width, total_height = self.DetectResolution(input_id)
@@ -593,7 +604,7 @@ class FpgaDriver(ChameleondInterface):
       raise FpgaDriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
-      self._RestartReceiverIfNeeded()
+      self._RestartReceiverIfNeeded(raise_error_if_no_input=True)
       return self._GetResolutionFromFpga()
     else:
       raise FpgaDriverError('Not a valid input_id.')
