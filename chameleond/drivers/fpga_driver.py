@@ -62,8 +62,8 @@ class FpgaDriver(ChameleondInterface):
     'i2cget': '/usr/local/sbin/i2cget',
     'i2cset': '/usr/local/sbin/i2cset',
     'hpd_control': '/usr/bin/hpd_control',
-    'memdump2file': '/usr/local/sbin/memdump2file',
     'memtool': '/usr/bin/memtool',
+    'pixeldump': '/usr/bin/pixeldump',
   }
 
   def __init__(self, *args, **kwargs):
@@ -535,10 +535,7 @@ class FpgaDriver(ChameleondInterface):
       total_width, total_height = self.DetectResolution(input_id)
       total_size = total_width * total_height * byte_per_pixel
       with tempfile.NamedTemporaryFile() as f:
-        # TODO(waihong): Direct memory dump instead of calling memdump2file.
-        # XXX: memdump2file bug, should unconditional plus 1
-        command = [self._TOOL_PATHS['memdump2file'],
-                   str(total_size / 1024 + 1), f.name]
+        command = [self._TOOL_PATHS['pixeldump'], str(total_size), f.name]
         subprocess.call(command)
         screen = f.read()[:total_size]
 

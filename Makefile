@@ -21,7 +21,7 @@ all: $(TARGETS)
 directories:
 	@mkdir -p $(BINDIR)
 
-BINARIES = $(BINDIR)/hpd_control
+BINARIES = $(BINDIR)/hpd_control $(BINDIR)/pixeldump
 
 .PHONY: binaries
 binaries: $(BINARIES)
@@ -30,10 +30,10 @@ binaries: $(BINARIES)
 chameleond:
 	@python setup.py sdist
 
-$(BINDIR)/hpd_control.o: $(SRCDIR)/hpd_control.c
+$(BINDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BINDIR)/hpd_control: $(BINDIR)/hpd_control.o
+$(BINDIR)/%: $(BINDIR)/%.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
 BUNDLE_VERSION ?= '9999'
