@@ -77,6 +77,17 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('ApplyEdid')
 
+  def IsPlugged(self, input_id):
+    """Returns if the HPD line is plugged.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      True if the HPD line is plugged; otherwise, False.
+    """
+    raise NotImplementedError('IsPlugged')
+
   def Plug(self, input_id):
     """Asserts HPD line to high, emulating plug.
 

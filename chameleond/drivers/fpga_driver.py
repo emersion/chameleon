@@ -135,7 +135,7 @@ class FpgaDriver(ChameleondInterface):
       raise_error_if_no_input: The flag to control whether to raise an error
           if no video input is detected.
     """
-    if self._IsPlugged(self._HDMI_ID):
+    if self.IsPlugged(self._HDMI_ID):
       # Wait the vidoe input stable before the check.
       try:
         self._WaitForCondition(self._IsVideoInputStable, True,
@@ -437,8 +437,11 @@ class FpgaDriver(ChameleondInterface):
       logging.info('Apply the default EDID.')
       self._ApplyHdmiEdid(0)
 
-  def _IsPlugged(self, input_id):
+  def IsPlugged(self, input_id):
     """Returns if the HPD line is plugged.
+
+    Args:
+      input_id: The ID of the input connector.
 
     Returns:
       True if the HPD line is plugged; otherwise, False.
@@ -522,7 +525,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    if not self._IsPlugged(input_id):
+    if not self.IsPlugged(input_id):
       raise FpgaDriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
@@ -607,7 +610,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    if not self._IsPlugged(input_id):
+    if not self.IsPlugged(input_id):
       raise FpgaDriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:

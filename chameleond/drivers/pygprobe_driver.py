@@ -175,6 +175,19 @@ class PygprobeDriver(ChameleondInterface):
     else:
       raise NotImplementedError('ApplyEdid')
 
+  def IsPlugged(self, input_id):
+    """Returns if the HPD line is plugged.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      True if the HPD line is plugged; otherwise, False.
+    """
+    # Always return True, as this version of Chameleon board can't unplug,
+    # so it is supposed to be always plugged.
+    return True
+
   def Plug(self, input_id):
     """Asserts HPD line to high, emulating plug.
 
