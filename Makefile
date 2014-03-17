@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 SHELL := bash
-VERSION := 0.0.1
+VERSION := 0.0.2
 CC := armv7a-cros-linux-gnueabi-gcc
 CFLAGS := -g -Wall
 INCLUDES := -Iinclude

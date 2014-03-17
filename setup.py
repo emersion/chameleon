@@ -7,7 +7,7 @@ from distutils.core import setup
 
 setup(
   name = 'chameleond',
-  version = '0.0.1',
+  version = '0.0.2',
   packages = ['chameleond', 'chameleond.drivers'],
   package_data = {'chameleond': ['data/*.bin']},
   url = 'http://www.chromium.org',
