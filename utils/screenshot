@@ -5,7 +5,9 @@
 """Connect to Chameleond and capture screenshot."""
 
 import argparse
+import errno
 import subprocess
+import sys
 import tempfile
 import time
 import xmlrpclib
@@ -17,15 +19,29 @@ def main():
       description='Connect to Chameleond and capture screenshot.',
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('--chameleon_host', type=str, dest='host',
-                      default='localhost', help='host address of Chameleond')
+                      help='host address of Chameleond')
   parser.add_argument('--port', type=int, dest='port', default=9992,
                       help='port number of Chameleond')
   parser.add_argument('--replug', dest='replug', action='store_true',
                       help='unplug and plug before capturing screen')
+  parser.add_argument('--area', type=str, dest='area',
+                      help='only capture the area, e.g. \'x,y,width,height\'')
   parser.add_argument('--output', type=str, dest='output', default='image.png',
                       help='output file name of screenshot')
 
   options = parser.parse_args()
+  if options.host is None:
+    print 'No chameleon_host is specified.'
+    parser.print_help()
+    sys.exit(errno.EINVAL)
+  area_args = []
+  if options.area:
+    area_args = [int(s) for s in options.area.split(',')]
+    if len(area_args) != 4:
+      print 'Invalid area parameter.'
+      parser.print_help()
+      sys.exit(errno.EINVAL)
+
   chameleon = xmlrpclib.ServerProxy(
       'http://%s:%d' % (options.host, options.port))
   inputs = chameleon.ProbeInputs()
@@ -34,16 +50,20 @@ def main():
   if options.replug:
     print 'Replugging...'
     chameleon.FireHpdPulse(main_input, 1000000)
-    time.sleep(1)
+    time.sleep(5)
   width, height = chameleon.DetectResolution(main_input)
   print 'Detected screen size %dx%d' % (width, height)
-  print 'Capturing the screen...'
-  pixels = chameleon.DumpPixels(main_input).data
+  if area_args:
+    size_str = '%dx%d' % (area_args[2], area_args[3])
+  else:
+    size_str = '%dx%d' % (width, height)
+  print 'Capturing the screen size %s...' % size_str
+  pixels = chameleon.DumpPixels(main_input, *area_args).data
   print 'Got pixel size %d' % len(pixels)
   with tempfile.NamedTemporaryFile(suffix='.bgra') as f:
     f.write(pixels)
     f.flush()
-    subprocess.check_call(['convert', '-size', '%dx%d' % (width, height),
+    subprocess.check_call(['convert', '-size', size_str,
         '-depth', '8', '-alpha', 'off', f.name, options.output])
     print 'Outputted to file:', options.output
 
