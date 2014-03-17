@@ -674,25 +674,16 @@ class FpgaDriver(ChameleondInterface):
 
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfNeeded(raise_error_if_no_input=True)
-      byte_per_pixel = 4
       # Capture the whole screen first.
       total_width, total_height = self.DetectResolution(input_id)
-      total_size = total_width * total_height * byte_per_pixel
       with tempfile.NamedTemporaryFile() as f:
-        command = [self._TOOL_PATHS['pixeldump'], str(total_size), f.name]
+        command = [self._TOOL_PATHS['pixeldump'], f.name,
+                   str(total_width), str(total_height)]
+        if x is not None and y is not None and width and height:
+          command.extend([str(x), str(y), str(width), str(height)])
         subprocess.call(command)
-        screen = f.read()[:total_size]
-
-      if x is not None and y is not None and width and height:
-        # Return the given area.
-        area = ''
-        for pos_y in range(y, y + height):
-          line_start = (pos_y * total_width + x) * byte_per_pixel
-          line_end = line_start + width * byte_per_pixel
-          area += screen[line_start:line_end]
-        return xmlrpclib.Binary(area)
-      else:
-        return xmlrpclib.Binary(screen)
+        screen = f.read()
+      return xmlrpclib.Binary(screen)
     else:
       raise FpgaDriverError('Not a valid input_id.')
 

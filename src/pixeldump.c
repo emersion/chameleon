@@ -17,23 +17,45 @@
 #include <unistd.h>
 
 #define FB_START 0xc0000000
+#define BYTE_PER_PIXEL 4
 
 int main(int argc, char **argv)
 {
-  unsigned long size, page_aligned_size;
+  int i;
+  unsigned long int_args[8];
+  unsigned long screen_width, screen_height;
+  unsigned long area_x, area_y, area_width, area_height;
+  unsigned long screen_size, page_aligned_size, area_size;
   int ifd, ofd;
   void *src, *dst;
+  int src_offset, dst_offset;
 
-  if (argc < 3) {
-    fprintf(stderr, "Usage: %s size_in_byte filename\n", argv[0]);
+  if (argc != 4 && argc != 8) {
+    fprintf(stderr,
+            "Usage:\t%s filename screen_width screen_height [area_x area_y \\\n"
+            "\tarea_width area_height]\n"
+            "Dump the pixels of a selected area from the screen to a file.\n",
+            argv[0]);
     exit(1);
   }
 
   errno = 0;
-  size = strtoul(argv[1], NULL, 0);
-  if (errno) {
-    perror("failed to parse size\n");
-    exit(1);
+  for (i = 2; i < argc; i++) {
+    int_args[i] = strtoul(argv[i], NULL, 0);
+    if (errno) {
+      perror("failed to parse size\n");
+      exit(1);
+    }
+  }
+  screen_width = int_args[2] * BYTE_PER_PIXEL;
+  screen_height = int_args[3];
+  area_size = screen_size = screen_width * screen_height;
+  if (argc == 8) {
+    area_x = int_args[4] * BYTE_PER_PIXEL;
+    area_y = int_args[5];
+    area_width = int_args[6] * BYTE_PER_PIXEL;
+    area_height = int_args[7];
+    area_size = area_width * area_height;
   }
 
   ifd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -42,13 +64,13 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  ofd = open(argv[2], O_RDWR | O_CREAT, 0644);
+  ofd = open(argv[1], O_RDWR | O_CREAT, 0644);
   if (ofd == -1) {
     perror("can't open dest file\n");
     exit(1);
   }
 
-  page_aligned_size = size + (-size % getpagesize());
+  page_aligned_size = screen_size + (-screen_size % getpagesize());
   src = mmap(0, page_aligned_size, PROT_READ | PROT_WRITE,
              MAP_SHARED, ifd, FB_START);
   if (src == MAP_FAILED) {
@@ -56,16 +78,26 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  ftruncate(ofd, size);
-  dst = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
+  ftruncate(ofd, area_size);
+  dst = mmap(0, area_size, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
   if (dst == MAP_FAILED) {
     perror("cannot mmap dst\n");
     exit(1);
   }
 
-  memcpy(dst, src, size);
-  munmap(dst, size);
-  munmap(src, size);
+  if (argc == 4) {
+    memcpy(dst, src, area_size);
+  } else {
+    src_offset = area_y * screen_width + area_x;
+    dst_offset = 0;
+    for (i = 0; i < area_height; i++) {
+      memcpy(dst + dst_offset, src + src_offset, area_width);
+      src_offset += screen_width;
+      dst_offset += area_width;
+    }
+  }
+  munmap(dst, area_size);
+  munmap(src, page_aligned_size);
   close(ofd);
   close(ifd);
   return 0;
