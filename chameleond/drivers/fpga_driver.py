@@ -131,7 +131,14 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       True if the frame is locked; otherwise, False.
     """
-    return self._GetResolutionFromFpga() == self._GetResolutionFromReceiver()
+    fpga = self._GetResolutionFromFpga()
+    rx = self._GetResolutionFromReceiver()
+    if fpga == rx:
+      logging.info('same resolution: %dx%d', *fpga)
+      return True
+    else:
+      logging.info('diff resolution: fpga:%dx%d != rx:%dx%d', *(fpga + rx))
+      return False
 
   def _RestartReceiverIfNeeded(self, raise_error_if_no_input):
     """Restarts the HDMI receiver if needed.
