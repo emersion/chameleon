@@ -495,16 +495,12 @@ class FpgaDriver(ChameleondInterface):
       repeat_count: The count of repeating the HPD pulses.
     """
     if input_id == self._HDMI_ID:
-      deassert_in_sec = float(deassert_interval_usec) / 1000000
-      if assert_interval_usec:
-        assert_in_sec = float(assert_interval_usec) / 1000000
-      else:
+      if assert_interval_usec is None:
         # Fall back to use the same value as deassertion if not given.
-        assert_in_sec = deassert_in_sec
-
+        assert_interval_usec = deassert_interval_usec
       command = [self._TOOL_PATHS['hpd_control'], 'repeat_pulse',
-                 '%f' % deassert_interval_usec,
-                 '%f' % assert_interval_usec,
+                 str(deassert_interval_usec),
+                 str(assert_interval_usec),
                  str(repeat_count)]
       subprocess.check_call(command)
     else:
