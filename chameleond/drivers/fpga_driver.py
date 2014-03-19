@@ -85,6 +85,7 @@ class FpgaDriver(ChameleondInterface):
     self._hpd_control_pattern = re.compile(r'HPD=([01])')
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
+    self._active_edid_id = -1
     self.Reset()
 
     self._CheckRequiredTools()
@@ -452,6 +453,7 @@ class FpgaDriver(ChameleondInterface):
     """
     self._AccessI2CWithRetry(self._DDC_I2C_BUS,
         lambda: self._ApplyHdmiEdid(edid_id), retry_count)
+    self._active_edid_id = edid_id
 
   def ApplyEdid(self, input_id, edid_id):
     """Applies the EDID to the selected input.
@@ -483,7 +485,7 @@ class FpgaDriver(ChameleondInterface):
 
   def _ApplyDefaultEdid(self):
     """Applies the default EDID to the HDMI input."""
-    if self.ReadEdid(self._HDMI_ID).data != self._all_edids[0]:
+    if self._active_edid_id != 0:
       logging.info('Apply the default EDID.')
       self._ApplyHdmiEdidWithRetry(0)
 
