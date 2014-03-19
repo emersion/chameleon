@@ -38,6 +38,16 @@ class FpgaDriver(ChameleondInterface):
   _EEPROM_I2C_SLAVE = 0x50
   _HDMIRX_I2C_SLAVE = 0x48
 
+  # Peripheral Module Reset Register
+  _PERMODRST_MEM_ADDRESS = 0xffd05014
+  _I2C_RESET_MASK = {
+      _RX_I2C_BUS: 0x1000,
+      _DDC_I2C_BUS: 0x2000
+  }
+  # FIXME: no document about width of the reset pulse; this is from experience
+  _DELAY_I2C_RESET = 0.1
+  _DELAY_I2C_RETRY_INIT = 1.0
+
   _HDMIRX_REG_RST_CTRL = 0x05
   _HDMIRX_MASK_SWRST = 0x01
   _HDMIRX_MASK_CDRRST = 0x80
@@ -216,6 +226,7 @@ class FpgaDriver(ChameleondInterface):
     logging.info('Execute the reset process.')
     self._ApplyDefaultEdid()
     self._RestartReceiverIfNeeded(raise_error_if_no_input=False)
+    logging.info('Done Execute the reset process.')
 
   def _IsPhysicalPlugged(self, input_id):
     """Returns if the physical cable is plugged.
@@ -346,6 +357,18 @@ class FpgaDriver(ChameleondInterface):
     else:
       raise FpgaDriverError('The argument data is not a valid type.')
 
+  def _ResetI2CBus(self, bus):
+    """Resets the I2C controller for the given I2C bus.
+
+    Args:
+      bus: The number of bus.
+    """
+    original_value = self._ReadMem(self._PERMODRST_MEM_ADDRESS)
+    self._WriteMem(self._PERMODRST_MEM_ADDRESS,
+                   original_value | self._I2C_RESET_MASK[bus])
+    time.sleep(self._DELAY_I2C_RESET)
+    self._WriteMem(self._PERMODRST_MEM_ADDRESS, original_value)
+
   # TODO(waihong): Move to some Python native library for memory access.
   def _ReadMem(self, address):
     """Reads the 32-bit integer from the given memory address.
@@ -372,6 +395,20 @@ class FpgaDriver(ChameleondInterface):
     command = [self._TOOL_PATHS['memtool'], '-32', '%#x=%#x' % (address, data)]
     subprocess.check_output(command, stderr=subprocess.STDOUT)
 
+  def _DumpI2CWithRetry(self, bus, slave, retry_count=3):
+    """Dumps all I2C content on the given bus and slave address with retries.
+
+    Args:
+      bus: The number of bus.
+      slave: The number of slave address.
+      retry_count: Number of retries.
+
+    Returns:
+      A byte-array of the I2C content.
+    """
+    return self._AccessI2CWithRetry(
+        bus, lambda: self._DumpI2C(bus, slave), retry_count)
+
   def ReadEdid(self, input_id):
     """Reads the EDID content of the selected input on Chameleon.
 
@@ -383,14 +420,14 @@ class FpgaDriver(ChameleondInterface):
     """
     if input_id == self._HDMI_ID:
       return xmlrpclib.Binary(
-          self._DumpI2C(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE))
+          self._DumpI2CWithRetry(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE))
     else:
       raise FpgaDriverError('Not a valid input_id.')
 
   def _ApplyHdmiEdid(self, edid_id):
     """Applies the EDID to the HDMI input.
 
-    This method does not check edid_id valid.
+    This method does not check the validity of edid_id.
 
     Args:
       edid_id: The ID of the EDID.
@@ -404,6 +441,18 @@ class FpgaDriver(ChameleondInterface):
                  self._all_edids[edid_id])
     self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value)
 
+  def _ApplyHdmiEdidWithRetry(self, edid_id, retry_count=3):
+    """Applies the EDID to the HDMI input with retry.
+
+    This method does not check the validity of edid_id.
+
+    Args:
+      edid_id: The ID of the EDID.
+      retry_count: Number of retries.
+    """
+    self._AccessI2CWithRetry(self._DDC_I2C_BUS,
+        lambda: self._ApplyHdmiEdid(edid_id), retry_count)
+
   def ApplyEdid(self, input_id, edid_id):
     """Applies the EDID to the selected input.
 
@@ -416,7 +465,7 @@ class FpgaDriver(ChameleondInterface):
     """
     if input_id == self._HDMI_ID:
       if edid_id > 0:
-        self._ApplyHdmiEdid(edid_id)
+        self._ApplyHdmiEdidWithRetry(edid_id)
       else:
         raise FpgaDriverError('Not a valid edid_id.')
     else:
@@ -436,7 +485,32 @@ class FpgaDriver(ChameleondInterface):
     """Applies the default EDID to the HDMI input."""
     if self.ReadEdid(self._HDMI_ID).data != self._all_edids[0]:
       logging.info('Apply the default EDID.')
-      self._ApplyHdmiEdid(0)
+      self._ApplyHdmiEdidWithRetry(0)
+
+  def _AccessI2CWithRetry(self, bus, func, retry_count):
+    """Access the I2C bus with reset and retries.
+
+    When the I2C controller reports error, the method resets the controller
+    and re-tries the function for 'retry_count' times.
+
+    Args:
+      bus: The number of bus.
+      func: The I2C access function to be executed.
+      retry_count: Number of retries.
+    """
+    delay = self._DELAY_I2C_RETRY_INIT
+    while retry_count > 0:
+      try:
+        return func()
+      except subprocess.CalledProcessError as e:
+        logging.info("I2C error({0}): {1}".format(e.returncode, str(e.cmd)))
+        self._ResetI2CBus(bus)
+        retry_count = retry_count - 1
+        delay = delay * 2
+        time.sleep(delay)
+        logging.info("  retrying...%d", retry_count)
+    logging.info("final try...")
+    return func()
 
   def IsPlugged(self, input_id):
     """Returns if the HPD line is plugged.
