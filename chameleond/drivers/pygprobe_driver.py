@@ -36,6 +36,26 @@ class PygprobeDriver(ChameleondInterface):
     self._serial_device.Flush()
     cmdline_commands.Reset(self._serial_device)
 
+  def IsHealthy(self):
+    """Returns if the Chameleon is healthy or any repair is needed.
+
+    Returns:
+      True if the Chameleon is healthy; otherwise, False, need to repair.
+    """
+    return True
+
+  def Repair(self):
+    """Repairs the Chameleon.
+
+    It can be an asynchronous call, e.g. do the repair after return. An
+    approximate time of the repair is returned. The caller should wait that
+    time before the next action.
+
+    Returns:
+      An approximate repair time in second.
+    """
+    return 0
+
   def ProbeInputs(self):
     """Probes all the display connectors on Chameleon board.
 

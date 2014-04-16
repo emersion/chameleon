@@ -21,6 +21,25 @@ class FpgaDriverError(Exception):
   pass
 
 
+class ChipError(Exception):
+  """Exception raised when any unexpected behavior happened on a chip."""
+  pass
+
+
+class BoardError(Exception):
+  """Exception raised when any unexpected behavior happened on the board."""
+  pass
+
+
+class ErrorLevel(object):
+  """Class to define the error level."""
+  GOOD = 0
+  # Chip error, be recovered by restarting Chameleond.
+  CHIP_ERROR = 1
+  # Board error, be recovered by rebooting the board.
+  BOARD_ERROR = 2
+
+
 class FpgaDriver(ChameleondInterface):
   """Chameleond Driver for FPGA customized platform."""
 
@@ -69,11 +88,13 @@ class FpgaDriver(ChameleondInterface):
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
 
   _TOOL_PATHS = {
+    'chameleond': '/etc/init.d/chameleond',
     'i2cdump': '/usr/local/sbin/i2cdump',
     'i2cget': '/usr/local/sbin/i2cget',
     'i2cset': '/usr/local/sbin/i2cset',
     'hpd_control': '/usr/bin/hpd_control',
     'memtool': '/usr/bin/memtool',
+    'reboot': '/sbin/reboot',
     'pixeldump': '/usr/bin/pixeldump',
   }
 
@@ -86,6 +107,7 @@ class FpgaDriver(ChameleondInterface):
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
     self._active_edid_id = -1
+    self._error_level = ErrorLevel.GOOD
     self.Reset()
 
     self._CheckRequiredTools()
@@ -223,10 +245,15 @@ class FpgaDriver(ChameleondInterface):
         self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE, self._HDMIRX_REG_RST_CTRL,
         self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
 
-    self._WaitForCondition(self._IsModeChanged, False,
-                           self._TIMEOUT_VIDEO_STABLE_PROBE)
-    self._WaitForCondition(self._IsFrameLocked, True,
-                           self._TIMEOUT_VIDEO_STABLE_PROBE)
+    try:
+      self._WaitForCondition(self._IsModeChanged, False,
+                             self._TIMEOUT_VIDEO_STABLE_PROBE)
+      self._WaitForCondition(self._IsFrameLocked, True,
+                             self._TIMEOUT_VIDEO_STABLE_PROBE)
+    except FpgaDriverError as e:
+      self._error_level = ErrorLevel.CHIP_ERROR
+      raise ChipError(e)
+
     logging.info('Video is stable.')
 
   def Reset(self):
@@ -235,6 +262,38 @@ class FpgaDriver(ChameleondInterface):
     self._ApplyDefaultEdid()
     self._RestartReceiverIfNeeded(raise_error_if_no_input=False)
     logging.info('Done Execute the reset process.')
+
+  def IsHealthy(self):
+    """Returns if the Chameleon is healthy or any repair is needed.
+
+    Returns:
+      True if the Chameleon is healthy; otherwise, False, need to repair.
+    """
+    return self._error_level == ErrorLevel.GOOD
+
+  def Repair(self):
+    """Repairs the Chameleon.
+
+    It can be an asynchronous call, e.g. do the repair after return. An
+    approximate time of the repair is returned. The caller should wait that
+    time before the next action.
+
+    Returns:
+      An approximate repair time in second.
+    """
+    logging.info('Error Level: %d', self._error_level)
+    if self._error_level == ErrorLevel.CHIP_ERROR:
+      logging.info('Try to restart Chameleond...')
+      command = '; '.join(['sleep 1',
+                           '%s restart' % self._TOOL_PATHS['chameleond']])
+      subprocess.Popen(command, shell=True)
+      return 10
+    elif self._error_level == ErrorLevel.BOARD_ERROR:
+      logging.info('Try to reboot the board...')
+      command = '; '.join(['sleep 1', self._TOOL_PATHS['reboot']])
+      subprocess.Popen(command, shell=True)
+      return 60
+    return 0
 
   def _IsPhysicalPlugged(self, input_id):
     """Returns if the physical cable is plugged.
@@ -508,18 +567,20 @@ class FpgaDriver(ChameleondInterface):
       retry_count: Number of retries.
     """
     delay = self._DELAY_I2C_RETRY_INIT
-    while retry_count > 0:
+    while retry_count >= 0:
       try:
         return func()
       except subprocess.CalledProcessError as e:
         logging.info("I2C error({0}): {1}".format(e.returncode, str(e.cmd)))
-        self._ResetI2CBus(bus)
         retry_count = retry_count - 1
-        delay = delay * 2
-        time.sleep(delay)
-        logging.info("  retrying...%d", retry_count)
-    logging.info("final try...")
-    return func()
+        if retry_count >= 0:
+          self._ResetI2CBus(bus)
+          delay = delay * 2
+          time.sleep(delay)
+          logging.info("  retrying... (%d retrys left)", retry_count)
+        else:
+          self._error_level = ErrorLevel.BOARD_ERROR
+          raise BoardError('I2C bus access failed')
 
   def IsPlugged(self, input_id):
     """Returns if the HPD line is plugged.
