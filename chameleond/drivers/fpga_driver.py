@@ -182,6 +182,9 @@ class FpgaDriver(ChameleondInterface):
         self._WaitForCondition(self._IsVideoInputStable, True,
                                self._TIMEOUT_VIDEO_STABLE_PROBE)
       except FpgaDriverError:
+        # Sometime the video-stable-bit not set is caused by a receiver issue.
+        # Safer to mark it as a chip error, such that it can be repaired.
+        self._error_level = ErrorLevel.CHIP_ERROR
         if raise_error_if_no_input:
           raise FpgaDriverError('no video input detected')
         else:
