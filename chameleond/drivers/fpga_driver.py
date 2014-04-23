@@ -108,7 +108,13 @@ class FpgaDriver(ChameleondInterface):
     self._all_edids = [self._ReadDefaultEdid()]
     self._active_edid_id = -1
     self._error_level = ErrorLevel.GOOD
-    self.Reset()
+
+    # Skip the BoardError, like I2C access failure, in order not to block the
+    # start-up of the RPC server. The repair routine will perform later.
+    try:
+      self.Reset()
+    except (FpgaDriverError, ChipError, BoardError):
+      pass
 
     self._CheckRequiredTools()
     # Set all ports unplugged on initialization.
