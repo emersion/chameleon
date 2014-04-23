@@ -60,7 +60,7 @@ def main():
   print 'Capturing the screen size %s...' % size_str
   pixels = chameleon.DumpPixels(main_input, *area_args).data
   print 'Got pixel size %d' % len(pixels)
-  with tempfile.NamedTemporaryFile(suffix='.bgra') as f:
+  with tempfile.NamedTemporaryFile(suffix='.rgba') as f:
     f.write(pixels)
     f.flush()
     subprocess.check_call(['convert', '-size', size_str,
