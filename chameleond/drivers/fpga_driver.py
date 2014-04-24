@@ -304,7 +304,18 @@ class FpgaDriver(ChameleondInterface):
       return 60
     return 0
 
-  def _IsPhysicalPlugged(self, input_id):
+  def GetSupportedInputs(self):
+    """Returns all supported connectors on the board.
+
+    Not like the ProbeInputs() method which only returns the connectors which
+    are connected, this method returns all supported connectors on the board.
+
+    Returns:
+      A tuple of input_id, for all supported connectors on the board.
+    """
+    return (self._HDMI_ID, )
+
+  def IsPhysicalPlugged(self, input_id):
     """Returns if the physical cable is plugged.
 
     It checks the source power +5V/+3.3V pin.
@@ -329,8 +340,8 @@ class FpgaDriver(ChameleondInterface):
     # TODO(waihong): Support more cards, like DVI and DP.
     input_ids = []
     # So far, only HDMI (index: 1) supported.
-    for input_id in (self._HDMI_ID, ):
-      if self._IsPhysicalPlugged(input_id):
+    for input_id in self.GetSupportedInputs():
+      if self.IsPhysicalPlugged(input_id):
         input_ids.append(input_id)
     return tuple(input_ids)
 
@@ -600,7 +611,7 @@ class FpgaDriver(ChameleondInterface):
     Returns:
       True if the HPD line is plugged; otherwise, False.
     """
-    if not self._IsPhysicalPlugged(input_id):
+    if not self.IsPhysicalPlugged(input_id):
       return False
 
     if input_id == self._HDMI_ID:

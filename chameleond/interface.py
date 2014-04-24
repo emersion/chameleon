@@ -36,6 +36,27 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('Repair')
 
+  def GetSupportedInputs(self):
+    """Returns all supported connectors on the board.
+
+    Not like the ProbeInputs() method which only returns the connectors which
+    are connected, this method returns all supported connectors on the board.
+
+    Returns:
+      A tuple of input_id, for all supported connectors on the board.
+    """
+    raise NotImplementedError('GetSupportedInputs')
+
+  def IsPhysicalPlugged(self, input_id):
+    """Returns if the physical cable is plugged.
+
+    It checks the source power +5V/+3.3V pin.
+
+    Returns:
+      True if the physical cable is plugged; otherwise, False.
+    """
+    raise NotImplementedError('IsPhysicalPlugged')
+
   def ProbeInputs(self):
     """Probes all the display connectors on Chameleon board.
 
