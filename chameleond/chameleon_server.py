@@ -10,7 +10,7 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer
 class ChameleonServer(object):
   """Chameleon Server, which starts a RPC service."""
 
-  def __init__(self, driver='fpga', *args, **kwargs):
+  def __init__(self, driver, *args, **kwargs):
     """Initializes ChameleonServer object.
 
     Args:
@@ -28,12 +28,11 @@ class ChameleonServer(object):
     Returns:
       The class of the driver.
     """
-    module_name = name + '_driver'
+    module_name = name
     logging.info('Load module %s...', module_name)
     package = __import__('chameleond.drivers', fromlist=[module_name])
     module = getattr(package, module_name)
-    class_name = ''.join([s.capitalize() for s in module_name.split('_')])
-    return getattr(module, class_name)
+    return getattr(module, 'ChameleondDriver')
 
   def RunServer(self, host='0.0.0.0', port=9992):
     """Runs Chameleon RPC server.

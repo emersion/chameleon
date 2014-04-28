@@ -14,13 +14,13 @@ from chameleond.interface import ChameleondInterface
 from pygprobe import cmdline_commands, common  # pylint: disable=F0401
 
 
-class PygprobeDriver(ChameleondInterface):
+class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for Pygprobe."""
 
   _ALL_INPUTS = ['RESERVED', 'DP', 'DVI', 'HDMI', 'VGA']  # index starts at 1
 
   def __init__(self, usb_serial=None, *args, **kwargs):
-    super(PygprobeDriver, self).__init__(*args, **kwargs)
+    super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._hdmi_initialized = False
     self._selected_input = 0
     self._all_edids = ['RESERVED']  # index starts at 1

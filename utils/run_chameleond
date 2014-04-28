@@ -16,7 +16,7 @@ def main():
   parser = argparse.ArgumentParser(
       description='Launch a Chameleon daemon.',
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-  parser.add_argument('--driver', type=str, dest='driver', default='fpga',
+  parser.add_argument('--driver', type=str, dest='driver', default='fpga_hdmi',
                       help='driver of Chameleond')
   parser.add_argument('--log', type=str, dest='log', metavar='PATH',
                       default='/var/log/chameleond',

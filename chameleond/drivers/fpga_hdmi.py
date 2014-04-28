@@ -16,7 +16,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
 
-class FpgaDriverError(Exception):
+class DriverError(Exception):
   """Exception raised when any error on FPGA driver."""
   pass
 
@@ -40,7 +40,7 @@ class ErrorLevel(object):
   BOARD_ERROR = 2
 
 
-class FpgaDriver(ChameleondInterface):
+class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for FPGA customized platform."""
 
   _HDMI_ID = 1
@@ -99,7 +99,7 @@ class FpgaDriver(ChameleondInterface):
   }
 
   def __init__(self, *args, **kwargs):
-    super(FpgaDriver, self).__init__(*args, **kwargs)
+    super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
     self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
@@ -113,7 +113,7 @@ class FpgaDriver(ChameleondInterface):
     # start-up of the RPC server. The repair routine will perform later.
     try:
       self.Reset()
-    except (FpgaDriverError, ChipError, BoardError):
+    except (DriverError, ChipError, BoardError):
       pass
 
     self._CheckRequiredTools()
@@ -125,11 +125,11 @@ class FpgaDriver(ChameleondInterface):
     """Checks all the required tools exist.
 
     Raises:
-      FpgaDriverError if missing a tool.
+      DriverError if missing a tool.
     """
     for path in self._TOOL_PATHS.itervalues():
       if not os.path.isfile(path):
-        raise FpgaDriverError('Required tool %s not existed' % path)
+        raise DriverError('Required tool %s not existed' % path)
 
   def _IsModeChanged(self):
     """Returns whether the video mode is changed.
@@ -187,12 +187,12 @@ class FpgaDriver(ChameleondInterface):
       try:
         self._WaitForCondition(self._IsVideoInputStable, True,
                                self._TIMEOUT_VIDEO_STABLE_PROBE)
-      except FpgaDriverError:
+      except DriverError:
         # Sometime the video-stable-bit not set is caused by a receiver issue.
         # Safer to mark it as a chip error, such that it can be repaired.
         self._error_level = ErrorLevel.CHIP_ERROR
         if raise_error_if_no_input:
-          raise FpgaDriverError('no video input detected')
+          raise DriverError('no video input detected')
         else:
           logging.info('no video input?')
           return
@@ -234,7 +234,7 @@ class FpgaDriver(ChameleondInterface):
       timeout: The timeout in second to break the check.
 
     Raises:
-      FpgaDriverError if timeout.
+      DriverError if timeout.
     """
     end_time = start_time = time.time()
     while end_time - start_time < timeout:
@@ -244,8 +244,8 @@ class FpgaDriver(ChameleondInterface):
       time.sleep(self._DELAY_VIDEO_MODE_PROBE)
       end_time = time.time()
     else:
-      raise FpgaDriverError('Timeout on waiting for condition %s == %s' %
-                            (str(func), str(value)))
+      raise DriverError('Timeout on waiting for condition %s == %s' %
+                        (str(func), str(value)))
 
   def _RestartReceiver(self):
     """Restarts the HDMI receiver."""
@@ -259,7 +259,7 @@ class FpgaDriver(ChameleondInterface):
                              self._TIMEOUT_VIDEO_STABLE_PROBE)
       self._WaitForCondition(self._IsFrameLocked, True,
                              self._TIMEOUT_VIDEO_STABLE_PROBE)
-    except FpgaDriverError as e:
+    except DriverError as e:
       self._error_level = ErrorLevel.CHIP_ERROR
       raise ChipError(e)
 
@@ -328,7 +328,7 @@ class FpgaDriver(ChameleondInterface):
                                self._HDMIRX_REG_SYS_STATE)
       return bool(sys_state & self._HDMIRX_MASK_PWR5V_DETECT)
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def ProbeInputs(self):
     """Probes all the display connectors on Chameleon board.
@@ -358,7 +358,7 @@ class FpgaDriver(ChameleondInterface):
     if input_id == self._HDMI_ID:
       return 'HDMI'
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def CreateEdid(self, edid):
     """Creates an internal record of EDID using the given byte array.
@@ -386,7 +386,7 @@ class FpgaDriver(ChameleondInterface):
     if edid_id > 0:
       self._all_edids[edid_id] = None
     else:
-      raise FpgaDriverError('Not a valid edid_id.')
+      raise DriverError('Not a valid edid_id.')
 
   # TODO(waihong): Move to some Python native library for I2C communication.
   def _DumpI2C(self, bus, slave):
@@ -423,7 +423,7 @@ class FpgaDriver(ChameleondInterface):
     if matches:
       return int(matches.group(0), 0)
     else:
-      raise FpgaDriverError('The output format of i2cget is not matched.')
+      raise DriverError('The output format of i2cget is not matched.')
 
   def _SetI2C(self, bus, slave, data, offset=0):
     """Sets the given I2C content on the given bus and slave address.
@@ -442,7 +442,7 @@ class FpgaDriver(ChameleondInterface):
     elif isinstance(data, int) and 0 <= data <= 0xff:
       subprocess.check_call(command + [str(offset), str(data)])
     else:
-      raise FpgaDriverError('The argument data is not a valid type.')
+      raise DriverError('The argument data is not a valid type.')
 
   def _ResetI2CBus(self, bus):
     """Resets the I2C controller for the given I2C bus.
@@ -509,7 +509,7 @@ class FpgaDriver(ChameleondInterface):
       return xmlrpclib.Binary(
           self._DumpI2CWithRetry(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE))
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def _ApplyHdmiEdid(self, edid_id):
     """Applies the EDID to the HDMI input.
@@ -555,9 +555,9 @@ class FpgaDriver(ChameleondInterface):
       if edid_id > 0:
         self._ApplyHdmiEdidWithRetry(edid_id)
       else:
-        raise FpgaDriverError('Not a valid edid_id.')
+        raise DriverError('Not a valid edid_id.')
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def _ReadDefaultEdid(self):
     """Reads the default EDID from file.
@@ -621,9 +621,9 @@ class FpgaDriver(ChameleondInterface):
       if matches:
         return bool(matches.group(1) == '1')
       else:
-        raise FpgaDriverError('hpd_control has wrong format.')
+        raise DriverError('hpd_control has wrong format.')
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def Plug(self, input_id):
     """Asserts HPD line to high, emulating plug.
@@ -635,7 +635,7 @@ class FpgaDriver(ChameleondInterface):
       command = [self._TOOL_PATHS['hpd_control'], 'plug']
       subprocess.check_call(command)
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def Unplug(self, input_id):
     """Deasserts HPD line to low, emulating unplug.
@@ -647,7 +647,7 @@ class FpgaDriver(ChameleondInterface):
       command = [self._TOOL_PATHS['hpd_control'], 'unplug']
       subprocess.check_call(command)
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def FireHpdPulse(self, input_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1):
@@ -669,7 +669,7 @@ class FpgaDriver(ChameleondInterface):
                  str(repeat_count)]
       subprocess.check_call(command)
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
@@ -687,7 +687,7 @@ class FpgaDriver(ChameleondInterface):
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
     if not self.IsPlugged(input_id):
-      raise FpgaDriverError('HPD is unplugged. No signal is expected.')
+      raise DriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfNeeded(raise_error_if_no_input=True)
@@ -702,7 +702,7 @@ class FpgaDriver(ChameleondInterface):
         screen = f.read()
       return xmlrpclib.Binary(screen)
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):
@@ -760,10 +760,10 @@ class FpgaDriver(ChameleondInterface):
       A (width, height) tuple.
     """
     if not self.IsPlugged(input_id):
-      raise FpgaDriverError('HPD is unplugged. No signal is expected.')
+      raise DriverError('HPD is unplugged. No signal is expected.')
 
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfNeeded(raise_error_if_no_input=True)
       return self._GetResolutionFromFpga()
     else:
-      raise FpgaDriverError('Not a valid input_id.')
+      raise DriverError('Not a valid input_id.')

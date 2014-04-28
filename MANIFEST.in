@@ -5,6 +5,4 @@ include bin/pixeldump
 include deploy/deploy
 include deploy/init.d/chameleond
 include deploy/init.d/chameleon-updater
-include fpga/boot-partition.img
-include fpga/fpga.rbf
-include fpga/socfpga.dtb
+recursive-include updatable boot-partition.img fpga.rbf socfpga.dtb
