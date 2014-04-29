@@ -14,6 +14,7 @@ import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
+from chameleond.utils import system_tools
 
 
 class DriverError(Exception):
@@ -87,17 +88,6 @@ class ChameleondDriver(ChameleondInterface):
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
 
-  _TOOL_PATHS = {
-    'chameleond': '/etc/init.d/chameleond',
-    'i2cdump': '/usr/local/sbin/i2cdump',
-    'i2cget': '/usr/local/sbin/i2cget',
-    'i2cset': '/usr/local/sbin/i2cset',
-    'hpd_control': '/usr/bin/hpd_control',
-    'memtool': '/usr/bin/memtool',
-    'reboot': '/sbin/reboot',
-    'pixeldump': '/usr/bin/pixeldump',
-  }
-
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
@@ -108,6 +98,7 @@ class ChameleondDriver(ChameleondInterface):
     self._all_edids = [self._ReadDefaultEdid()]
     self._active_edid_id = -1
     self._error_level = ErrorLevel.GOOD
+    self._tools = system_tools.SystemTools()
 
     # Skip the BoardError, like I2C access failure, in order not to block the
     # start-up of the RPC server. The repair routine will perform later.
@@ -116,20 +107,9 @@ class ChameleondDriver(ChameleondInterface):
     except (DriverError, ChipError, BoardError):
       pass
 
-    self._CheckRequiredTools()
     # Set all ports unplugged on initialization.
     for input_id in self.ProbeInputs():
       self.Unplug(input_id)
-
-  def _CheckRequiredTools(self):
-    """Checks all the required tools exist.
-
-    Raises:
-      DriverError if missing a tool.
-    """
-    for path in self._TOOL_PATHS.itervalues():
-      if not os.path.isfile(path):
-        raise DriverError('Required tool %s not existed' % path)
 
   def _IsModeChanged(self):
     """Returns whether the video mode is changed.
@@ -293,14 +273,11 @@ class ChameleondDriver(ChameleondInterface):
     logging.info('Error Level: %d', self._error_level)
     if self._error_level == ErrorLevel.CHIP_ERROR:
       logging.info('Try to restart Chameleond...')
-      command = '; '.join(['sleep 1',
-                           '%s restart' % self._TOOL_PATHS['chameleond']])
-      subprocess.Popen(command, shell=True)
+      self._tools.DelayedCall(1, 'chameleond', 'restart')
       return 10
     elif self._error_level == ErrorLevel.BOARD_ERROR:
       logging.info('Try to reboot the board...')
-      command = '; '.join(['sleep 1', self._TOOL_PATHS['reboot']])
-      subprocess.Popen(command, shell=True)
+      self._tools.DelayedCall(1, 'reboot')
       return 60
     return 0
 
@@ -399,8 +376,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the I2C content.
     """
-    command = [self._TOOL_PATHS['i2cdump'], '-f', '-y', str(bus), str(slave)]
-    message = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    message = self._tools.Output('i2cdump', '-f', '-y', bus, slave)
     matches = self._i2cdump_pattern.findall(message)
     return array.array(
         'B', [int(s, 16) for match in matches for s in match]).tostring()
@@ -416,9 +392,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       An integer of the byte value.
     """
-    command = [self._TOOL_PATHS['i2cget'], '-f', '-y', str(bus),
-               str(slave), str(offset)]
-    message = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    message = self._tools.Output('i2cget', '-f', '-y', bus, slave, offset)
     matches = self._i2cget_pattern.match(message)
     if matches:
       return int(matches.group(0), 0)
@@ -434,13 +408,13 @@ class ChameleondDriver(ChameleondInterface):
       data: A byte or a byte-array of content to set.
       offset: The offset which the data starts from this address.
     """
-    command = [self._TOOL_PATHS['i2cset'], '-f', '-y', str(bus), str(slave)]
     if isinstance(data, str):
       for index in xrange(0, len(data), 8):
-        subprocess.check_call(command + [str(offset + index)] +
-            [str(ord(d)) for d in data[index:index+8]] + ['i'])
+        data_args = [ord(d) for d in data[index:index+8]] + ['i']
+        self._tools.Call('i2cset', '-f', '-y', bus, slave,
+                         offset + index, *data_args)
     elif isinstance(data, int) and 0 <= data <= 0xff:
-      subprocess.check_call(command + [str(offset), str(data)])
+      self._tools.Call('i2cset', '-f', '-y', bus, slave, offset, data)
     else:
       raise DriverError('The argument data is not a valid type.')
 
@@ -466,8 +440,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       An integer.
     """
-    command = [self._TOOL_PATHS['memtool'], '-32', '%#x' % address, '1']
-    message = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    message = self._tools.Output('memtool', '-32', '%#x' % address, '1')
     matches = self._memtool_pattern.search(message)
     if matches:
       return int(matches.group(1), 16)
@@ -479,8 +452,7 @@ class ChameleondDriver(ChameleondInterface):
       address: The memory address.
       data: The 32-bit integer to write.
     """
-    command = [self._TOOL_PATHS['memtool'], '-32', '%#x=%#x' % (address, data)]
-    subprocess.check_output(command, stderr=subprocess.STDOUT)
+    self._tools.Call('memtool', '-32', '%#x=%#x' % (address, data))
 
   def _DumpI2CWithRetry(self, bus, slave, retry_count=3):
     """Dumps all I2C content on the given bus and slave address with retries.
@@ -615,8 +587,7 @@ class ChameleondDriver(ChameleondInterface):
       return False
 
     if input_id == self._HDMI_ID:
-      command = [self._TOOL_PATHS['hpd_control'], 'status']
-      message = subprocess.check_output(command)
+      message = self._tools.Output('hpd_control', 'status')
       matches = self._hpd_control_pattern.match(message)
       if matches:
         return bool(matches.group(1) == '1')
@@ -632,8 +603,7 @@ class ChameleondDriver(ChameleondInterface):
       input_id: The ID of the input connector.
     """
     if input_id == self._HDMI_ID:
-      command = [self._TOOL_PATHS['hpd_control'], 'plug']
-      subprocess.check_call(command)
+      self._tools.Call('hpd_control', 'plug')
     else:
       raise DriverError('Not a valid input_id.')
 
@@ -644,8 +614,7 @@ class ChameleondDriver(ChameleondInterface):
       input_id: The ID of the input connector.
     """
     if input_id == self._HDMI_ID:
-      command = [self._TOOL_PATHS['hpd_control'], 'unplug']
-      subprocess.check_call(command)
+      self._tools.Call('hpd_control', 'unplug')
     else:
       raise DriverError('Not a valid input_id.')
 
@@ -663,11 +632,8 @@ class ChameleondDriver(ChameleondInterface):
       if assert_interval_usec is None:
         # Fall back to use the same value as deassertion if not given.
         assert_interval_usec = deassert_interval_usec
-      command = [self._TOOL_PATHS['hpd_control'], 'repeat_pulse',
-                 str(deassert_interval_usec),
-                 str(assert_interval_usec),
-                 str(repeat_count)]
-      subprocess.check_call(command)
+      self._tools.Call('hpd_control', 'repeat_pulse', deassert_interval_usec,
+                       assert_interval_usec, repeat_count)
     else:
       raise DriverError('Not a valid input_id.')
 
@@ -694,11 +660,11 @@ class ChameleondDriver(ChameleondInterface):
       # Capture the whole screen first.
       total_width, total_height = self.DetectResolution(input_id)
       with tempfile.NamedTemporaryFile() as f:
-        command = [self._TOOL_PATHS['pixeldump'], f.name,
-                   str(total_width), str(total_height)]
-        if x is not None and y is not None and width and height:
-          command.extend([str(x), str(y), str(width), str(height)])
-        subprocess.call(command)
+        if x is None or y is None or not width or not height:
+          self._tools.Call('pixeldump', f.name, total_width, total_height)
+        else:
+          self._tools.Call('pixeldump', f.name, total_width, total_height,
+                           x, y, width, height)
         screen = f.read()
       return xmlrpclib.Binary(screen)
     else:
