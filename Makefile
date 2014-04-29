@@ -37,13 +37,15 @@ $(BINDIR)/%: $(BINDIR)/%.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
 BUNDLE_VERSION ?= '9999'
+CHAMELEON_BOARD ?= 'fpga_hdmi'
 
 .PHONY: install
 install:
 	@mkdir -p $(DESTDIR)
 	@cp -f $(BINARIES) "$(DESTDIR)"
 	@python setup.py install -f
-	@BUNDLE_VERSION=$(BUNDLE_VERSION) deploy/deploy
+	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \
+	    deploy/deploy
 
 CHAMELEON_USER ?= root
 BUNDLE = chameleond-$(VERSION).tar.gz
@@ -52,11 +54,14 @@ BUNDLEDIR = chameleond-$(VERSION)
 .PHONY: remote-install
 remote-install:
 	@echo "Set bundle version to $(BUNDLE_VERSION)"
+	@echo "Set board to $(CHAMELEON_BOARD)"
 ifdef CHAMELEON_HOST
 	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
 	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
 	    "cd /tmp && tar zxf $(BUNDLE) && cd $(BUNDLEDIR) &&" \
-	    "make install BUNDLE_VERSION=$(BUNDLE_VERSION)"
+	    "make install " \
+                "BUNDLE_VERSION=$(BUNDLE_VERSION) " \
+                "CHAMELEON_BOARD=$(CHAMELEON_BOARD)"
 else
 	$(error CHAMELEON_HOST is undefined)
 endif

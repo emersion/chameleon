@@ -25,6 +25,7 @@ CONFIG_TMP="$(mktemp /tmp/${DAEMON_NAME}.XXXXXX)"
 cat <<END >${CONFIG_TMP}
 CHAMELEOND_DIR="${CHAMELEOND_DIR}"
 BUNDLE_VERSION="${BUNDLE_VERSION}"
+CHAMELEON_BOARD="${CHAMELEON_BOARD}"
 END
 mv -f "${CONFIG_TMP}" "${CONFIG_FILE}"
 
@@ -34,7 +35,7 @@ update-rc.d "${DAEMON_NAME}" defaults 92 8
 cp -f "${SCRIPT_DIR}/${UPDATER_NAME}" "${INITD_DIR}"
 update-rc.d "${UPDATER_NAME}" defaults 90 10
 
-FPGA_DIR="$(dirname ${SCRIPT})/../updatable/fpga_hdmi"
+FPGA_DIR="$(dirname ${SCRIPT})/../updatable/${CHAMELEON_BOARD}"
 FPGA_BOOT_PART=$(fdisk -l /dev/mmcblk0 | grep 'a2  Unknown' | cut -f1 -d' ')
 FPGA_FAT_PART=$(fdisk -l /dev/mmcblk0 | grep ' b  W95 FAT32' | cut -f1 -d' ')
 MOUNT_DIR='/media/mmc1'

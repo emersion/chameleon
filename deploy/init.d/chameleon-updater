@@ -69,7 +69,9 @@ do_start () {
     wget -q "${BUNDLE_URL}/${latest_bundle}"
     tar zxf ${latest_bundle}
     cd ${bundle_dir}
-    make install BUNDLE_VERSION="${latest_ver}-r${latest_rev}"
+    make install \
+        BUNDLE_VERSION="${latest_ver}-r${latest_rev}" \
+        CHAMELEON_BOARD="${CHAMELEON_BOARD}"
     popd > /dev/null
 }
 

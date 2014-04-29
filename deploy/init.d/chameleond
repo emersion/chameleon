@@ -19,6 +19,7 @@ CONFIG_FILE="/etc/default/${DAEMON_NAME}"
 . "${CONFIG_FILE}"
 
 DAEMON="${CHAMELEOND_DIR}/run_chameleond"
+DAEMON_ARGS="--driver ${CHAMELEON_BOARD}"
 DAEMON_USER='root'
 PIDFILE="/var/run/${DAEMON_NAME}.pid"
 
@@ -30,7 +31,7 @@ do_start () {
     if ! is_already_running; then
         start-stop-daemon --start --background --pidfile "${PIDFILE}" \
             --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \
-            --startas "${DAEMON}"
+            --startas "${DAEMON}" -- ${DAEMON_ARGS}
         do_status
     else
         echo "${DAEMON_NAME} is already running."
