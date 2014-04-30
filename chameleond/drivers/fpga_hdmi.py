@@ -13,6 +13,7 @@ import xmlrpclib
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 from chameleond.utils import i2c
+from chameleond.utils import mem
 from chameleond.utils import system_tools
 
 
@@ -87,13 +88,13 @@ class ChameleondDriver(ChameleondInterface):
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
-    self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
     self._hpd_control_pattern = re.compile(r'HPD=([01])')
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
     self._active_edid_id = -1
     self._error_level = ErrorLevel.GOOD
     self._tools = system_tools.SystemTools()
+    self._mem = mem.Mem(self._tools)
     self._hdmirx_bus = i2c.I2cBus(self._tools, self._HDMIRX_I2C_BUS)
     self._hdmirx_bus.RegisterResetter(
         lambda: self._ResetI2CBus(self._HDMIRX_I2C_BUS))
@@ -352,35 +353,9 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       bus: The number of bus.
     """
-    original_value = self._ReadMem(self._PERMODRST_MEM_ADDRESS)
-    self._WriteMem(self._PERMODRST_MEM_ADDRESS,
-                   original_value | self._I2C_RESET_MASK[bus])
-    time.sleep(self._DELAY_I2C_RESET)
-    self._WriteMem(self._PERMODRST_MEM_ADDRESS, original_value)
-
-  # TODO(waihong): Move to some Python native library for memory access.
-  def _ReadMem(self, address):
-    """Reads the 32-bit integer from the given memory address.
-
-    Args:
-      address: The memory address.
-
-    Returns:
-      An integer.
-    """
-    message = self._tools.Output('memtool', '-32', '%#x' % address, '1')
-    matches = self._memtool_pattern.search(message)
-    if matches:
-      return int(matches.group(1), 16)
-
-  def _WriteMem(self, address, data):
-    """Writes the given 32-bit integer to the given memory address.
-
-    Args:
-      address: The memory address.
-      data: The 32-bit integer to write.
-    """
-    self._tools.Call('memtool', '-32', '%#x=%#x' % (address, data))
+    self._mem.SetAndClearMask(self._PERMODRST_MEM_ADDRESS,
+                              self._I2C_RESET_MASK[bus],
+                              self._DELAY_I2C_RESET)
 
   def ReadEdid(self, input_id):
     """Reads the EDID content of the selected input on Chameleon.
@@ -409,16 +384,16 @@ class ChameleondDriver(ChameleondInterface):
       edid_id: The ID of the EDID.
     """
     # TODO(waihong): Implement I2C slave for EDID response.
-    gpio_value = self._ReadMem(self._GPIO_MEM_ADDRESS)
     # Disable EEPROM write-protection.
-    self._WriteMem(self._GPIO_MEM_ADDRESS,
-                   gpio_value | self._GPIO_EEPROM_WP_N_MASK)
+    self._mem.SetMask(self._GPIO_MEM_ADDRESS, self._GPIO_EEPROM_WP_N_MASK)
     try:
       self._eeprom.Set(self._all_edids[edid_id])
     except i2c.I2cBusError as e:
       self._error_level = ErrorLevel.BOARD_ERROR
       raise BoardError(e)
-    self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value)
+    finally:
+      # Enable EEPROM write-protection.
+      self._mem.ClearMask(self._GPIO_MEM_ADDRESS, self._GPIO_EEPROM_WP_N_MASK)
 
   def ApplyEdid(self, input_id, edid_id):
     """Applies the EDID to the selected input.
@@ -574,8 +549,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    width = self._ReadMem(self._FRAME_WIDTH_ADDRESS)
-    height = self._ReadMem(self._FRAME_HEIGHT_ADDRESS)
+    width = self._mem.Read(self._FRAME_WIDTH_ADDRESS)
+    height = self._mem.Read(self._FRAME_HEIGHT_ADDRESS)
     return (width, height)
 
   def _GetResolutionFromReceiver(self):
