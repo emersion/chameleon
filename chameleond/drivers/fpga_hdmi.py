@@ -3,17 +3,16 @@
 # found in the LICENSE file.
 """Chameleond Driver for FPGA customized platform."""
 
-import array
 import logging
 import os
 import re
-import subprocess
 import tempfile
 import time
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
+from chameleond.utils import i2c
 from chameleond.utils import system_tools
 
 
@@ -53,7 +52,7 @@ class ChameleondDriver(ChameleondInterface):
   _GPIO_EEPROM_WP_N_MASK = 0x1
   _GPIO_HPD_MASK = 0x2
 
-  _RX_I2C_BUS = 0
+  _HDMIRX_I2C_BUS = 0
   _DDC_I2C_BUS = 1
   _EEPROM_I2C_SLAVE = 0x50
   _HDMIRX_I2C_SLAVE = 0x48
@@ -61,12 +60,11 @@ class ChameleondDriver(ChameleondInterface):
   # Peripheral Module Reset Register
   _PERMODRST_MEM_ADDRESS = 0xffd05014
   _I2C_RESET_MASK = {
-      _RX_I2C_BUS: 0x1000,
+      _HDMIRX_I2C_BUS: 0x1000,
       _DDC_I2C_BUS: 0x2000
   }
   # FIXME: no document about width of the reset pulse; this is from experience
   _DELAY_I2C_RESET = 0.1
-  _DELAY_I2C_RETRY_INIT = 1.0
 
   _HDMIRX_REG_RST_CTRL = 0x05
   _HDMIRX_MASK_SWRST = 0x01
@@ -84,14 +82,11 @@ class ChameleondDriver(ChameleondInterface):
   _HDMIRX_REG_VACTIVE_H = 0x60
   _HDMIRX_REG_VACTIVE_L = 0x61
 
-  _DELAY_REG_SET = 0.001
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
-    self._i2cget_pattern = re.compile(r'0x[0-9a-f]{2}')
-    self._i2cdump_pattern = re.compile(r'[0-9a-f]0:' + ' ([0-9a-f]{2})' * 16)
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
     self._hpd_control_pattern = re.compile(r'HPD=([01])')
     # Reserve index 0 as the default EDID.
@@ -99,6 +94,13 @@ class ChameleondDriver(ChameleondInterface):
     self._active_edid_id = -1
     self._error_level = ErrorLevel.GOOD
     self._tools = system_tools.SystemTools()
+    self._hdmirx_bus = i2c.I2cBus(self._tools, self._HDMIRX_I2C_BUS)
+    self._hdmirx_bus.RegisterResetter(
+        lambda: self._ResetI2CBus(self._HDMIRX_I2C_BUS))
+    self._ddc_bus = i2c.I2cBus(self._tools, self._DDC_I2C_BUS)
+    self._ddc_bus.RegisterResetter(lambda: self._ResetI2CBus(self._DDC_I2C_BUS))
+    self._hdmirx = self._hdmirx_bus.CreateSlave(self._HDMIRX_I2C_SLAVE)
+    self._eeprom = self._ddc_bus.CreateSlave(self._EEPROM_I2C_SLAVE)
 
     # Skip the BoardError, like I2C access failure, in order not to block the
     # start-up of the RPC server. The repair routine will perform later.
@@ -117,8 +119,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the video mode is changed; otherwsie, False.
     """
-    video_mode = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                              self._HDMIRX_REG_VIDEO_MODE)
+    video_mode = self._hdmirx.Get(self._HDMIRX_REG_VIDEO_MODE)
     return bool(video_mode & self._HDMIRX_MASK_MODE_CHANGED)
 
   def _IsVideoInputStable(self):
@@ -127,8 +128,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the video input is stable; otherwise, False.
     """
-    video_mode = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                              self._HDMIRX_REG_VIDEO_MODE)
+    video_mode = self._hdmirx.Get(self._HDMIRX_REG_VIDEO_MODE)
     return bool(video_mode & self._HDMIRX_MASK_VIDEO_STABLE)
 
   def _IsFrameLocked(self):
@@ -188,23 +188,6 @@ class ChameleondDriver(ChameleondInterface):
       if need_restart:
         self._RestartReceiver()
 
-  def _SetAndClearI2CRegister(self, bus, slave, offset, bitmask, delay=None):
-    """Sets I2C registers with the bitmask and then clear it.
-
-    Args:
-      bus: The number of bus.
-      slave: The number of slave address.
-      offset: The offset of the register.
-      bitmask: The bitmask to set and clear.
-      delay: The time between set and clear. Default: self._DELAY_REG_SET
-    """
-    byte = self._GetI2C(bus, slave, offset)
-    self._SetI2C(bus, slave, byte | bitmask, offset)
-    if delay is None:
-      delay = self._DELAY_REG_SET
-    time.sleep(delay)
-    self._SetI2C(bus, slave, byte & ~bitmask, offset)
-
   def _WaitForCondition(self, func, value, timeout):
     """Waits for the given function matches the given value.
 
@@ -230,9 +213,8 @@ class ChameleondDriver(ChameleondInterface):
   def _RestartReceiver(self):
     """Restarts the HDMI receiver."""
     logging.info('Resetting HDMI receiver...')
-    self._SetAndClearI2CRegister(
-        self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE, self._HDMIRX_REG_RST_CTRL,
-        self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
+    self._hdmirx.SetAndClear(self._HDMIRX_REG_RST_CTRL,
+       self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
 
     try:
       self._WaitForCondition(self._IsModeChanged, False,
@@ -301,8 +283,7 @@ class ChameleondDriver(ChameleondInterface):
       True if the physical cable is plugged; otherwise, False.
     """
     if input_id == self._HDMI_ID:
-      sys_state = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                               self._HDMIRX_REG_SYS_STATE)
+      sys_state = self._hdmirx.Get(self._HDMIRX_REG_SYS_STATE)
       return bool(sys_state & self._HDMIRX_MASK_PWR5V_DETECT)
     else:
       raise DriverError('Not a valid input_id.')
@@ -365,59 +346,6 @@ class ChameleondDriver(ChameleondInterface):
     else:
       raise DriverError('Not a valid edid_id.')
 
-  # TODO(waihong): Move to some Python native library for I2C communication.
-  def _DumpI2C(self, bus, slave):
-    """Dumps all I2C content on the given bus and slave address.
-
-    Args:
-      bus: The number of bus.
-      slave: The number of slave address.
-
-    Returns:
-      A byte-array of the I2C content.
-    """
-    message = self._tools.Output('i2cdump', '-f', '-y', bus, slave)
-    matches = self._i2cdump_pattern.findall(message)
-    return array.array(
-        'B', [int(s, 16) for match in matches for s in match]).tostring()
-
-  def _GetI2C(self, bus, slave, offset):
-    """Gets the byte value of the given I2C bus, slave, and offset address.
-
-    Args:
-      bus: The number of bus.
-      slave: The number of slave address.
-      offset: The offset address to read.
-
-    Returns:
-      An integer of the byte value.
-    """
-    message = self._tools.Output('i2cget', '-f', '-y', bus, slave, offset)
-    matches = self._i2cget_pattern.match(message)
-    if matches:
-      return int(matches.group(0), 0)
-    else:
-      raise DriverError('The output format of i2cget is not matched.')
-
-  def _SetI2C(self, bus, slave, data, offset=0):
-    """Sets the given I2C content on the given bus and slave address.
-
-    Args:
-      bus: The number of bus.
-      slave: The number of slave address.
-      data: A byte or a byte-array of content to set.
-      offset: The offset which the data starts from this address.
-    """
-    if isinstance(data, str):
-      for index in xrange(0, len(data), 8):
-        data_args = [ord(d) for d in data[index:index+8]] + ['i']
-        self._tools.Call('i2cset', '-f', '-y', bus, slave,
-                         offset + index, *data_args)
-    elif isinstance(data, int) and 0 <= data <= 0xff:
-      self._tools.Call('i2cset', '-f', '-y', bus, slave, offset, data)
-    else:
-      raise DriverError('The argument data is not a valid type.')
-
   def _ResetI2CBus(self, bus):
     """Resets the I2C controller for the given I2C bus.
 
@@ -454,20 +382,6 @@ class ChameleondDriver(ChameleondInterface):
     """
     self._tools.Call('memtool', '-32', '%#x=%#x' % (address, data))
 
-  def _DumpI2CWithRetry(self, bus, slave, retry_count=3):
-    """Dumps all I2C content on the given bus and slave address with retries.
-
-    Args:
-      bus: The number of bus.
-      slave: The number of slave address.
-      retry_count: Number of retries.
-
-    Returns:
-      A byte-array of the I2C content.
-    """
-    return self._AccessI2CWithRetry(
-        bus, lambda: self._DumpI2C(bus, slave), retry_count)
-
   def ReadEdid(self, input_id):
     """Reads the EDID content of the selected input on Chameleon.
 
@@ -478,8 +392,11 @@ class ChameleondDriver(ChameleondInterface):
       A byte array of EDID data, wrapped in a xmlrpclib.Binary object.
     """
     if input_id == self._HDMI_ID:
-      return xmlrpclib.Binary(
-          self._DumpI2CWithRetry(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE))
+      try:
+        return xmlrpclib.Binary(self._eeprom.Dump())
+      except i2c.I2cBusError as e:
+        self._error_level = ErrorLevel.BOARD_ERROR
+        raise BoardError(e)
     else:
       raise DriverError('Not a valid input_id.')
 
@@ -496,22 +413,12 @@ class ChameleondDriver(ChameleondInterface):
     # Disable EEPROM write-protection.
     self._WriteMem(self._GPIO_MEM_ADDRESS,
                    gpio_value | self._GPIO_EEPROM_WP_N_MASK)
-    self._SetI2C(self._DDC_I2C_BUS, self._EEPROM_I2C_SLAVE,
-                 self._all_edids[edid_id])
+    try:
+      self._eeprom.Set(self._all_edids[edid_id])
+    except i2c.I2cBusError as e:
+      self._error_level = ErrorLevel.BOARD_ERROR
+      raise BoardError(e)
     self._WriteMem(self._GPIO_MEM_ADDRESS, gpio_value)
-
-  def _ApplyHdmiEdidWithRetry(self, edid_id, retry_count=3):
-    """Applies the EDID to the HDMI input with retry.
-
-    This method does not check the validity of edid_id.
-
-    Args:
-      edid_id: The ID of the EDID.
-      retry_count: Number of retries.
-    """
-    self._AccessI2CWithRetry(self._DDC_I2C_BUS,
-        lambda: self._ApplyHdmiEdid(edid_id), retry_count)
-    self._active_edid_id = edid_id
 
   def ApplyEdid(self, input_id, edid_id):
     """Applies the EDID to the selected input.
@@ -525,7 +432,7 @@ class ChameleondDriver(ChameleondInterface):
     """
     if input_id == self._HDMI_ID:
       if edid_id > 0:
-        self._ApplyHdmiEdidWithRetry(edid_id)
+        self._ApplyHdmiEdid(edid_id)
       else:
         raise DriverError('Not a valid edid_id.')
     else:
@@ -545,34 +452,7 @@ class ChameleondDriver(ChameleondInterface):
     """Applies the default EDID to the HDMI input."""
     if self._active_edid_id != 0:
       logging.info('Apply the default EDID.')
-      self._ApplyHdmiEdidWithRetry(0)
-
-  def _AccessI2CWithRetry(self, bus, func, retry_count):
-    """Access the I2C bus with reset and retries.
-
-    When the I2C controller reports error, the method resets the controller
-    and re-tries the function for 'retry_count' times.
-
-    Args:
-      bus: The number of bus.
-      func: The I2C access function to be executed.
-      retry_count: Number of retries.
-    """
-    delay = self._DELAY_I2C_RETRY_INIT
-    while retry_count >= 0:
-      try:
-        return func()
-      except subprocess.CalledProcessError as e:
-        logging.info("I2C error({0}): {1}".format(e.returncode, str(e.cmd)))
-        retry_count = retry_count - 1
-        if retry_count >= 0:
-          self._ResetI2CBus(bus)
-          delay = delay * 2
-          time.sleep(delay)
-          logging.info("  retrying... (%d retrys left)", retry_count)
-        else:
-          self._error_level = ErrorLevel.BOARD_ERROR
-          raise BoardError('I2C bus access failed')
+      self._ApplyHdmiEdid(0)
 
   def IsPlugged(self, input_id):
     """Returns if the HPD line is plugged.
@@ -704,14 +584,10 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    hactive_h = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                             self._HDMIRX_REG_HACTIVE_H)
-    hactive_l = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                             self._HDMIRX_REG_HACTIVE_L)
-    vactive_h = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                             self._HDMIRX_REG_VACTIVE_H)
-    vactive_l = self._GetI2C(self._RX_I2C_BUS, self._HDMIRX_I2C_SLAVE,
-                             self._HDMIRX_REG_VACTIVE_L)
+    hactive_h = self._hdmirx.Get(self._HDMIRX_REG_HACTIVE_H)
+    hactive_l = self._hdmirx.Get(self._HDMIRX_REG_HACTIVE_L)
+    vactive_h = self._hdmirx.Get(self._HDMIRX_REG_VACTIVE_H)
+    vactive_l = self._hdmirx.Get(self._HDMIRX_REG_VACTIVE_L)
     width = (hactive_h & 0xf0) << 4 | hactive_l
     height = (vactive_h & 0xf0) << 4 | vactive_l
     return (width, height)
