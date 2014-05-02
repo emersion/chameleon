@@ -254,11 +254,11 @@ class ChameleondDriver(ChameleondInterface):
     if self._error_level == ErrorLevel.CHIP_ERROR:
       logging.info('Try to restart Chameleond...')
       self._tools.DelayedCall(1, 'chameleond', 'restart')
-      return 10
+      return 20
     elif self._error_level == ErrorLevel.BOARD_ERROR:
       logging.info('Try to reboot the board...')
       self._tools.DelayedCall(1, 'reboot')
-      return 60
+      return 120
     return 0
 
   def GetSupportedInputs(self):
