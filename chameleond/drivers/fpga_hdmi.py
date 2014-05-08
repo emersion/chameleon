@@ -165,10 +165,7 @@ class ChameleondDriver(ChameleondInterface):
     """
     if self.IsPlugged(self._HDMI_ID):
       # Wait the vidoe input stable before the check.
-      try:
-        self._WaitForCondition(self._IsVideoInputStable, True,
-                               self._TIMEOUT_VIDEO_STABLE_PROBE)
-      except DriverError:
+      if not self.WaitVideoInputStable(self._HDMI_ID):
         # Sometime the video-stable-bit not set is caused by a receiver issue.
         # Safer to mark it as a chip error, such that it can be repaired.
         self._error_level = ErrorLevel.CHIP_ERROR
@@ -316,6 +313,28 @@ class ChameleondDriver(ChameleondInterface):
     # TODO(waihong): Support more connectors, like DVI and DP.
     if input_id == self._HDMI_ID:
       return 'HDMI'
+    else:
+      raise DriverError('Not a valid input_id.')
+
+  def WaitVideoInputStable(self, input_id, timeout=None):
+    """Waits the video input stable or timeout.
+
+    Args:
+      input_id: The ID of the input connector.
+      timeout: The time period to wait for.
+
+    Returns:
+      True if the video input becomes stable within the timeout period;
+      otherwise, False.
+    """
+    if input_id == self._HDMI_ID:
+      if timeout is None:
+        timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+      try:
+        self._WaitForCondition(self._IsVideoInputStable, True, timeout)
+      except DriverError:
+        return False
+      return True
     else:
       raise DriverError('Not a valid input_id.')
 

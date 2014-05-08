@@ -76,6 +76,19 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('StrInterface')
 
+  def WaitVideoInputStable(self, input_id, timeout=None):
+    """Waits the video input stable or timeout.
+
+    Args:
+      input_id: The ID of the input connector.
+      timeout: The time period to wait for.
+
+    Returns:
+      True if the video input becomes stable within the timeout period;
+      otherwise, False.
+    """
+    raise NotImplementedError('WaitVideoInputStable')
+
   def CreateEdid(self, edid):
     """Creates an internal record of EDID using the given byte array.
 

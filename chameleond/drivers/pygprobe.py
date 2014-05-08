@@ -128,6 +128,20 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._ALL_INPUTS[input_id]
 
+  def WaitVideoInputStable(self, input_id, timeout=None):
+    """Waits the video input stable or timeout.
+
+    Args:
+      input_id: The ID of the input connector.
+      timeout: The time period to wait for.
+
+    Returns:
+      True if the video input becomes stable within the timeout period;
+      otherwise, False.
+    """
+    # Always return True, for compatibility.
+    return True
+
   def _LoadEdidToBuffer(self, edid_id):
     """Loads the EDID to host buffer. Will be applied later.
 
