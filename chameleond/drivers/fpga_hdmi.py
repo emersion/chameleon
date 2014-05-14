@@ -12,8 +12,8 @@ import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
-from chameleond.utils import i2c
-from chameleond.utils import mem
+from chameleond.utils import i2c_tool as i2c
+from chameleond.utils import mem_tool as mem
 from chameleond.utils import system_tools
 
 
