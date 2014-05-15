@@ -6,25 +6,24 @@
 import re
 import time
 
+import chameleon_common  # pylint: disable=W0611
+from chameleond.utils import system_tools
+
 
 class OutputFormatError(Exception):
   """Exception raised when output messages of the Mem tool did not match."""
   pass
 
 
-class Mem(object):
+class _Memory(object):
   """A class to abstract the memory access for IO."""
 
   _REG_SET_DELAY = 0.001
 
-  def __init__(self, tools):
-    """Constructs a Mem object.
-
-    Args:
-      tools: The SystemTools object.
-    """
+  def __init__(self):
+    """Constructs a _Memory object."""
     self._memtool_pattern = re.compile(r'0x[0-9A-F]{8}:  ([0-9A-F]{8})')
-    self._tools = tools
+    self._tools = system_tools.SystemTools
 
   def Read(self, address):
     """Reads the 32-bit integer from the given memory address.
@@ -82,3 +81,7 @@ class Mem(object):
       delay = self._REG_SET_DELAY
     time.sleep(delay)
     self.ClearMask(address, mask)
+
+
+# Singleton
+Memory = _Memory()

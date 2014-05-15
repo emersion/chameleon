@@ -7,7 +7,7 @@ import os
 import subprocess
 
 
-class SystemTools(object):
+class _SystemTools(object):
   """A class to wrap the required tools for Chameleond execution."""
 
   _TOOL_PATHS = {
@@ -21,7 +21,8 @@ class SystemTools(object):
     'pixeldump': '/usr/bin/pixeldump',
   }
 
-  def _init(self):
+  def __init__(self):
+    """Constructs a _SystemTools object."""
     self._CheckRequiredTools()
 
   def _CheckRequiredTools(self):
@@ -71,3 +72,6 @@ class SystemTools(object):
     tool_command = [self._TOOL_PATHS[name]] + map(str, args)
     command = '; '.join([sleep_command, ' '.join(tool_command)])
     subprocess.Popen(command, shell=True)
+
+# Singleton
+SystemTools = _SystemTools()

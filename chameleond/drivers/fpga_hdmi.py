@@ -93,8 +93,8 @@ class ChameleondDriver(ChameleondInterface):
     self._all_edids = [self._ReadDefaultEdid()]
     self._active_edid_id = -1
     self._error_level = ErrorLevel.GOOD
-    self._tools = system_tools.SystemTools()
-    self._mem = mem.Mem(self._tools)
+    self._tools = system_tools.SystemTools
+    self._memory = mem.Memory
     self._hdmirx_bus = i2c.I2cBus(self._tools, self._HDMIRX_I2C_BUS)
     self._hdmirx_bus.RegisterResetter(
         lambda: self._ResetI2CBus(self._HDMIRX_I2C_BUS))
@@ -372,9 +372,9 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       bus: The number of bus.
     """
-    self._mem.SetAndClearMask(self._PERMODRST_MEM_ADDRESS,
-                              self._I2C_RESET_MASK[bus],
-                              self._DELAY_I2C_RESET)
+    self._memory.SetAndClearMask(self._PERMODRST_MEM_ADDRESS,
+                                 self._I2C_RESET_MASK[bus],
+                                 self._DELAY_I2C_RESET)
 
   def ReadEdid(self, input_id):
     """Reads the EDID content of the selected input on Chameleon.
@@ -404,7 +404,7 @@ class ChameleondDriver(ChameleondInterface):
     """
     # TODO(waihong): Implement I2C slave for EDID response.
     # Disable EEPROM write-protection.
-    self._mem.SetMask(self._GPIO_MEM_ADDRESS, self._GPIO_EEPROM_WP_N_MASK)
+    self._memory.SetMask(self._GPIO_MEM_ADDRESS, self._GPIO_EEPROM_WP_N_MASK)
     try:
       self._eeprom.Set(self._all_edids[edid_id])
     except i2c.I2cBusError as e:
@@ -412,7 +412,8 @@ class ChameleondDriver(ChameleondInterface):
       raise BoardError(e)
     finally:
       # Enable EEPROM write-protection.
-      self._mem.ClearMask(self._GPIO_MEM_ADDRESS, self._GPIO_EEPROM_WP_N_MASK)
+      self._memory.ClearMask(self._GPIO_MEM_ADDRESS,
+                             self._GPIO_EEPROM_WP_N_MASK)
 
   def ApplyEdid(self, input_id, edid_id):
     """Applies the EDID to the selected input.
@@ -568,8 +569,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    width = self._mem.Read(self._FRAME_WIDTH_ADDRESS)
-    height = self._mem.Read(self._FRAME_HEIGHT_ADDRESS)
+    width = self._memory.Read(self._FRAME_WIDTH_ADDRESS)
+    height = self._memory.Read(self._FRAME_HEIGHT_ADDRESS)
     return (width, height)
 
   def _GetResolutionFromReceiver(self):
