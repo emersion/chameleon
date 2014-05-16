@@ -61,6 +61,7 @@ class I2cBus(object):
     self.tools = tools
     self.bus = bus
     self._resetter = None
+    self._slaves = {}
 
   def RegisterResetter(self, resetter):
     """Registers the Reset function of the I2C bus.
@@ -75,16 +76,20 @@ class I2cBus(object):
     if self._resetter:
       self._resetter()
 
-  def CreateSlave(self, slave):
-    """Creates the I2C slave object of the given slave address.
+  def GetSlave(self, slave):
+    """Gets the I2C slave object of the given slave address.
+
+    It returns the cached the I2cSlave objects if they are already created.
 
     Args:
       slave: The number of slave address.
 
     Returns:
-      An I2cSlave object.
+      An I2cSlave or its subclass object.
     """
-    return I2cSlave(self, slave)
+    if slave not in self._slaves:
+      self._slaves[slave] = I2cSlave(slave)
+    return self._slaves[slave]
 
 
 class I2cSlave(object):

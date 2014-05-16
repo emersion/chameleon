@@ -102,8 +102,8 @@ class ChameleondDriver(ChameleondInterface):
         lambda: self._ResetI2CBus(self._HDMIRX_I2C_BUS))
     self._ddc_bus = i2c.I2cBus(self._tools, self._DDC_I2C_BUS)
     self._ddc_bus.RegisterResetter(lambda: self._ResetI2CBus(self._DDC_I2C_BUS))
-    self._hdmirx = self._hdmirx_bus.CreateSlave(self._HDMIRX_I2C_SLAVE)
-    self._eeprom = self._ddc_bus.CreateSlave(self._EEPROM_I2C_SLAVE)
+    self._hdmirx = self._hdmirx_bus.GetSlave(self._HDMIRX_I2C_SLAVE)
+    self._eeprom = self._ddc_bus.GetSlave(self._EEPROM_I2C_SLAVE)
 
     # Skip the BoardError, like I2C access failure, in order not to block the
     # start-up of the RPC server. The repair routine will perform later.
