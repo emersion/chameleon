@@ -73,6 +73,21 @@ class HdmiRx(i2c_fpga.I2cSlave):
   _REG_INTERNAL_STATUS = 0x0a
   _BIT_P0_PWR5V_DET = 1
 
+  _REG_EDID_SLAVE_ADDR = 0x87
+  _BIT_ENABLE_EDID_ACCESS = 1
+
+  _REG_IO_MAP = 0x8c
+  _BIT_VDIO3_ENABLE = 1 << 3
+  _BIT_SP_OUT_MODE = 1 << 0
+
+  _REG_EDID_CONFIG = 0xc0
+  _VALUE_ENABLE_EDID_P0 = 0x06  # DDC monitor; disable P1; enable P0.
+  _VALUE_DISABLE_EDID = 0x03  # No DDC monitor; disable P1; disable P0.
+
+  # Registers for checksum
+  _REG_P0_B0_SUM = 0xc4  # Port 0, block 0
+  _REG_P0_B1_SUM = 0xc5  # Port 0, block 1
+
   def Initialize(self):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize HDMI RX chip.')
@@ -99,6 +114,46 @@ class HdmiRx(i2c_fpga.I2cSlave):
   def IsCablePowered(self):
     """Returns if the cable is powered or not."""
     return bool(self.Get(self._REG_INTERNAL_STATUS) & self._BIT_P0_PWR5V_DET)
+
+  def SetEdidSlave(self, slave):
+    """Sets the slave address for the EDID which is stored in the internal RAM.
+
+    Args:
+      slave: The slave address for the EDID.
+    """
+    old_value = self.Get(self._REG_EDID_SLAVE_ADDR)
+    # Bit 7:1 is the slave address; bit 0 is to enable EDID access.
+    # Keep the original state of the EDID accessibility.
+    new_value = (slave << 1) | (old_value & self._BIT_ENABLE_EDID_ACCESS)
+    self.Set(new_value, self._REG_EDID_SLAVE_ADDR)
+
+  def EnableEdidAccess(self):
+    """Enables the access of the EDID RAM content."""
+    self.SetMask(self._REG_EDID_SLAVE_ADDR, self._BIT_ENABLE_EDID_ACCESS)
+
+  def DisableEdidAccess(self):
+    """Disables the access of the EDID RAM content."""
+    self.ClearMask(self._REG_EDID_SLAVE_ADDR, self._BIT_ENABLE_EDID_ACCESS)
+
+  def EnableEdid(self):
+    """Enables the receiver to monitor DDC and response EDID."""
+    self.Set(self._VALUE_ENABLE_EDID_P0, self._REG_EDID_CONFIG)
+
+  def DisableEdid(self):
+    """Disables the receiver to monitor DDC and response EDID."""
+    self.Set(self._VALUE_DISABLE_EDID, self._REG_EDID_CONFIG)
+
+  def UpdateEdidChecksum(self, block_num, checksum):
+    """Updates the checksum of the EDID block.
+
+    Args:
+      block_num: 0 for Block 0; 1 for Block 1.
+      checksum: The checksum value.
+    """
+    if block_num == 0:
+      self.Set(checksum, self._REG_P0_B0_SUM)
+    elif block_num == 1:
+      self.Set(checksum, self._REG_P0_B1_SUM)
 
 
 class VgaRx(i2c_fpga.I2cSlave):
