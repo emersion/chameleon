@@ -542,14 +542,15 @@ class ChameleondDriver(ChameleondInterface):
 
     if input_id == self._HDMI_ID:
       self._RestartReceiverIfNeeded(raise_error_if_no_input=True)
-      # Capture the whole screen first.
+
       total_width, total_height = self.DetectResolution(input_id)
       with tempfile.NamedTemporaryFile() as f:
         if x is None or y is None or not width or not height:
-          self._tools.Call('pixeldump', f.name, total_width, total_height)
+          self._tools.Call('pixeldump', f.name, total_width, total_height,
+                           len(self._PIXEL_FORMAT))
         else:
           self._tools.Call('pixeldump', f.name, total_width, total_height,
-                           x, y, width, height)
+                           len(self._PIXEL_FORMAT), x, y, width, height)
         screen = f.read()
       return xmlrpclib.Binary(screen)
     else:
