@@ -8,6 +8,7 @@ from abc import ABCMeta
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import edid
+from chameleond.utils import fpga
 from chameleond.utils import ids
 from chameleond.utils import io
 from chameleond.utils import rx
@@ -65,6 +66,10 @@ class InputFlow(object):
     self._fpga.vpass.Select(self._input_id)
     self._fpga.vdump0.Select(self._input_id)
     self._fpga.vdump1.Select(self._input_id)
+
+  def GetPixelDumpArgs(self):
+    """Gets the arguments of pixeldump tool which selects the proper buffers."""
+    return fpga.VideoDumper.GetPixelDumpArgs(self._input_id)
 
   def GetResolution(self):
     """Gets the resolution of the video flow."""

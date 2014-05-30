@@ -5,6 +5,7 @@
 
 import logging
 import os
+import tempfile
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
@@ -13,6 +14,7 @@ from chameleond.utils import fpga
 from chameleond.utils import i2c_fpga as i2c
 from chameleond.utils import ids
 from chameleond.utils import input_flow
+from chameleond.utils import system_tools
 
 
 class DriverError(Exception):
@@ -25,12 +27,15 @@ class ChameleondDriver(ChameleondInterface):
 
   _I2C_BUS_MAIN = 0
 
+  _PIXEL_FORMAT = 'rgb'
+
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._selected_input = None
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
 
+    self._tools = system_tools.SystemTools
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
     fpga_ctrl = fpga.FpgaController()
     self._input_flows = {
@@ -259,6 +264,14 @@ class ChameleondDriver(ChameleondInterface):
       self._input_flows[input_id].Select()
       self._selected_input = input_id
 
+  def GetPixelFormat(self):
+    """Returns the pixel format for the output of DumpPixels.
+
+    Returns:
+      A string of the format, like 'rgba', 'bgra', 'rgb', etc.
+    """
+    return self._PIXEL_FORMAT
+
   def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
 
@@ -274,8 +287,29 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    # TODO(waihong): Implement this method.
-    raise NotImplementedError('DumpPixels')
+    self._SelectInput(input_id)
+    if not self.IsPlugged(input_id):
+      raise DriverError('HPD is unplugged. No signal is expected.')
+
+    total_width, total_height = self.DetectResolution(input_id)
+    if total_width == 0 or total_height == 0:
+      raise DriverError('Something wrong with the resolution: %dx%d' %
+                        (total_width, total_height))
+    # Specify the proper arguemnt for dual-buffer capture.
+    if input_id in (ids.DP1, ids.DP2, ids.HDMI):
+      total_width = total_width / 2
+
+    with tempfile.NamedTemporaryFile() as f:
+      if x is None or y is None or not width or not height:
+        self._tools.Call('pixeldump', f.name, total_width, total_height,
+                         len(self._PIXEL_FORMAT),
+                         *self._input_flows[input_id].GetPixelDumpArgs())
+      else:
+        self._tools.Call('pixeldump', f.name, total_width, total_height,
+                         len(self._PIXEL_FORMAT), x, y, width, height,
+                         *self._input_flows[input_id].GetPixelDumpArgs())
+      screen = f.read()
+    return xmlrpclib.Binary(screen)
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):

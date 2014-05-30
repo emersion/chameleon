@@ -152,6 +152,13 @@ class VideoDumper(object):
   _DUMP_ADDRESSES = (0xc0000000,  # Dumper 0
                      0xd0000000)  # Dumper 1
 
+  _PIXELDUMP_ARGS = {
+    ids.DP1: ['-a', _DUMP_ADDRESSES[0], '-b', _DUMP_ADDRESSES[1]],
+    ids.DP2: ['-a', _DUMP_ADDRESSES[1], '-b', _DUMP_ADDRESSES[0]],
+    ids.HDMI: ['-a', _DUMP_ADDRESSES[1], '-b', _DUMP_ADDRESSES[0]],
+    ids.VGA: ['-a', _DUMP_ADDRESSES[0]],
+  }
+
   def __init__(self, index):
     """Constructs a VideoDumper object.
 
@@ -181,6 +188,15 @@ class VideoDumper(object):
   def GetHeight(self):
     """Gets the height of the video path."""
     return self._memory.Read(self._REGS_BASE[self._index] + self._REG_HEIGHT)
+
+  @classmethod
+  def GetPixelDumpArgs(cls, input_id):
+    """Gets the arguments of pixeldump tool which selects the proper buffers.
+
+    Args:
+      input_id: 0 for DP1, 1 for DP2, 2 for HDMI, and 3 for VGA.
+    """
+    return cls._PIXELDUMP_ARGS[input_id]
 
 
 class EdidController(object):
