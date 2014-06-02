@@ -17,6 +17,8 @@ from pygprobe import cmdline_commands, common  # pylint: disable=F0401
 class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for Pygprobe."""
 
+  _PIXEL_FORMAT = 'rrggbb'
+
   _ALL_INPUTS = ['RESERVED', 'DP', 'DVI', 'HDMI', 'VGA']  # index starts at 1
 
   def __init__(self, usb_serial=None, *args, **kwargs):
@@ -286,6 +288,14 @@ class ChameleondDriver(ChameleondInterface):
           time.sleep(assert_in_sec)
     else:
       raise NotImplementedError('FireHpdPulse')
+
+  def GetPixelFormat(self):
+    """Returns the pixel format for the output of DumpPixels.
+
+    Returns:
+      A string of the format, like 'rgba', 'bgra', 'rgb', etc.
+    """
+    return self._PIXEL_FORMAT
 
   def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.

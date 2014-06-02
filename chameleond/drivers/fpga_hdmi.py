@@ -46,6 +46,8 @@ class ChameleondDriver(ChameleondInterface):
 
   _HDMI_ID = 1
 
+  _PIXEL_FORMAT = 'rgba'
+
   _GPIO_MEM_ADDRESS = 0xff2100d0
   _FRAME_WIDTH_ADDRESS = 0xff210100
   _FRAME_HEIGHT_ADDRESS = 0xff210104
@@ -511,6 +513,14 @@ class ChameleondDriver(ChameleondInterface):
                        assert_interval_usec, repeat_count)
     else:
       raise DriverError('Not a valid input_id.')
+
+  def GetPixelFormat(self):
+    """Returns the pixel format for the output of DumpPixels.
+
+    Returns:
+      A string of the format, like 'rgba', 'bgra', 'rgb', etc.
+    """
+    return self._PIXEL_FORMAT
 
   def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.

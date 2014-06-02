@@ -170,6 +170,14 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('FireHpdPulse')
 
+  def GetPixelFormat(self):
+    """Returns the pixel format for the output of DumpPixels.
+
+    Returns:
+      A string of the format, like 'rgba', 'bgra', 'rgb', etc.
+    """
+    raise NotImplementedError('GetPixelFormat')
+
   def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
 
