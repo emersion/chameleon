@@ -25,12 +25,14 @@ class DpRx(i2c_fpga.I2cSlave):
 
     # TODO(waihong): Declare constants for the registers and values.
     self.Set(0x02, 0x05)  # bank 0
-    self.Set(0x05, 0xef)  # inverse clock with 1ns adjustment
+    self.Set(0x01, 0xe3)  # make interrupt output polarity active low to
+                          # match hdmi
     self.Set(0xe0, 0xd2)  # video fifo gain???
     self.Set(0xc5, 0xcc)  # [3:0] CR Wait Time x 100us???
                           # This makes 2560x1600 work
     self.Set(0x03, 0x05)  # bank 1
-    self.Set(0xee, 0xa5)  # max driving strength for video
+    self.Set(0xee, 0xa5)  # the driving strength for video
+                          # (ITE firmware uses 0xc8)
     self.Set(0x03, 0xb8)  # ?
 
     # Initialize the audio path.
@@ -49,6 +51,7 @@ class DpRx(i2c_fpga.I2cSlave):
     """Uses dual pixel mode which occupes 2 video paths in FPGA."""
     self.Set(0x02, 0x05)  # bank 0
     self.Set(0x6c, 0xed)  # power up dual pixel mode path
+    self.Set(0x06, 0xef)  # tune dual pixel dp timing
     self.Set(0x03, 0x05)  # bank 1
     self.Set(0x11, 0xa2)  # bit 0 reset FIFO
     self.Set(0x10, 0xa2)  # bit 4 enables dual pixel mode
@@ -57,6 +60,7 @@ class DpRx(i2c_fpga.I2cSlave):
     """Uses single pixel mode which occupes 1 video path in FPGA."""
     self.Set(0x02, 0x05)  # bank 0
     self.Set(0xec, 0xed)  # power down double pixel mode path
+    self.Set(0x07, 0xef)  # tune single pixel dp timing
     self.Set(0x03, 0x05)  # bank 1
     self.Set(0x00, 0xa2)  # bit 4 disables dual pixel mode
 
@@ -103,8 +107,11 @@ class HdmiRx(i2c_fpga.I2cSlave):
     self.SetDualPixelMode()
 
     # TODO(waihong): Declare constants for the registers and values.
+    self.Set(0x3f, 0x63)  # enable interrupt IO output
     self.Set(0x33, 0x58)  # set driving strength to max (video)
     self.Set(0x33, 0x59)  # set driving strength to max (audio)
+
+    self.SetColorSpaceConvertion()
 
   def SetDualPixelMode(self):
     """Uses dual pixel mode which occupes 2 video paths in FPGA."""
@@ -112,12 +119,42 @@ class HdmiRx(i2c_fpga.I2cSlave):
     self.Set(0x0f, 0x0d)  # enable PHFCLK
     self.Set(0x01, 0x8b)  # enable dual pixel mode
     self.Set(0x08, 0x8c)  # enable QA IO
+    self.Set(0xb1, 0x50)  # tune hdmi dual pixel timing
 
   def SetSinglePixelMode(self):
     """Uses single pixel mode which occupes 1 video path in FPGA."""
     self.Set(0x07, 0x0d)  # disable PHFCLK
     self.Set(0x80, 0x8b)  # disable dual pixel mode
     self.Set(0x09, 0x8c)  # enable QA IO, single pixel mode 1
+    self.Set(0xb3, 0x50)  # tune hdmi single pixel timing
+
+  def SetColorSpaceConvertion(self):
+    """Sets the registers for YUV color space convertion."""
+    self.Set(0x01, 0x0f)
+    self.Set(0x04, 0x70)
+    self.Set(0x00, 0x71)
+    self.Set(0xa7, 0x72)
+    self.Set(0x4f, 0x73)
+    self.Set(0x09, 0x74)
+    self.Set(0xba, 0x75)
+    self.Set(0x3b, 0x76)
+    self.Set(0x4b, 0x77)
+    self.Set(0x3e, 0x78)
+    self.Set(0x4f, 0x79)
+    self.Set(0x09, 0x7a)
+    self.Set(0x57, 0x7b)
+    self.Set(0x0e, 0x7c)
+    self.Set(0x02, 0x7d)
+    self.Set(0x00, 0x7e)
+    self.Set(0x4f, 0x7f)
+    self.Set(0x09, 0x80)
+    self.Set(0xfe, 0x81)
+    self.Set(0x3f, 0x82)
+    self.Set(0xe8, 0x83)
+    self.Set(0x10, 0x84)
+    self.Set(0x00, 0x0f)
+    self.Set(0x01, 0x11) # Port 0 all logic reset
+    self.Set(0x00, 0x11)
 
   def IsCablePowered(self):
     """Returns if the cable is powered or not."""

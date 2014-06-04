@@ -131,32 +131,44 @@ class VideoDumper(object):
   _BIT_CLK_ALT = 1 << 1
   _BIT_STOP = 0
   _BIT_RUN = 1 << 2
+  # Run only when both dumpers' _BIT_RUN_DUAL set.
+  _BIT_RUN_DUAL = 1 << 3
 
-  # Register which stores the memory address to dump
-  _REG_ADDR = 0x4
+  # Register which stores the offsets, related to 0xc0000000, for dump.
+  _REG_START_ADDR = 0x8
+  _REG_END_ADDR = 0xc
+  _REG_LOOP = 0x10
+  _REG_LIMIT = 0x14
   # Registers to get the width and height
-  _REG_WIDTH = 0x10
-  _REG_HEIGHT = 0x14
+  _REG_WIDTH = 0x18
+  _REG_HEIGHT = 0x1c
 
   _VALUES_CTRL = {
-    ids.DP1: (_BIT_RUN | _BIT_CLK_NORMAL,  # Dumper 0
-              _BIT_RUN | _BIT_CLK_ALT),  # Dumper 1
-    ids.DP2: (_BIT_RUN | _BIT_CLK_ALT,
-              _BIT_RUN | _BIT_CLK_NORMAL),
-    ids.HDMI: (_BIT_RUN | _BIT_CLK_ALT,
-               _BIT_RUN | _BIT_CLK_NORMAL),
+    ids.DP1: (_BIT_RUN_DUAL | _BIT_CLK_NORMAL,  # Dumper 0
+              _BIT_RUN_DUAL | _BIT_CLK_ALT),  # Dumper 1
+    ids.DP2: (_BIT_RUN_DUAL | _BIT_CLK_ALT,
+              _BIT_RUN_DUAL | _BIT_CLK_NORMAL),
+    ids.HDMI: (_BIT_RUN_DUAL | _BIT_CLK_ALT,
+               _BIT_RUN_DUAL | _BIT_CLK_NORMAL),
     ids.VGA: (_BIT_RUN | _BIT_CLK_NORMAL,
               _BIT_STOP)
   }
 
-  _DUMP_ADDRESSES = (0xc0000000,  # Dumper 0
-                     0xd0000000)  # Dumper 1
+  _DUMP_BASE_ADDRESS = 0xc0000000
+  _DUMP_BUFFER_SIZE = 0x1c000000
+  _DUMP_START_ADDRESSES = (0x00000000,  # Dumper 0
+                           0x20000000)  # Dumper 1
+  _DEFAULT_LOOP = 1
+  _DEFAULT_LIMIT = 1
 
   _PIXELDUMP_ARGS = {
-    ids.DP1: ['-a', _DUMP_ADDRESSES[0], '-b', _DUMP_ADDRESSES[1]],
-    ids.DP2: ['-a', _DUMP_ADDRESSES[1], '-b', _DUMP_ADDRESSES[0]],
-    ids.HDMI: ['-a', _DUMP_ADDRESSES[1], '-b', _DUMP_ADDRESSES[0]],
-    ids.VGA: ['-a', _DUMP_ADDRESSES[0]],
+    ids.DP1: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0],
+              '-b', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[1]],
+    ids.DP2: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[1],
+              '-b', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0]],
+    ids.HDMI: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[1],
+               '-b', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0]],
+    ids.VGA: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0]],
   }
 
   def __init__(self, index):
@@ -167,6 +179,27 @@ class VideoDumper(object):
     """
     self._memory = mem.Memory
     self._index = index
+    self._alt_index = 0 if self._index else 1
+
+  def Stop(self):
+    """Stops dumping."""
+    self._memory.ClearMask(self._REGS_BASE[self._index] + self._REG_CTRL,
+                           self._BIT_RUN | self._BIT_RUN_DUAL)
+
+  def Start(self, input_id):
+    """Starts dumping.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+    """
+    ctrl_value = self._VALUES_CTRL[input_id][self._index]
+    if ctrl_value & self._BIT_RUN:
+      bit_run = self._BIT_RUN
+    elif ctrl_value & self._BIT_RUN_DUAL:
+      bit_run = self._BIT_RUN_DUAL
+    else:
+      return
+    self._memory.SetMask(self._REGS_BASE[self._index] + self._REG_CTRL, bit_run)
 
   def Select(self, input_id):
     """Selects the given input for dumping.
@@ -174,9 +207,17 @@ class VideoDumper(object):
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
     """
-    # Set the memory address for dump.
-    self._memory.Write(self._REGS_BASE[self._index] + self._REG_ADDR,
-                       self._DUMP_ADDRESSES[self._index])
+    self.Stop()
+    # Set the memory addresses, loop, and limit for dump.
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_START_ADDR,
+                       self._DUMP_START_ADDRESSES[self._index])
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
+                       self._DUMP_START_ADDRESSES[self._index] +
+                         self._DUMP_BUFFER_SIZE)
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_LOOP,
+                       self._DEFAULT_LOOP)
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_LIMIT,
+                       self._DEFAULT_LIMIT)
     # Use the proper CLK and run.
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_CTRL,
                        self._VALUES_CTRL[input_id][self._index])
