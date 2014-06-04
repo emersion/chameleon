@@ -88,6 +88,14 @@ class HdmiRx(i2c_fpga.I2cSlave):
   _REG_P0_B0_SUM = 0xc4  # Port 0, block 0
   _REG_P0_B1_SUM = 0xc5  # Port 0, block 1
 
+  _REG_VIDEO_MODE = 0x99
+  _BIT_VIDEO_STABLE = 1 << 3
+
+  _REG_HACTIVE_H = 0x9f
+  _REG_HACTIVE_L = 0x9e
+  _REG_VACTIVE_H = 0xa4
+  _REG_VACTIVE_L = 0xa5
+
   def Initialize(self):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize HDMI RX chip.')
@@ -154,6 +162,21 @@ class HdmiRx(i2c_fpga.I2cSlave):
       self.Set(checksum, self._REG_P0_B0_SUM)
     elif block_num == 1:
       self.Set(checksum, self._REG_P0_B1_SUM)
+
+  def IsVideoInputStable(self):
+    """Returns whether the video input is stable."""
+    video_mode = self.Get(self._REG_VIDEO_MODE)
+    return bool(video_mode & self._BIT_VIDEO_STABLE)
+
+  def GetResolution(self):
+    """Gets the resolution reported from receiver."""
+    hactive_h = self.Get(self._REG_HACTIVE_H)
+    hactive_l = self.Get(self._REG_HACTIVE_L)
+    vactive_h = self.Get(self._REG_VACTIVE_H)
+    vactive_l = self.Get(self._REG_VACTIVE_L)
+    width = (hactive_h & 0x3f) << 8 | hactive_l
+    height = (vactive_h & 0xf0) << 4 | vactive_l
+    return (width, height)
 
 
 class VgaRx(i2c_fpga.I2cSlave):

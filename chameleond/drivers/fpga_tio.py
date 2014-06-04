@@ -143,8 +143,7 @@ class ChameleondDriver(ChameleondInterface):
       True if the video input becomes stable within the timeout period;
       otherwise, False.
     """
-    # TODO(waihong): Implement this method.
-    return True
+    return self._input_flows[input_id].WaitVideoInputStable(timeout)
 
   def _ReadDefaultEdid(self):
     """Reads the default EDID from file.

@@ -7,6 +7,7 @@ import logging
 from abc import ABCMeta
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.utils import common
 from chameleond.utils import edid
 from chameleond.utils import fpga
 from chameleond.utils import ids
@@ -66,17 +67,18 @@ class InputFlow(object):
     self._fpga.vpass.Select(self._input_id)
     self._fpga.vdump0.Select(self._input_id)
     self._fpga.vdump1.Select(self._input_id)
+    self.WaitVideoOutputStable()
 
   def GetPixelDumpArgs(self):
     """Gets the arguments of pixeldump tool which selects the proper buffers."""
     return fpga.VideoDumper.GetPixelDumpArgs(self._input_id)
 
-  def GetResolution(self):
-    """Gets the resolution of the video flow."""
+  def _GetResolutionFromFpga(self):
+    """Gets the resolution reported from the FPGA."""
     # For dual pixel mode.
     resolution0 = (self._fpga.vdump0.GetWidth(), self._fpga.vdump0.GetHeight())
     resolution1 = (self._fpga.vdump1.GetWidth(), self._fpga.vdump1.GetHeight())
-    if resolution0 != resolution1:
+    if self._input_id != ids.VGA and resolution0 != resolution1:
       logging.warn('Different resolutions between paths: %dx%d != %dx%d',
                    *(resolution0 + resolution1))
     return (resolution0[0] + resolution1[0], resolution0[1])
@@ -85,6 +87,20 @@ class InputFlow(object):
   def GetConnectorType(cls):
     """Returns the human readable string for the connector type."""
     return cls._CONNECTOR_TYPE
+
+  def GetResolution(self):
+    """Gets the resolution of the video flow."""
+    self.WaitVideoOutputStable()
+    # The base implementation just returns the resolution from FPGA
+    return self._GetResolutionFromFpga()
+
+  def WaitVideoInputStable(self, unused_timeout=None):
+    """Waits the video input stable or timeout."""
+    return True
+
+  def WaitVideoOutputStable(self, unused_timeout=None):
+    """Waits the video output stable or timeout."""
+    return True
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -144,11 +160,24 @@ class DpInputFlow(InputFlow):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
 
+  def WaitVideoInputStable(self, unused_timeout=None):
+    """Waits the video input stable or timeout."""
+    # TODO(waihong): Implement this method.
+    return True
+
+  def WaitVideoOutputStable(self, unused_timeout=None):
+    """Waits the video output stable or timeout."""
+    # TODO(waihong): Implement this method.
+    return True
+
 
 class HdmiInputFlow(InputFlow):
   """An abstraction of the entire flow for HDMI."""
 
   _CONNECTOR_TYPE = 'HDMI'
+
+  _DELAY_VIDEO_MODE_PROBE = 0.1
+  _TIMEOUT_VIDEO_STABLE_PROBE = 10
 
   def __init__(self, *args):
     super(HdmiInputFlow, self).__init__(*args)
@@ -177,6 +206,46 @@ class HdmiInputFlow(InputFlow):
   def WriteEdid(self, data):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
+
+  def WaitVideoInputStable(self, timeout=None):
+    """Waits the video input stable or timeout."""
+    if timeout is None:
+      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+    try:
+      common.WaitForCondition(self._rx.IsVideoInputStable, True,
+          self._DELAY_VIDEO_MODE_PROBE, timeout)
+    except common.TimeoutError:
+      return False
+    return True
+
+  def _IsFrameLocked(self):
+    """Returns whether the FPGA frame is locked.
+
+    It compares the resolution reported from the receiver with the FPGA.
+
+    Returns:
+      True if the frame is locked; otherwise, False.
+    """
+    resolution_fpga = self._GetResolutionFromFpga()
+    resolution_rx = self._rx.GetResolution()
+    if resolution_fpga == resolution_rx:
+      logging.info('same resolution: %dx%d', *resolution_fpga)
+      return True
+    else:
+      logging.info('diff resolution: fpga:%dx%d != rx:%dx%d',
+                   *(resolution_fpga + resolution_rx))
+      return False
+
+  def WaitVideoOutputStable(self, timeout=None):
+    """Waits the video output stable or timeout."""
+    if timeout is None:
+      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+    try:
+      common.WaitForCondition(self._IsFrameLocked, True,
+          self._DELAY_VIDEO_MODE_PROBE, timeout)
+    except common.TimeoutError:
+      return False
+    return True
 
 
 class VgaInputFlow(InputFlow):
@@ -213,3 +282,11 @@ class VgaInputFlow(InputFlow):
   def WriteEdid(self, data):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
+
+  def WaitVideoInputStable(self, unused_timeout=None):
+    """Waits the video input stable or timeout."""
+    return True
+
+  def WaitVideoOutputStable(self, unused_timeout=None):
+    """Waits the video output stable or timeout."""
+    return True

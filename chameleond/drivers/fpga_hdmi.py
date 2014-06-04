@@ -7,11 +7,11 @@ import logging
 import os
 import re
 import tempfile
-import time
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
+from chameleond.utils import common
 from chameleond.utils import i2c_tool as i2c
 from chameleond.utils import mem_tool as mem
 from chameleond.utils import system_tools
@@ -188,28 +188,6 @@ class ChameleondDriver(ChameleondInterface):
       if need_restart:
         self._RestartReceiver()
 
-  def _WaitForCondition(self, func, value, timeout):
-    """Waits for the given function matches the given value.
-
-    Args:
-      func: The function to be tested.
-      value: The value to fit the condition.
-      timeout: The timeout in second to break the check.
-
-    Raises:
-      DriverError if timeout.
-    """
-    end_time = start_time = time.time()
-    while end_time - start_time < timeout:
-      if func() == value:
-        break
-      logging.info('Waiting for condition %s == %s', func.__name__, str(value))
-      time.sleep(self._DELAY_VIDEO_MODE_PROBE)
-      end_time = time.time()
-    else:
-      raise DriverError('Timeout on waiting for condition %s == %s' %
-                        (str(func), str(value)))
-
   def _RestartReceiver(self):
     """Restarts the HDMI receiver."""
     logging.info('Resetting HDMI receiver...')
@@ -217,11 +195,11 @@ class ChameleondDriver(ChameleondInterface):
        self._HDMIRX_MASK_CDRRST | self._HDMIRX_MASK_SWRST)
 
     try:
-      self._WaitForCondition(self._IsModeChanged, False,
-                             self._TIMEOUT_VIDEO_STABLE_PROBE)
-      self._WaitForCondition(self._IsFrameLocked, True,
-                             self._TIMEOUT_VIDEO_STABLE_PROBE)
-    except DriverError as e:
+      common.WaitForCondition(self._IsModeChanged, False,
+          self._DELAY_VIDEO_MODE_PROBE, self._TIMEOUT_VIDEO_STABLE_PROBE)
+      common.WaitForCondition(self._IsFrameLocked, True,
+          self._DELAY_VIDEO_MODE_PROBE, self._TIMEOUT_VIDEO_STABLE_PROBE)
+    except common.TimeoutError as e:
       self._error_level = ErrorLevel.CHIP_ERROR
       raise ChipError(e)
 
@@ -333,8 +311,9 @@ class ChameleondDriver(ChameleondInterface):
       if timeout is None:
         timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
       try:
-        self._WaitForCondition(self._IsVideoInputStable, True, timeout)
-      except DriverError:
+        common.WaitForCondition(self._IsVideoInputStable, True,
+            self._DELAY_VIDEO_MODE_PROBE, timeout)
+      except common.TimeoutError:
         return False
       return True
     else:
