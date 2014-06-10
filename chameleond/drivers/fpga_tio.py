@@ -295,7 +295,7 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('Something wrong with the resolution: %dx%d' %
                         (total_width, total_height))
     # Specify the proper arguemnt for dual-buffer capture.
-    if input_id in (ids.DP1, ids.DP2, ids.HDMI):
+    if self._input_flows[input_id].IsDualPixelMode():
       total_width = total_width / 2
 
     with tempfile.NamedTemporaryFile() as f:

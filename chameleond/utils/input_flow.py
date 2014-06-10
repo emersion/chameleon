@@ -33,6 +33,8 @@ class InputFlow(object):
     ids.VGA: rx.VgaRx.SLAVE_ADDRESSES[0]
   }
   _MUX_CONFIGS = {
+    # Use a dual-pixel-mode setting for IO as no support for two flows
+    # simultaneously so far.
     ids.DP1: io.MuxIo.CONFIG_DP1_DUAL,
     ids.DP2: io.MuxIo.CONFIG_DP2_DUAL,
     ids.HDMI: io.MuxIo.CONFIG_HDMI_DUAL,
@@ -58,24 +60,29 @@ class InputFlow(object):
     """Initializes the input flow."""
     logging.info('Initialize InputFlow #%d.', self._input_id)
     self._power_io.ResetReceiver(self._input_id)
-    self._rx.Initialize()
+    self._rx.Initialize(self.IsDualPixelMode())
 
   def Select(self):
     """Selects the input flow to set the proper muxes and FPGA paths."""
     logging.info('Select InputFlow #%d.', self._input_id)
     self._mux_io.SetConfig(self._MUX_CONFIGS[self._input_id])
     self._fpga.vpass.Select(self._input_id)
-    self._fpga.vdump0.Select(self._input_id)
-    self._fpga.vdump1.Select(self._input_id)
+    self._fpga.vdump0.Select(self._input_id, self.IsDualPixelMode())
+    self._fpga.vdump1.Select(self._input_id, self.IsDualPixelMode())
     self.WaitVideoOutputStable()
 
   def GetPixelDumpArgs(self):
     """Gets the arguments of pixeldump tool which selects the proper buffers."""
-    return fpga.VideoDumper.GetPixelDumpArgs(self._input_id)
+    return fpga.VideoDumper.GetPixelDumpArgs(self._input_id,
+                                             self.IsDualPixelMode())
 
-  def _GetResolutionFromFpga(self):
-    """Gets the resolution reported from the FPGA."""
-    # For dual pixel mode.
+  @classmethod
+  def GetConnectorType(cls):
+    """Returns the human readable string for the connector type."""
+    return cls._CONNECTOR_TYPE
+
+  def _GetResolutionFromFpgaForDualPixelMode(self):
+    """Gets the resolution reported from the FPGA for dual pixel mode."""
     resolution0 = (self._fpga.vdump0.GetWidth(), self._fpga.vdump0.GetHeight())
     resolution1 = (self._fpga.vdump1.GetWidth(), self._fpga.vdump1.GetHeight())
     if self._input_id != ids.VGA and resolution0 != resolution1:
@@ -83,15 +90,18 @@ class InputFlow(object):
                    *(resolution0 + resolution1))
     return (resolution0[0] + resolution1[0], resolution0[1])
 
-  @classmethod
-  def GetConnectorType(cls):
-    """Returns the human readable string for the connector type."""
-    return cls._CONNECTOR_TYPE
+  def _GetResolutionFromFpga(self):
+    """Gets the resolution reported from the FPGA."""
+    if self.IsDualPixelMode():
+      return self._GetResolutionFromFpgaForDualPixelMode()
+    elif fpga.VideoDumper.PRIMARY_FLOW_INDEXES[self._input_id] == 0:
+      return (self._fpga.vdump0.GetWidth(), self._fpga.vdump0.GetHeight())
+    else:
+      return (self._fpga.vdump1.GetWidth(), self._fpga.vdump1.GetHeight())
 
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
-    # The base implementation just returns the resolution from FPGA
     return self._GetResolutionFromFpga()
 
   def WaitVideoInputStable(self, unused_timeout=None):
@@ -101,6 +111,10 @@ class InputFlow(object):
   def WaitVideoOutputStable(self, unused_timeout=None):
     """Waits the video output stable or timeout."""
     return True
+
+  def IsDualPixelMode(self):
+    """Returns if the input flow uses dual pixel mode."""
+    raise NotImplementedError('IsDualPixelMode')
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -131,10 +145,15 @@ class DpInputFlow(InputFlow):
   """An abstraction of the entire flow for DisplayPort."""
 
   _CONNECTOR_TYPE = 'DP'
+  _IS_DUAL_PIXEL_MODE = False
 
   def __init__(self, *args):
     super(DpInputFlow, self).__init__(*args)
     self._edid = edid.DpEdid(args[0], self._main_bus)
+
+  def IsDualPixelMode(self):
+    """Returns if the input flow uses dual pixel mode."""
+    return self._IS_DUAL_PIXEL_MODE
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -175,6 +194,7 @@ class HdmiInputFlow(InputFlow):
   """An abstraction of the entire flow for HDMI."""
 
   _CONNECTOR_TYPE = 'HDMI'
+  _IS_DUAL_PIXEL_MODE = False
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
@@ -182,6 +202,10 @@ class HdmiInputFlow(InputFlow):
   def __init__(self, *args):
     super(HdmiInputFlow, self).__init__(*args)
     self._edid = edid.HdmiEdid(self._main_bus)
+
+  def IsDualPixelMode(self):
+    """Returns if the input flow uses dual pixel mode."""
+    return self._IS_DUAL_PIXEL_MODE
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -252,10 +276,15 @@ class VgaInputFlow(InputFlow):
   """An abstraction of the entire flow for VGA."""
 
   _CONNECTOR_TYPE = 'VGA'
+  _IS_DUAL_PIXEL_MODE = False
 
   def __init__(self, *args):
     super(VgaInputFlow, self).__init__(*args)
     self._edid = edid.VgaEdid(self._fpga)
+
+  def IsDualPixelMode(self):
+    """Returns if the input flow uses dual pixel mode."""
+    return self._IS_DUAL_PIXEL_MODE
 
   # TODO(waihong): Implement the following methods for VGA.
 

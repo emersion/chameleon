@@ -17,11 +17,13 @@ class DpRx(i2c_fpga.I2cSlave):
 
   _AUDIO_RESET_DELAY = 0.001
 
-  def Initialize(self):
+  def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize DisplayPort RX chip.')
-    # Use the dual pixel mode by default.
-    self.SetDualPixelMode()
+    if dual_pixel_mode:
+      self.SetDualPixelMode()
+    else:
+      self.SetSinglePixelMode()
 
     # TODO(waihong): Declare constants for the registers and values.
     self.Set(0x02, 0x05)  # bank 0
@@ -100,11 +102,13 @@ class HdmiRx(i2c_fpga.I2cSlave):
   _REG_VACTIVE_H = 0xa4
   _REG_VACTIVE_L = 0xa5
 
-  def Initialize(self):
+  def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize HDMI RX chip.')
-    # Use the dual pixel mode by default.
-    self.SetDualPixelMode()
+    if dual_pixel_mode:
+      self.SetDualPixelMode()
+    else:
+      self.SetSinglePixelMode()
 
     # TODO(waihong): Declare constants for the registers and values.
     self.Set(0x3f, 0x63)  # enable interrupt IO output
@@ -221,7 +225,7 @@ class VgaRx(i2c_fpga.I2cSlave):
 
   SLAVE_ADDRESSES = (0x4c, )
 
-  def Initialize(self):
+  def Initialize(self, unused_dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize CRT RX chip.')
     # TODO(waihong): Declare constants for the registers and values.

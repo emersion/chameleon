@@ -143,15 +143,12 @@ class VideoDumper(object):
   _REG_WIDTH = 0x18
   _REG_HEIGHT = 0x1c
 
-  _VALUES_CTRL = {
-    ids.DP1: (_BIT_RUN_DUAL | _BIT_CLK_NORMAL,  # Dumper 0
-              _BIT_RUN_DUAL | _BIT_CLK_ALT),  # Dumper 1
-    ids.DP2: (_BIT_RUN_DUAL | _BIT_CLK_ALT,
-              _BIT_RUN_DUAL | _BIT_CLK_NORMAL),
-    ids.HDMI: (_BIT_RUN_DUAL | _BIT_CLK_ALT,
-               _BIT_RUN_DUAL | _BIT_CLK_NORMAL),
-    ids.VGA: (_BIT_RUN | _BIT_CLK_NORMAL,
-              _BIT_STOP)
+  # On dual pixel mode, the primary flow index:
+  PRIMARY_FLOW_INDEXES = {
+    ids.DP1: 0,
+    ids.DP2: 1,
+    ids.HDMI: 1,
+    ids.VGA: 0,
   }
 
   _DUMP_BASE_ADDRESS = 0xc0000000
@@ -160,16 +157,6 @@ class VideoDumper(object):
                            0x20000000)  # Dumper 1
   _DEFAULT_LOOP = 1
   _DEFAULT_LIMIT = 1
-
-  _PIXELDUMP_ARGS = {
-    ids.DP1: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0],
-              '-b', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[1]],
-    ids.DP2: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[1],
-              '-b', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0]],
-    ids.HDMI: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[1],
-               '-b', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0]],
-    ids.VGA: ['-a', _DUMP_BASE_ADDRESS + _DUMP_START_ADDRESSES[0]],
-  }
 
   def __init__(self, index):
     """Constructs a VideoDumper object.
@@ -186,26 +173,27 @@ class VideoDumper(object):
     self._memory.ClearMask(self._REGS_BASE[self._index] + self._REG_CTRL,
                            self._BIT_RUN | self._BIT_RUN_DUAL)
 
-  def Start(self, input_id):
+  def Start(self, input_id, dual_pixel_mode):
     """Starts dumping.
 
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
+      dual_pixel_mode: True to use dual pixel mode; otherwise, False.
     """
-    ctrl_value = self._VALUES_CTRL[input_id][self._index]
-    if ctrl_value & self._BIT_RUN:
-      bit_run = self._BIT_RUN
-    elif ctrl_value & self._BIT_RUN_DUAL:
+    if dual_pixel_mode:
       bit_run = self._BIT_RUN_DUAL
+    elif self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
+      bit_run = self._BIT_RUN
     else:
       return
     self._memory.SetMask(self._REGS_BASE[self._index] + self._REG_CTRL, bit_run)
 
-  def Select(self, input_id):
+  def Select(self, input_id, dual_pixel_mode):
     """Selects the given input for dumping.
 
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
+      dual_pixel_mode: True to use dual pixel mode; otherwise, False.
     """
     self.Stop()
     # Set the memory addresses, loop, and limit for dump.
@@ -219,8 +207,15 @@ class VideoDumper(object):
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_LIMIT,
                        self._DEFAULT_LIMIT)
     # Use the proper CLK and run.
+    if self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
+      ctrl_value = self._BIT_CLK_NORMAL
+    elif dual_pixel_mode:
+      ctrl_value = self._BIT_CLK_ALT
+    else:
+      ctrl_value = 0
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_CTRL,
-                       self._VALUES_CTRL[input_id][self._index])
+                       ctrl_value)
+    self.Start(input_id, dual_pixel_mode)
 
   def GetWidth(self):
     """Gets the width of the video path."""
@@ -231,13 +226,31 @@ class VideoDumper(object):
     return self._memory.Read(self._REGS_BASE[self._index] + self._REG_HEIGHT)
 
   @classmethod
-  def GetPixelDumpArgs(cls, input_id):
+  def GetPixelDumpArgs(cls, input_id, dual_pixel_mode):
     """Gets the arguments of pixeldump tool which selects the proper buffers.
 
     Args:
-      input_id: 0 for DP1, 1 for DP2, 2 for HDMI, and 3 for VGA.
+      input_id: The ID of the input connector. Check the value in ids.py.
+      dual_pixel_mode: True to use dual pixel mode; otherwise, False.
     """
-    return cls._PIXELDUMP_ARGS[input_id]
+    i = cls.PRIMARY_FLOW_INDEXES[input_id]
+    if dual_pixel_mode:
+      # XXX: Swap A and B only for HDMI pixeldump. Because the receiver
+      # output pixels in a swapped order, like the following chart.
+      #
+      #  Input                           | DP1 | DP2 | HDMI | CRT |
+      # -----------------------------------------------------------
+      #  (1) CLOCK                       | A   | B   | B    | A   |
+      # -----------------------------------------------------------
+      #  (2) SINGLE PIXEL DATA           | A   | B   | B    | A   |
+      #  (3) DUAL PIXEL EVEN PIXELS DATA | A   | B   | A*   |     |
+      #  (4) DUAL PIXEL ODD PIXELS DATA  | B   | A   | B*   |     |
+      if input_id == ids.HDMI:
+        i = 1 - i
+      return ['-a', cls._DUMP_BASE_ADDRESS + cls._DUMP_START_ADDRESSES[i],
+              '-b', cls._DUMP_BASE_ADDRESS + cls._DUMP_START_ADDRESSES[1 - i]]
+    else:
+      return ['-a', cls._DUMP_BASE_ADDRESS + cls._DUMP_START_ADDRESSES[i]]
 
 
 class EdidController(object):
