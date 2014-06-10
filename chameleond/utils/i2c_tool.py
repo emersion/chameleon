@@ -88,7 +88,7 @@ class I2cBus(object):
       An I2cSlave or its subclass object.
     """
     if slave not in self._slaves:
-      self._slaves[slave] = I2cSlave(slave)
+      self._slaves[slave] = I2cSlave(self, slave)
     return self._slaves[slave]
 
 
