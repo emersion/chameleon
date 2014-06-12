@@ -244,7 +244,7 @@ class HdmiInputFlow(InputFlow):
   """An abstraction of the entire flow for HDMI."""
 
   _CONNECTOR_TYPE = 'HDMI'
-  _IS_DUAL_PIXEL_MODE = False
+  _IS_DUAL_PIXEL_MODE = True
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
