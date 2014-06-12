@@ -29,6 +29,9 @@ class ChameleondDriver(ChameleondInterface):
 
   _PIXEL_FORMAT = 'rgb'
 
+  # Time to wait for video frame dump to start before a timeout error is raised
+  _TIMEOUT_FRAME_DUMP_PROBE = 1.0
+
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._selected_input = None
@@ -262,6 +265,7 @@ class ChameleondDriver(ChameleondInterface):
     if input_id != self._selected_input:
       self._input_flows[input_id].Select()
       self._selected_input = input_id
+    self._input_flows[input_id].Do_FSM()
 
   def GetPixelFormat(self):
     """Returns the pixel format for the output of DumpPixels.
@@ -298,6 +302,13 @@ class ChameleondDriver(ChameleondInterface):
     if self._input_flows[input_id].IsDualPixelMode():
       total_width = total_width / 2
 
+    # Reset video dump such that it starts at beginning of the dump buffer.
+    self._input_flows[input_id].StopVideoDump()
+    self._input_flows[input_id].StartVideoDump()
+    # Wait until it dumps at least one frame.
+    self._input_flows[input_id].WaitForVideoDumpFrameReady(
+        self._TIMEOUT_FRAME_DUMP_PROBE)
+
     with tempfile.NamedTemporaryFile() as f:
       if x is None or y is None or not width or not height:
         self._tools.Call('pixeldump', f.name, total_width, total_height,
@@ -308,6 +319,7 @@ class ChameleondDriver(ChameleondInterface):
                          len(self._PIXEL_FORMAT), x, y, width, height,
                          *self._input_flows[input_id].GetPixelDumpArgs())
       screen = f.read()
+
     return xmlrpclib.Binary(screen)
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,

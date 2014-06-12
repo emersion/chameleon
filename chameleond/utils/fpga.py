@@ -142,6 +142,7 @@ class VideoDumper(object):
   # Registers to get the width and height
   _REG_WIDTH = 0x18
   _REG_HEIGHT = 0x1c
+  _REG_FRAME_COUNT = 0x20
 
   # On dual pixel mode, the primary flow index:
   PRIMARY_FLOW_INDEXES = {
@@ -155,8 +156,8 @@ class VideoDumper(object):
   _DUMP_BUFFER_SIZE = 0x1c000000
   _DUMP_START_ADDRESSES = (0x00000000,  # Dumper 0
                            0x20000000)  # Dumper 1
-  _DEFAULT_LOOP = 1
-  _DEFAULT_LIMIT = 1
+  _DEFAULT_LOOP = 0
+  _DEFAULT_LIMIT = 100
 
   def __init__(self, index):
     """Constructs a VideoDumper object.
@@ -166,7 +167,6 @@ class VideoDumper(object):
     """
     self._memory = mem.Memory
     self._index = index
-    self._alt_index = 0 if self._index else 1
 
   def Stop(self):
     """Stops dumping."""
@@ -209,10 +209,8 @@ class VideoDumper(object):
     # Use the proper CLK and run.
     if self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
       ctrl_value = self._BIT_CLK_NORMAL
-    elif dual_pixel_mode:
-      ctrl_value = self._BIT_CLK_ALT
     else:
-      ctrl_value = 0
+      ctrl_value = self._BIT_CLK_ALT
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_CTRL,
                        ctrl_value)
     self.Start(input_id, dual_pixel_mode)
@@ -224,6 +222,11 @@ class VideoDumper(object):
   def GetHeight(self):
     """Gets the height of the video path."""
     return self._memory.Read(self._REGS_BASE[self._index] + self._REG_HEIGHT)
+
+  def GetFrameCount(self):
+    """Gets the total count of frames captured."""
+    return self._memory.Read(self._REGS_BASE[self._index] +
+                             self._REG_FRAME_COUNT)
 
   @classmethod
   def GetPixelDumpArgs(cls, input_id, dual_pixel_mode):

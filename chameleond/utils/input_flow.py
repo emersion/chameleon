@@ -41,6 +41,9 @@ class InputFlow(object):
     ids.VGA: io.MuxIo.CONFIG_VGA
   }
 
+  # Delay in second to ensure at least one frame is dumped.
+  _DELAY_VIDEO_DUMP_PROBE = 0.1
+
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
     """Constructs a InputFlow object.
 
@@ -94,15 +97,62 @@ class InputFlow(object):
     """Gets the resolution reported from the FPGA."""
     if self.IsDualPixelMode():
       return self._GetResolutionFromFpgaForDualPixelMode()
-    elif fpga.VideoDumper.PRIMARY_FLOW_INDEXES[self._input_id] == 0:
-      return (self._fpga.vdump0.GetWidth(), self._fpga.vdump0.GetHeight())
     else:
-      return (self._fpga.vdump1.GetWidth(), self._fpga.vdump1.GetHeight())
+      vdump = self._GetEffectiveVideoDumpers()[0]
+      return (vdump.GetWidth(), vdump.GetHeight())
 
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
     return self._GetResolutionFromFpga()
+
+  def _GetEffectiveVideoDumpers(self):
+    """Gets effective video dumpers on the flow."""
+    if self.IsDualPixelMode():
+      return [self._fpga.vdump0, self._fpga.vdump1]
+    elif fpga.VideoDumper.PRIMARY_FLOW_INDEXES[self._input_id] == 0:
+      return [self._fpga.vdump0]
+    else:
+      return [self._fpga.vdump1]
+
+  def StopVideoDump(self):
+    """Stops video dump."""
+    for vdump in self._GetEffectiveVideoDumpers():
+      vdump.Stop()
+
+  def StartVideoDump(self):
+    """Starts video dump."""
+    for vdump in self._GetEffectiveVideoDumpers():
+      vdump.Start(self._input_id, self.IsDualPixelMode())
+
+  def _IsVideoDumpFrameReady(self):
+    """Returns true if FPGA dumps at least one frame.
+
+    The function assumes that the frame count starts at zero.
+    """
+    dumpers = self._GetEffectiveVideoDumpers()
+    target_count = len(dumpers)
+    ready_count = 0
+    for dumper in dumpers:
+      if dumper.GetFrameCount():
+        ready_count = ready_count + 1
+    return ready_count == target_count
+
+  def WaitForVideoDumpFrameReady(self, timeout):
+    """Waits until FPGA dumps at least one frame."""
+    common.WaitForCondition(self._IsVideoDumpFrameReady, True,
+        self._DELAY_VIDEO_DUMP_PROBE, timeout)
+
+  def Do_FSM(self):
+    """Does the Finite-State-Machine to ensure the input flow ready.
+
+    The receiver requires to do the FSM in order to clear its state, in case
+    of some events happended, like mode change, power reattach, etc.
+
+    It should be called before doing any post-receiver-action, like capturing
+    frames.
+    """
+    pass
 
   def WaitVideoInputStable(self, unused_timeout=None):
     """Waits the video input stable or timeout."""
@@ -230,6 +280,21 @@ class HdmiInputFlow(InputFlow):
   def WriteEdid(self, data):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
+
+  def Do_FSM(self):
+    """Does the Finite-State-Machine to ensure the input flow ready.
+
+    The receiver requires to do the FSM in order to clear its state, in case
+    of some events happended, like mode change, power reattach, etc.
+
+    It should be called before doing any post-receiver-action, like capturing
+    frames.
+    """
+    if self.WaitVideoInputStable():
+      self._rx.Do_FSM()
+      self.WaitVideoOutputStable()
+    else:
+      logging.warn('Skip doing receiver FSM as video input not stable.')
 
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout."""

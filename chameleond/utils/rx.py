@@ -77,7 +77,10 @@ class HdmiRx(i2c_fpga.I2cSlave):
   SLAVE_ADDRESSES = (0x48, )
 
   _REG_INTERNAL_STATUS = 0x0a
-  _BIT_P0_PWR5V_DET = 1
+  _BIT_P0_PWR5V_DET = 1 << 0
+
+  _REG_P0_RESET = 0x11
+  _BIT_P0_SWRST = 1 << 0
 
   _REG_EDID_SLAVE_ADDR = 0x87
   _BIT_ENABLE_EDID_ACCESS = 1
@@ -101,6 +104,8 @@ class HdmiRx(i2c_fpga.I2cSlave):
   _REG_HACTIVE_L = 0x9e
   _REG_VACTIVE_H = 0xa4
   _REG_VACTIVE_L = 0xa5
+
+  _DELAY_SOFTWARE_RESET = 0.3
 
   def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
@@ -208,6 +213,14 @@ class HdmiRx(i2c_fpga.I2cSlave):
     """Returns whether the video input is stable."""
     video_mode = self.Get(self._REG_VIDEO_MODE)
     return bool(video_mode & self._BIT_VIDEO_STABLE)
+
+  def Do_FSM(self):
+    """Does the Finite-State-Machine."""
+    # TODO: Remove this hack when we find a better way to keep receiver
+    # sending good signal.
+    logging.info('Hack to reset the receiver.')
+    self.SetAndClear(self._REG_P0_RESET, self._BIT_P0_SWRST,
+                     self._DELAY_SOFTWARE_RESET)
 
   def GetResolution(self):
     """Gets the resolution reported from receiver."""
