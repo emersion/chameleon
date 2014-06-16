@@ -34,6 +34,7 @@ class ChameleondDriver(ChameleondInterface):
 
   # The frame index which is used for the regular DumpPixels API.
   _DEFAULT_FRAME_INDEX = 0
+  _DEFAULT_FRAME_LIMIT = _DEFAULT_FRAME_INDEX + 1
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
@@ -294,13 +295,56 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
+    self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT)
+    return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX,
+                                  x, y, width, height)
+
+  def GetMaxFrameLimit(self, input_id):
+    """Returns of the maximal number of frames which can be dumped.
+
+    It depends on the size of the internal buffer on the board and the
+    current resolution of the display input. It may change once the
+    resolution changes.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      A number of the frame limit.
+    """
+    return self._input_flows[input_id].GetMaxFrameLimit()
+
+  def CaptureVideo(self, input_id, total_frame):
+    """Captures the video stream on the given input to the buffer.
+
+    This API is a synchronous call. It returns after all the frames are
+    captured. The frames can be read using the ReadCapturedFrame API.
+
+    The example of usage:
+      chameleon.CaptureVideo(hdmi_input, total_frame)
+      for i in xrange(total_frame):
+        frame = chameleon.ReadCapturedFrame(i, *area).data
+        CompareFrame(frame, golden_frames[i])
+
+    Args:
+      input_id: The ID of the input connector.
+      total_frame: The total number of frames to capture, should not larger
+                   than value of GetMaxFrameLimit.
+
+    Returns:
+      A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
+    """
     self._SelectInput(input_id)
     if not self.IsPlugged(input_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
 
+    max_frame_limit = self.GetMaxFrameLimit(input_id)
+    if total_frame > max_frame_limit:
+      raise DriverError('Exceed the max frame limit %d > %d',
+                        total_frame, max_frame_limit)
+
     # Reset video dump such that it starts at beginning of the dump buffer.
-    self._input_flows[input_id].StopVideoDump()
-    self._input_flows[input_id].StartVideoDump()
+    self._input_flows[input_id].RestartVideoDump(total_frame)
     # Wait until it dumps at least one frame.
     self._input_flows[input_id].WaitForVideoDumpFrameReady(
         self._TIMEOUT_FRAME_DUMP_PROBE)
@@ -313,8 +357,6 @@ class ChameleondDriver(ChameleondInterface):
       'is_dual_pixel': self._input_flows[input_id].IsDualPixelMode(),
       'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
     }
-    return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX,
-                                  x, y, width, height)
 
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.
@@ -347,7 +389,7 @@ class ChameleondDriver(ChameleondInterface):
     # Modify the memory offset to match the frame.
     PAGE_SIZE = 4096
     frame_size = total_width * total_height * len(self._PIXEL_FORMAT)
-    frame_size = frame_size + (-frame_size % PAGE_SIZE)
+    frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
     offset = frame_size * frame_index
     for i in range(1, len(pixeldump_args), 2):
       pixeldump_args[i] += offset

@@ -115,12 +115,17 @@ class InputFlow(object):
     else:
       return [self._fpga.vdump1]
 
-  def StopVideoDump(self):
+  def GetMaxFrameLimit(self):
+    """Returns of the maximal number of frames which can be dumped."""
+    vdump = self._GetEffectiveVideoDumpers()[0]
+    return vdump.GetMaxFrameLimit(self.IsDualPixelMode())
+
+  def _StopVideoDump(self):
     """Stops video dump."""
     for vdump in self._GetEffectiveVideoDumpers():
       vdump.Stop()
 
-  def StartVideoDump(self):
+  def _StartVideoDump(self):
     """Starts video dump."""
     for vdump in self._GetEffectiveVideoDumpers():
       vdump.Start(self._input_id, self.IsDualPixelMode())
@@ -142,6 +147,18 @@ class InputFlow(object):
     """Waits until FPGA dumps at least one frame."""
     common.WaitForCondition(self._IsVideoDumpFrameReady, True,
         self._DELAY_VIDEO_DUMP_PROBE, timeout)
+
+  def RestartVideoDump(self, frame_limit=None):
+    """Restarts video dump.
+
+    Args:
+      frame_limit: The limitation of frame to dump.
+    """
+    self._StopVideoDump()
+    if frame_limit:
+      for vdump in self._GetEffectiveVideoDumpers():
+        vdump.SetFrameLimit(frame_limit)
+    self._StartVideoDump()
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
