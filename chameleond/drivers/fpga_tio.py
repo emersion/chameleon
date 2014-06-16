@@ -32,9 +32,13 @@ class ChameleondDriver(ChameleondInterface):
   # Time to wait for video frame dump to start before a timeout error is raised
   _TIMEOUT_FRAME_DUMP_PROBE = 1.0
 
+  # The frame index which is used for the regular DumpPixels API.
+  _DEFAULT_FRAME_INDEX = 0
+
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._selected_input = None
+    self._captured_params = {}
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
 
@@ -294,32 +298,69 @@ class ChameleondDriver(ChameleondInterface):
     if not self.IsPlugged(input_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
 
-    total_width, total_height = self.DetectResolution(input_id)
-    if total_width == 0 or total_height == 0:
-      raise DriverError('Something wrong with the resolution: %dx%d' %
-                        (total_width, total_height))
-    # Specify the proper arguemnt for dual-buffer capture.
-    if self._input_flows[input_id].IsDualPixelMode():
-      total_width = total_width / 2
-
     # Reset video dump such that it starts at beginning of the dump buffer.
     self._input_flows[input_id].StopVideoDump()
     self._input_flows[input_id].StartVideoDump()
     # Wait until it dumps at least one frame.
     self._input_flows[input_id].WaitForVideoDumpFrameReady(
         self._TIMEOUT_FRAME_DUMP_PROBE)
+    total_width, total_height = self.DetectResolution(input_id)
+    if total_width == 0 or total_height == 0:
+      raise DriverError('Something wrong with the resolution: %dx%d' %
+                        (total_width, total_height))
+    self._captured_params = {
+      'resolution': (total_width, total_height),
+      'is_dual_pixel': self._input_flows[input_id].IsDualPixelMode(),
+      'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
+    }
+    return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX,
+                                  x, y, width, height)
+
+  def GetCapturedResolution(self):
+    """Gets the resolution of the captured frame.
+
+    Returns:
+      A (width, height) tuple.
+    """
+    return self._captured_params['resolution']
+
+  def ReadCapturedFrame(self, frame_index, x=None, y=None, width=None,
+                        height=None):
+    """Reads the content of the captured frames from the buffer.
+
+    Args:
+      frame_index: The index of the frame to read.
+      x: The X position of the top-left corner.
+      y: The Y position of the top-left corner.
+      width: The width of the area.
+      height: The height of the area.
+
+    Returns:
+      A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
+    """
+    total_width, total_height = self.GetCapturedResolution()
+    pixeldump_args = self._captured_params['pixeldump_args']
+    # Specify the proper arguemnt for dual-buffer capture.
+    if self._captured_params['is_dual_pixel']:
+      total_width = total_width / 2
+
+    # Modify the memory offset to match the frame.
+    PAGE_SIZE = 4096
+    frame_size = total_width * total_height * len(self._PIXEL_FORMAT)
+    frame_size = frame_size + (-frame_size % PAGE_SIZE)
+    offset = frame_size * frame_index
+    for i in range(1, len(pixeldump_args), 2):
+      pixeldump_args[i] += offset
 
     with tempfile.NamedTemporaryFile() as f:
       if x is None or y is None or not width or not height:
         self._tools.Call('pixeldump', f.name, total_width, total_height,
-                         len(self._PIXEL_FORMAT),
-                         *self._input_flows[input_id].GetPixelDumpArgs())
+                         len(self._PIXEL_FORMAT), *pixeldump_args)
       else:
         self._tools.Call('pixeldump', f.name, total_width, total_height,
                          len(self._PIXEL_FORMAT), x, y, width, height,
-                         *self._input_flows[input_id].GetPixelDumpArgs())
+                         *pixeldump_args)
       screen = f.read()
-
     return xmlrpclib.Binary(screen)
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
