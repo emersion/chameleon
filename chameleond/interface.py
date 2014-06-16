@@ -195,6 +195,67 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DumpPixels')
 
+  def GetMaxFrameLimit(self, input_id):
+    """Returns of the maximal number of frames which can be dumped.
+
+    It depends on the size of the internal buffer on the board and the
+    current resolution of the display input. It may change once the
+    resolution changes.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      A number of the frame limit.
+    """
+    raise NotImplementedError('GetMaxFrameLimit')
+
+  def CaptureVideo(self, input_id, total_frame):
+    """Captures the video stream on the given input to the buffer.
+
+    This API is a synchronous call. It returns after all the frames are
+    captured. The frames can be read using the ReadCapturedFrame API.
+
+    The example of usage:
+      chameleon.CaptureVideo(hdmi_input, total_frame)
+      for i in xrange(total_frame):
+        frame = chameleon.ReadCapturedFrame(i, *area).data
+        CompareFrame(frame, golden_frames[i])
+
+    Args:
+      input_id: The ID of the input connector.
+      total_frame: The total number of frames to capture, should not larger
+                   than value of GetMaxFrameLimit.
+
+    Returns:
+      A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
+    """
+    raise NotImplementedError('CaptureVideo')
+
+  def GetCapturedResolution(self):
+    """Gets the resolution of the captured frame.
+
+    Returns:
+      A (width, height) tuple.
+    """
+    raise NotImplementedError('GetCapturedResolution')
+
+  def ReadCapturedFrame(self, frame_index, x=None, y=None, width=None,
+                        height=None):
+    """Reads the content of the captured frames from the buffer.
+
+    Args:
+      frame_index: The index of the frame to read.
+      x: The X position of the top-left corner.
+      y: The Y position of the top-left corner.
+      width: The width of the area.
+      height: The height of the area.
+
+    Returns:
+      A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
+    """
+    raise NotImplementedError('ReadCapturedFrame')
+
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):
     """Computes the checksum of pixels in the selected area.
