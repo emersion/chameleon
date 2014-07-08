@@ -130,23 +130,22 @@ class InputFlow(object):
     for vdump in self._GetEffectiveVideoDumpers():
       vdump.Start(self._input_id, self.IsDualPixelMode())
 
-  def _IsVideoDumpFrameReady(self):
-    """Returns true if FPGA dumps at least one frame.
+  def _HasFramesDumpedAtLess(self, frame_count):
+    """Returns true if FPGA dumps at least the given frame count.
 
     The function assumes that the frame count starts at zero.
     """
     dumpers = self._GetEffectiveVideoDumpers()
-    target_count = len(dumpers)
-    ready_count = 0
     for dumper in dumpers:
-      if dumper.GetFrameCount():
-        ready_count = ready_count + 1
-    return ready_count == target_count
+      if dumper.GetFrameCount() < frame_count:
+        return False
+    return True
 
-  def WaitForVideoDumpFrameReady(self, timeout):
-    """Waits until FPGA dumps at least one frame."""
-    common.WaitForCondition(self._IsVideoDumpFrameReady, True,
-        self._DELAY_VIDEO_DUMP_PROBE, timeout)
+  def WaitForVideoDumpFrameReady(self, frame_count, timeout):
+    """Waits until FPGA dumps at least the given frame count or timeout."""
+    common.WaitForCondition(
+        lambda: self._HasFramesDumpedAtLess(frame_count),
+        True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
 
   def RestartVideoDump(self, frame_limit=None):
     """Restarts video dump.

@@ -30,7 +30,7 @@ class ChameleondDriver(ChameleondInterface):
   _PIXEL_FORMAT = 'rgb'
 
   # Time to wait for video frame dump to start before a timeout error is raised
-  _TIMEOUT_FRAME_DUMP_PROBE = 1.0
+  _TIMEOUT_FRAME_DUMP_PROBE = 60.0
 
   # The frame index which is used for the regular DumpPixels API.
   _DEFAULT_FRAME_INDEX = 0
@@ -345,9 +345,9 @@ class ChameleondDriver(ChameleondInterface):
 
     # Reset video dump such that it starts at beginning of the dump buffer.
     self._input_flows[input_id].RestartVideoDump(total_frame)
-    # Wait until it dumps at least one frame.
+    # TODO(waihong): Make the timeout value based on the FPS rate.
     self._input_flows[input_id].WaitForVideoDumpFrameReady(
-        self._TIMEOUT_FRAME_DUMP_PROBE)
+        total_frame, self._TIMEOUT_FRAME_DUMP_PROBE)
     total_width, total_height = self.DetectResolution(input_id)
     if total_width == 0 or total_height == 0:
       raise DriverError('Something wrong with the resolution: %dx%d' %
