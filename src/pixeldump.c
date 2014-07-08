@@ -160,8 +160,9 @@ int main(int argc, char **argv)
       dst_offset += area_width;
     }
   }
+  for (i = 0; i < num_buffer; i++)
+    munmap(src[i], page_aligned_size);
   munmap(dst, area_size);
-  munmap(src, page_aligned_size);
   close(ofd);
   close(ifd);
   return 0;
