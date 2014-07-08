@@ -133,6 +133,8 @@ class VideoDumper(object):
   _BIT_RUN = 1 << 2
   # Run only when both dumpers' _BIT_RUN_DUAL set.
   _BIT_RUN_DUAL = 1 << 3
+  # Set to generate 64-bit frame hash; otherwise, 32-bit.
+  _BIT_HASH_64 = 1 << 4
 
   # Register which stores the offsets, related to 0xc0000000, for dump.
   _REG_START_ADDR = 0x8
@@ -144,11 +146,26 @@ class VideoDumper(object):
   _REG_HEIGHT = 0x1c
   _REG_FRAME_COUNT = 0x20
 
-  # On dual pixel mode, the primary flow index:
+  # Frame hash buffer
+  _REG_HASH_BASE = 0x400
+
+  #  Input                           | DP1 | DP2 | HDMI | CRT |
+  # -----------------------------------------------------------
+  #  (1) CLOCK                       | A   | B   | B    | A   |
+  # -----------------------------------------------------------
+  #  (2) SINGLE PIXEL DATA           | A   | B   | B    | A   |
+  #  (3) DUAL PIXEL EVEN PIXELS DATA | A   | B   | A    |     |
+  #  (4) DUAL PIXEL ODD PIXELS DATA  | B   | A   | B    |     |
   PRIMARY_FLOW_INDEXES = {
     ids.DP1: 0,
     ids.DP2: 1,
     ids.HDMI: 1,
+    ids.VGA: 0,
+  }
+  EVEN_PIXELS_FLOW_INDEXES = {
+    ids.DP1: 0,
+    ids.DP2: 1,
+    ids.HDMI: 0,
     ids.VGA: 0,
   }
 
@@ -223,13 +240,18 @@ class VideoDumper(object):
                        self._DEFAULT_LOOP)
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_LIMIT,
                        self._DEFAULT_LIMIT)
-    # Use the proper CLK and run.
+    # Use the proper CLK.
     if self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
       ctrl_value = self._BIT_CLK_NORMAL
     else:
       ctrl_value = self._BIT_CLK_ALT
+    # Use the proper hash mode.
+    if not dual_pixel_mode:
+      ctrl_value = ctrl_value | self._BIT_HASH_64
+
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_CTRL,
                        ctrl_value)
+    # Start dumping.
     self.Start(input_id, dual_pixel_mode)
 
   def GetWidth(self):
@@ -245,6 +267,23 @@ class VideoDumper(object):
     return self._memory.Read(self._REGS_BASE[self._index] +
                              self._REG_FRAME_COUNT)
 
+  def GetFrameHash(self, index, dual_pixel_mode):
+    """Gets the frame hash of the given frame index.
+
+    Returns:
+      A list of hash16 values.
+    """
+    if dual_pixel_mode:
+      hash32 = self._memory.Read(self._REGS_BASE[self._index] +
+                                 self._REG_HASH_BASE + index * 4)
+      return [hash32 >> 16, hash32 & 0xffff]
+    else:
+      hash32s = [self._memory.Read(self._REGS_BASE[self._index] +
+                                   self._REG_HASH_BASE + (index * 2 + i) * 4)
+                 for i in (0, 1)]
+      return [hash32s[1] >> 16, hash32s[1] & 0xffff,
+              hash32s[0] >> 16, hash32s[0] & 0xffff]
+
   @classmethod
   def GetPixelDumpArgs(cls, input_id, dual_pixel_mode):
     """Gets the arguments of pixeldump tool which selects the proper buffers.
@@ -255,18 +294,7 @@ class VideoDumper(object):
     """
     i = cls.PRIMARY_FLOW_INDEXES[input_id]
     if dual_pixel_mode:
-      # XXX: Swap A and B only for HDMI pixeldump. Because the receiver
-      # output pixels in a swapped order, like the following chart.
-      #
-      #  Input                           | DP1 | DP2 | HDMI | CRT |
-      # -----------------------------------------------------------
-      #  (1) CLOCK                       | A   | B   | B    | A   |
-      # -----------------------------------------------------------
-      #  (2) SINGLE PIXEL DATA           | A   | B   | B    | A   |
-      #  (3) DUAL PIXEL EVEN PIXELS DATA | A   | B   | A*   |     |
-      #  (4) DUAL PIXEL ODD PIXELS DATA  | B   | A   | B*   |     |
-      if input_id == ids.HDMI:
-        i = 1 - i
+      i = cls.EVEN_PIXELS_FLOW_INDEXES[input_id]
       return ['-a', cls._DUMP_BASE_ADDRESS + cls._DUMP_START_ADDRESSES[i],
               '-b', cls._DUMP_BASE_ADDRESS + cls._DUMP_START_ADDRESSES[1 - i]]
     else:

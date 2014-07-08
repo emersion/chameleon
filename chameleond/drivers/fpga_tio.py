@@ -353,6 +353,7 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('Something wrong with the resolution: %dx%d' %
                         (total_width, total_height))
     self._captured_params = {
+      'input_id': input_id,
       'resolution': (total_width, total_height),
       'is_dual_pixel': self._input_flows[input_id].IsDualPixelMode(),
       'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
@@ -409,6 +410,18 @@ class ChameleondDriver(ChameleondInterface):
       screen = f.read()
     return xmlrpclib.Binary(screen)
 
+  def GetCapturedChecksum(self, frame_index):
+    """Gets the checksum of pixels from the captured frame.
+
+    Args:
+      frame_index: The index of the frame.
+
+    Returns:
+      The checksum of the pixels.
+    """
+    input_id = self._captured_params['input_id']
+    return self._input_flows[input_id].GetFrameHash(frame_index)
+
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):
     """Computes the checksum of pixels in the selected area.
@@ -425,8 +438,12 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The checksum of the pixels.
     """
-    # TODO(waihong): Implement this method.
-    raise NotImplementedError('ComputePixelChecksum')
+    if x is None or y is None or not width or not height:
+      self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT)
+      return self.GetCapturedChecksum(self._DEFAULT_FRAME_INDEX)
+    else:
+      # Region checksum not supported yet.
+      raise NotImplementedError('ComputePixelChecksum')
 
   def DetectResolution(self, input_id):
     """Detects the source resolution.

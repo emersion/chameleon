@@ -109,7 +109,10 @@ class InputFlow(object):
   def _GetEffectiveVideoDumpers(self):
     """Gets effective video dumpers on the flow."""
     if self.IsDualPixelMode():
-      return [self._fpga.vdump0, self._fpga.vdump1]
+      if fpga.VideoDumper.EVEN_PIXELS_FLOW_INDEXES[self._input_id] == 0:
+        return [self._fpga.vdump0, self._fpga.vdump1]
+      else:
+        return [self._fpga.vdump1, self._fpga.vdump0]
     elif fpga.VideoDumper.PRIMARY_FLOW_INDEXES[self._input_id] == 0:
       return [self._fpga.vdump0]
     else:
@@ -119,6 +122,20 @@ class InputFlow(object):
     """Returns of the maximal number of frames which can be dumped."""
     vdump = self._GetEffectiveVideoDumpers()[0]
     return vdump.GetMaxFrameLimit()
+
+  def GetFrameHash(self, index):
+    """Gets the frame hash of the given frame index.
+
+    Returns:
+      A list of hash16 values.
+    """
+    hashes = [v.GetFrameHash(index, self.IsDualPixelMode())
+              for v in self._GetEffectiveVideoDumpers()]
+    if len(hashes) == 1:
+      return hashes[0]
+    else:
+      # [Odd MSB, Even MSB, Odd LSB, Odd LSB]
+      return [hashes[1][0], hashes[0][0], hashes[1][1], hashes[0][1]]
 
   def _StopVideoDump(self):
     """Stops video dump."""
