@@ -118,7 +118,7 @@ class InputFlow(object):
   def GetMaxFrameLimit(self):
     """Returns of the maximal number of frames which can be dumped."""
     vdump = self._GetEffectiveVideoDumpers()[0]
-    return vdump.GetMaxFrameLimit(self.IsDualPixelMode())
+    return vdump.GetMaxFrameLimit()
 
   def _StopVideoDump(self):
     """Stops video dump."""

@@ -188,18 +188,11 @@ class VideoDumper(object):
       return
     self._memory.SetMask(self._REGS_BASE[self._index] + self._REG_CTRL, bit_run)
 
-  def GetMaxFrameLimit(self, dual_pixel_mode):
-    """Returns of the maximal number of frames which can be dumped.
-
-    Args:
-      dual_pixel_mode: True to use dual pixel mode; otherwise, False.
-    """
+  def GetMaxFrameLimit(self):
+    """Returns of the maximal number of frames which can be dumped."""
     BYTE_PER_PIXEL = 3
     PAGE_SIZE = 4096
-    width = self.GetWidth()
-    if dual_pixel_mode:
-      width = width / 2
-    frame_size = width * self.GetHeight() * BYTE_PER_PIXEL
+    frame_size = self.GetWidth() * self.GetHeight() * BYTE_PER_PIXEL
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
     return self._DUMP_BUFFER_SIZE / frame_size
 
