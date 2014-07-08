@@ -381,7 +381,6 @@ class ChameleondDriver(ChameleondInterface):
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
     total_width, total_height = self.GetCapturedResolution()
-    pixeldump_args = self._captured_params['pixeldump_args']
     # Specify the proper arguemnt for dual-buffer capture.
     if self._captured_params['is_dual_pixel']:
       total_width = total_width / 2
@@ -391,17 +390,22 @@ class ChameleondDriver(ChameleondInterface):
     frame_size = total_width * total_height * len(self._PIXEL_FORMAT)
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
     offset = frame_size * frame_index
-    for i in range(1, len(pixeldump_args), 2):
-      pixeldump_args[i] += offset
+    offset_args = []
+    for arg in self._captured_params['pixeldump_args']:
+      if isinstance(arg, (int, long)):
+        offset_args.append(arg + offset)
+      else:
+        offset_args.append(arg)
+    logging.info('pixeldump args %r', offset_args)
 
     with tempfile.NamedTemporaryFile() as f:
       if x is None or y is None or not width or not height:
         self._tools.Call('pixeldump', f.name, total_width, total_height,
-                         len(self._PIXEL_FORMAT), *pixeldump_args)
+                         len(self._PIXEL_FORMAT), *offset_args)
       else:
         self._tools.Call('pixeldump', f.name, total_width, total_height,
                          len(self._PIXEL_FORMAT), x, y, width, height,
-                         *pixeldump_args)
+                         *offset_args)
       screen = f.read()
     return xmlrpclib.Binary(screen)
 
