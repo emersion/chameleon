@@ -37,7 +37,7 @@ $(BINDIR)/%: $(BINDIR)/%.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
 BUNDLE_VERSION ?= '9999'
-CHAMELEON_BOARD ?= 'fpga_hdmi'
+CHAMELEON_BOARD ?= 'fpga_tio'
 
 .PHONY: install
 install:
