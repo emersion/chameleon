@@ -141,10 +141,20 @@ class PowerIo(IoExpander):
     self.SetDirection(
         self.MASK_DP1_INT_L | self.MASK_DP2_INT_L | self.MASK_HDMI_INT_L)
     # Enable all power and deassert reset.
-    self.SetOutput(
-        self.MASK_EN_PP3300 | self.MASK_EN_PP1800 | self.MASK_EN_PP1200 |
-        self.MASK_DP1_RST_L | self.MASK_DP2_RST_L | self.MASK_HDMI_RST_L |
-        self.MASK_VGA_RST_L)
+    try:
+      self.SetOutput(
+          self.MASK_EN_PP3300 | self.MASK_EN_PP1800 | self.MASK_EN_PP1200 |
+          self.MASK_DP1_RST_L | self.MASK_DP2_RST_L | self.MASK_HDMI_RST_L |
+          self.MASK_VGA_RST_L)
+    except i2c_fpga.I2cBusError:
+      # This is to work around a problem where rx may pull i2c low for a short
+      # amount of time (<3ms) when powered up for the very first time so
+      # writing these two bytes out may cause the second byte to fail.
+      logging.info('  ... re-enable the power for rx')
+      self.SetOutput(
+          self.MASK_EN_PP3300 | self.MASK_EN_PP1800 | self.MASK_EN_PP1200 |
+          self.MASK_DP1_RST_L | self.MASK_DP2_RST_L | self.MASK_HDMI_RST_L |
+          self.MASK_VGA_RST_L)
 
   def ResetReceiver(self, input_id):
     """Reset the given receiver.
