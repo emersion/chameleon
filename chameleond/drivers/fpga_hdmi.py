@@ -46,7 +46,7 @@ class ChameleondDriver(ChameleondInterface):
 
   _HDMI_ID = 1
 
-  _PIXEL_FORMAT = 'rgba'
+  _PIXEL_FORMAT = 'rgbx'
 
   _GPIO_MEM_ADDRESS = 0xff2100d0
   _FRAME_WIDTH_ADDRESS = 0xff210100
