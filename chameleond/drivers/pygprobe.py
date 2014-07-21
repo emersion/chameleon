@@ -265,20 +265,22 @@ class ChameleondDriver(ChameleondInterface):
     raise NotImplementedError('Unplug')
 
   def FireHpdPulse(self, input_id, deassert_interval_usec,
-                   assert_interval_usec=None, repeat_count=1):
-    """Fires a HPD pulse (high -> low -> high) or multiple HPD pulses.
+                   assert_interval_usec=None, repeat_count=1,
+                   end_level=None):
+    """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
       input_id: The ID of the input connector.
       deassert_interval_usec: The time in microsecond of the deassert pulse.
       assert_interval_usec: The time in microsecond of the assert pulse.
-      repeat_count: The count of repeating the HPD pulses.
+      repeat_count: The count of HPD pulses to fire.
+      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
     self._SelectInput(input_id)
     self._serial_device.Flush()
     connector = self.GetConnectorType(input_id)
     # Only support HDMI HPD pulse.
-    if connector == 'HDMI':
+    if connector == 'HDMI' and end_level is None:
       deassert_in_10ms = deassert_interval_usec / 10000
       assert_in_sec = float(assert_interval_usec) / 1000000
       for i in range(repeat_count):

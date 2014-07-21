@@ -10,6 +10,7 @@ import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
+
 from chameleond.utils import fpga
 from chameleond.utils import i2c_fpga as i2c
 from chameleond.utils import ids
@@ -252,17 +253,25 @@ class ChameleondDriver(ChameleondInterface):
     return self._input_flows[input_id].Unplug()
 
   def FireHpdPulse(self, input_id, deassert_interval_usec,
-                   assert_interval_usec=None, repeat_count=1):
-    """Fires a HPD pulse (high -> low -> high) or multiple HPD pulses.
+                   assert_interval_usec=None, repeat_count=1,
+                   end_level=1):
+    """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
       input_id: The ID of the input connector.
       deassert_interval_usec: The time in microsecond of the deassert pulse.
       assert_interval_usec: The time in microsecond of the assert pulse.
-      repeat_count: The count of repeating the HPD pulses.
+                            If None, then use the same value as
+                            deassert_interval_usec.
+      repeat_count: The count of HPD pulses to fire.
+      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
-    # TODO(waihong): Implement this method.
-    raise NotImplementedError('FireHpdPulse')
+    if assert_interval_usec is None:
+      # Fall back to use the same value as deassertion if not given.
+      assert_interval_usec = deassert_interval_usec
+
+    return self._input_flows[input_id].FireHpdPulse(deassert_interval_usec,
+            assert_interval_usec, repeat_count, end_level)
 
   def _SelectInput(self, input_id):
     """Selects the input on Chameleon.

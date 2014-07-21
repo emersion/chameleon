@@ -443,7 +443,7 @@ class ChameleondDriver(ChameleondInterface):
       return False
 
     if input_id == self._HDMI_ID:
-      message = self._tools.Output('hpd_control', 'status')
+      message = self._tools.Output('hpd_control_hdmi', 'status')
       matches = self._hpd_control_pattern.match(message)
       if matches:
         return bool(matches.group(1) == '1')
@@ -459,7 +459,7 @@ class ChameleondDriver(ChameleondInterface):
       input_id: The ID of the input connector.
     """
     if input_id == self._HDMI_ID:
-      self._tools.Call('hpd_control', 'plug')
+      self._tools.Call('hpd_control_hdmi', 'plug')
     else:
       raise DriverError('Not a valid input_id.')
 
@@ -470,26 +470,31 @@ class ChameleondDriver(ChameleondInterface):
       input_id: The ID of the input connector.
     """
     if input_id == self._HDMI_ID:
-      self._tools.Call('hpd_control', 'unplug')
+      self._tools.Call('hpd_control_hdmi', 'unplug')
     else:
       raise DriverError('Not a valid input_id.')
 
   def FireHpdPulse(self, input_id, deassert_interval_usec,
-                   assert_interval_usec=None, repeat_count=1):
-    """Fires a HPD pulse (high -> low -> high) or multiple HPD pulses.
+                   assert_interval_usec=None, repeat_count=1,
+                   end_level=1):
+    """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
       input_id: The ID of the input connector.
       deassert_interval_usec: The time in microsecond of the deassert pulse.
       assert_interval_usec: The time in microsecond of the assert pulse.
-      repeat_count: The count of repeating the HPD pulses.
+                            If None, then use the same value as
+                            deassert_interval_usec.
+      repeat_count: The count of HPD pulses to fire.
+      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
     if input_id == self._HDMI_ID:
       if assert_interval_usec is None:
         # Fall back to use the same value as deassertion if not given.
         assert_interval_usec = deassert_interval_usec
-      self._tools.Call('hpd_control', 'repeat_pulse', deassert_interval_usec,
-                       assert_interval_usec, repeat_count)
+      self._tools.Call('hpd_control_hdmi', 'repeat_pulse',
+                       deassert_interval_usec,
+                       assert_interval_usec, repeat_count, end_level)
     else:
       raise DriverError('Not a valid input_id.')
 

@@ -15,10 +15,12 @@ static const char *USAGE =
 "  status               - Shows the HPD status.\n"
 "  plug                 - Assert HPD line to high, emulating a plug.\n"
 "  unplug               - Deassert HPD line to low, emulating an unplug.\n"
-"  repeat_pulse TD TA C - Repeat multiple HPD pulse (H->L->H->...->H).\n"
-"                         TD: The time in usec of the deassert pulse.\n"
-"                         TA: The time in usec of the assert pulse.\n"
-"                         C: The repeat count.\n";
+"  repeat_pulse TD TA C EL \n"
+"                        - Repeat multiple HPD pulse (L->H->L->...).\n"
+"                      TD: The time in usec of the deassert pulse.\n"
+"                      TA: The time in usec of the assert pulse.\n"
+"                       C: The repeat count.\n"
+"                      EL: End level: 0 for LOW or 1 for HIGH.\n";
 
 #include <fcntl.h>
 #include <sched.h>
@@ -28,7 +30,7 @@ static const char *USAGE =
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <hpd_control.h>
+#include <hpd_control_hdmi.h>
 
 /* The time in usec. If required HPD pulse is smaller than this duration.
  * Set the process scheduling to the highest real-time priority.
@@ -110,13 +112,13 @@ int cmd_unplug(const int argc, const char **argv)
   return 0;
 }
 
-/* Function to repeat multiple HPD pulse (H->L->H->...->H) */
+/* Function to repeat multiple HPD pulse (L->H->L->...) */
 int cmd_repeat_pulse(const int argc, const char **argv)
 {
-  int deassert_usec, assert_usec, count;
+  int deassert_usec, assert_usec, count, end_level;
   int i;
 
-  if (argc != 3) {
+  if (argc != 4) {
     fprintf(stderr, "Number of parameters not correct.\n\n");
     usage();
     return 1;
@@ -125,7 +127,9 @@ int cmd_repeat_pulse(const int argc, const char **argv)
   deassert_usec = atoi(argv[0]);
   assert_usec = atoi(argv[1]);
   count = atoi(argv[2]);
-  if (deassert_usec == 0 || assert_usec == 0 || count == 0) {
+  end_level = atoi(argv[3]);
+  if (deassert_usec <= 0 || assert_usec <= 0 || count <= 0 ||
+      (end_level != 0 && end_level != 1)) {
     fprintf(stderr, "Wrong paramenters.\n\n");
     usage();
     return 1;
@@ -139,8 +143,12 @@ int cmd_repeat_pulse(const int argc, const char **argv)
     *g_gpio_ptr |= BIT_HPD_N_MASK;
     usleep(deassert_usec);
     *g_gpio_ptr &= ~BIT_HPD_N_MASK;
-    if (i < count - 1)
-      usleep(assert_usec);
+    usleep(assert_usec);
+  }
+
+  //End with HPD low
+  if (!end_level) {
+    *g_gpio_ptr |= BIT_HPD_N_MASK;
   }
   return 0;
 }

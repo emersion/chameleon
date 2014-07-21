@@ -21,6 +21,7 @@ import struct
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import ids
 from chameleond.utils import mem_native as mem
+from chameleond.utils import system_tools
 
 
 class FpgaController(object):
@@ -87,6 +88,23 @@ class HpdController(object):
     self._memory.Write(self._HPD_BASE + self._HPD_OFFSETS[input_id],
                        self._BIT_UNPLUG)
 
+  def FireHpdPulse(self, input_id, deassert_interval_usec, assert_interval_usec,
+          repeat_count, end_level):
+    """Fires one or more HPD pulse (low -> high -> low -> ...).
+
+    Args:
+      input_id: The ID of the input connector.
+      deassert_interval_usec: The time in microsecond of the deassert pulse.
+      assert_interval_usec: The time in microsecond of the assert pulse.
+                            If None, then use the same value as
+                            deassert_interval_usec.
+      repeat_count: The count of HPD pulses to fire.
+      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
+    """
+    system_tools.SystemTools.Call(
+            'hpd_control_tio', 'repeat_pulse',
+            self._HPD_OFFSETS[input_id], int(deassert_interval_usec),
+            int(assert_interval_usec), repeat_count, end_level)
 
 class VideoPasser(object):
   """A class to abstract the behavior of video pass-through.
