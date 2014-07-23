@@ -118,10 +118,13 @@ class InputFlow(object):
     else:
       return [self._fpga.vdump1]
 
-  def GetMaxFrameLimit(self):
+  def GetMaxFrameLimit(self, width=None, height=None):
     """Returns of the maximal number of frames which can be dumped."""
-    vdump = self._GetEffectiveVideoDumpers()[0]
-    return vdump.GetMaxFrameLimit()
+    if None in (width, height):
+      width, height = self.GetResolution()
+    if self.IsDualPixelMode():
+      width = width / 2
+    return fpga.VideoDumper.GetMaxFrameLimit(width, height)
 
   def GetFrameHash(self, index):
     """Gets the frame hash of the given frame index.
@@ -164,16 +167,26 @@ class InputFlow(object):
         lambda: self._HasFramesDumpedAtLess(frame_count),
         True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
 
-  def RestartVideoDump(self, frame_limit=None):
+  def RestartVideoDump(self, frame_limit, x, y, width, height):
     """Restarts video dump.
 
     Args:
       frame_limit: The limitation of frame to dump.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
     """
     self._StopVideoDump()
-    if frame_limit:
-      for vdump in self._GetEffectiveVideoDumpers():
-        vdump.SetFrameLimit(frame_limit)
+    for vdump in self._GetEffectiveVideoDumpers():
+      vdump.SetFrameLimit(frame_limit)
+      if None in (x, y, width, height):
+        vdump.DisableCrop()
+      else:
+        if self.IsDualPixelMode():
+          vdump.EnableCrop(x / 2, y, width / 2, height)
+        else:
+          vdump.EnableCrop(x, y, width, height)
     self._StartVideoDump()
 
   def Do_FSM(self):

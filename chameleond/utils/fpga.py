@@ -135,6 +135,8 @@ class VideoDumper(object):
   _BIT_RUN_DUAL = 1 << 3
   # Set to generate 64-bit frame hash; otherwise, 32-bit.
   _BIT_HASH_64 = 1 << 4
+  # Set to enable cropping.
+  _BIT_CROP = 1 << 5
 
   # Register which stores the offsets, related to 0xc0000000, for dump.
   _REG_START_ADDR = 0x8
@@ -145,6 +147,9 @@ class VideoDumper(object):
   _REG_WIDTH = 0x18
   _REG_HEIGHT = 0x1c
   _REG_FRAME_COUNT = 0x20
+  # Registers to crop frames
+  _REG_CROP_XRANGE = 0x24
+  _REG_CROP_YRANGE = 0x28
 
   # Frame hash buffer
   _REG_HASH_BASE = 0x400
@@ -185,6 +190,31 @@ class VideoDumper(object):
     self._memory = mem.Memory
     self._index = index
 
+  def EnableCrop(self, x, y, width, height):
+    """Enable cropping frames.
+
+    Only dump the pixels and its checksum within the given rectangle.
+
+    Args:
+      x: The left column index of the rectangle.
+      y: The top row index of the rectangle.
+      width: The width of the rectangle.
+      height: The height of the rectangle.
+    """
+    right = x + width
+    bottom = y + height
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_CROP_XRANGE,
+                       right << 16 | x)
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_CROP_YRANGE,
+                       bottom << 16 | y)
+    self._memory.SetMask(self._REGS_BASE[self._index] + self._REG_CTRL,
+                         self._BIT_CROP)
+
+  def DisableCrop(self):
+    """Disable cropping frames."""
+    self._memory.ClearMask(self._REGS_BASE[self._index] + self._REG_CTRL,
+                           self._BIT_CROP)
+
   def Stop(self):
     """Stops dumping."""
     self._memory.ClearMask(self._REGS_BASE[self._index] + self._REG_CTRL,
@@ -205,13 +235,14 @@ class VideoDumper(object):
       return
     self._memory.SetMask(self._REGS_BASE[self._index] + self._REG_CTRL, bit_run)
 
-  def GetMaxFrameLimit(self):
+  @classmethod
+  def GetMaxFrameLimit(cls, width, height):
     """Returns of the maximal number of frames which can be dumped."""
     BYTE_PER_PIXEL = 3
     PAGE_SIZE = 4096
-    frame_size = self.GetWidth() * self.GetHeight() * BYTE_PER_PIXEL
+    frame_size = width * height * BYTE_PER_PIXEL
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
-    return self._DUMP_BUFFER_SIZE / frame_size
+    return cls._DUMP_BUFFER_SIZE / frame_size
 
   def SetFrameLimit(self, frame_limit):
     """Sets the limitation of total frames to dump.

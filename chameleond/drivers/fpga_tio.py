@@ -295,11 +295,10 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT)
-    return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX,
-                                  x, y, width, height)
+    self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
+    return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX)
 
-  def GetMaxFrameLimit(self, input_id):
+  def GetMaxFrameLimit(self, input_id, width=None, height=None):
     """Returns of the maximal number of frames which can be dumped.
 
     It depends on the size of the internal buffer on the board and the
@@ -308,13 +307,16 @@ class ChameleondDriver(ChameleondInterface):
 
     Args:
       input_id: The ID of the input connector.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
 
     Returns:
       A number of the frame limit.
     """
-    return self._input_flows[input_id].GetMaxFrameLimit()
+    return self._input_flows[input_id].GetMaxFrameLimit(width, height)
 
-  def CaptureVideo(self, input_id, total_frame):
+  def CaptureVideo(self, input_id, total_frame, x=None, y=None, width=None,
+                   height=None):
     """Captures the video stream on the given input to the buffer.
 
     This API is a synchronous call. It returns after all the frames are
@@ -330,6 +332,10 @@ class ChameleondDriver(ChameleondInterface):
       input_id: The ID of the input connector.
       total_frame: The total number of frames to capture, should not larger
                    than value of GetMaxFrameLimit.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
 
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
@@ -338,57 +344,70 @@ class ChameleondDriver(ChameleondInterface):
     if not self.IsPlugged(input_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
 
-    max_frame_limit = self.GetMaxFrameLimit(input_id)
+    max_frame_limit = self.GetMaxFrameLimit(input_id, width, height)
     if total_frame > max_frame_limit:
       raise DriverError('Exceed the max frame limit %d > %d',
                         total_frame, max_frame_limit)
 
+    is_dual_pixel_mode = self._input_flows[input_id].IsDualPixelMode()
+    if None not in (x, y, width, height):
+      if is_dual_pixel_mode:
+        if any((x % 16, y % 8, width % 16, height % 8)):
+          raise DriverError('Argument not aligned')
+      else:
+        if any((x % 8, y % 8, width % 8, height % 8)):
+          raise DriverError('Argument not aligned')
+
     # Reset video dump such that it starts at beginning of the dump buffer.
-    self._input_flows[input_id].RestartVideoDump(total_frame)
+    self._input_flows[input_id].RestartVideoDump(
+        total_frame, x, y, width, height)
     # TODO(waihong): Make the timeout value based on the FPS rate.
     self._input_flows[input_id].WaitForVideoDumpFrameReady(
         total_frame, self._TIMEOUT_FRAME_DUMP_PROBE)
-    total_width, total_height = self.DetectResolution(input_id)
-    if total_width == 0 or total_height == 0:
-      raise DriverError('Something wrong with the resolution: %dx%d' %
-                        (total_width, total_height))
+
+    if None in (width, height):
+      width, height = self.DetectResolution(input_id)
+
     self._captured_params = {
+      'total_frame': total_frame,
       'input_id': input_id,
-      'resolution': (total_width, total_height),
-      'is_dual_pixel': self._input_flows[input_id].IsDualPixelMode(),
+      'resolution': (width, height),
+      'is_dual_pixel': is_dual_pixel_mode,
       'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
     }
 
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.
 
+    If a cropping area is specified on capturing, returns the cropped
+    resolution.
+
     Returns:
       A (width, height) tuple.
     """
     return self._captured_params['resolution']
 
-  def ReadCapturedFrame(self, frame_index, x=None, y=None, width=None,
-                        height=None):
+  def ReadCapturedFrame(self, frame_index):
     """Reads the content of the captured frames from the buffer.
 
     Args:
       frame_index: The index of the frame to read.
-      x: The X position of the top-left corner.
-      y: The Y position of the top-left corner.
-      width: The width of the area.
-      height: The height of the area.
 
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    total_width, total_height = self.GetCapturedResolution()
+    total_frame = self._captured_params['total_frame']
+    if not 0 <= frame_index < total_frame:
+      raise DriverError('The frame index is out-of-range: %d not in [0, %d)' %
+                        (frame_index, total_frame))
+    width, height = self.GetCapturedResolution()
     # Specify the proper arguemnt for dual-buffer capture.
     if self._captured_params['is_dual_pixel']:
-      total_width = total_width / 2
+      width = width / 2
 
     # Modify the memory offset to match the frame.
     PAGE_SIZE = 4096
-    frame_size = total_width * total_height * len(self._PIXEL_FORMAT)
+    frame_size = width * height * len(self._PIXEL_FORMAT)
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
     offset = frame_size * frame_index
     offset_args = []
@@ -400,13 +419,8 @@ class ChameleondDriver(ChameleondInterface):
     logging.info('pixeldump args %r', offset_args)
 
     with tempfile.NamedTemporaryFile() as f:
-      if x is None or y is None or not width or not height:
-        self._tools.Call('pixeldump', f.name, total_width, total_height,
-                         len(self._PIXEL_FORMAT), *offset_args)
-      else:
-        self._tools.Call('pixeldump', f.name, total_width, total_height,
-                         len(self._PIXEL_FORMAT), x, y, width, height,
-                         *offset_args)
+      self._tools.Call('pixeldump', f.name, width, height,
+                       len(self._PIXEL_FORMAT), *offset_args)
       screen = f.read()
     return xmlrpclib.Binary(screen)
 
@@ -419,6 +433,9 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The checksum of the pixels.
     """
+    # TODO(waihong): On dual-pixel-mode, only 256 checksums are recorded in
+    # FPGA. The checksums will be overrided when recording over 256 frames.
+    # Need to save the checksums into some local space.
     input_id = self._captured_params['input_id']
     return self._input_flows[input_id].GetFrameHash(frame_index)
 
@@ -438,12 +455,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The checksum of the pixels.
     """
-    if x is None or y is None or not width or not height:
-      self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT)
-      return self.GetCapturedChecksum(self._DEFAULT_FRAME_INDEX)
-    else:
-      # Region checksum not supported yet.
-      raise NotImplementedError('ComputePixelChecksum')
+    self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
+    return self.GetCapturedChecksum(self._DEFAULT_FRAME_INDEX)
 
   def DetectResolution(self, input_id):
     """Detects the source resolution.
@@ -455,4 +468,8 @@ class ChameleondDriver(ChameleondInterface):
       A (width, height) tuple.
     """
     self._SelectInput(input_id)
-    return self._input_flows[input_id].GetResolution()
+    width, height = self._input_flows[input_id].GetResolution()
+    if width == 0 or height == 0:
+      raise DriverError('Something wrong with the resolution: %dx%d' %
+                        (width, height))
+    return (width, height)

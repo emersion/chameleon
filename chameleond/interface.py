@@ -195,7 +195,7 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DumpPixels')
 
-  def GetMaxFrameLimit(self, input_id):
+  def GetMaxFrameLimit(self, input_id, width=None, height=None):
     """Returns of the maximal number of frames which can be dumped.
 
     It depends on the size of the internal buffer on the board and the
@@ -204,13 +204,16 @@ class ChameleondInterface(object):
 
     Args:
       input_id: The ID of the input connector.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
 
     Returns:
       A number of the frame limit.
     """
     raise NotImplementedError('GetMaxFrameLimit')
 
-  def CaptureVideo(self, input_id, total_frame):
+  def CaptureVideo(self, input_id, total_frame, x=None, y=None, width=None,
+                   height=None):
     """Captures the video stream on the given input to the buffer.
 
     This API is a synchronous call. It returns after all the frames are
@@ -226,6 +229,10 @@ class ChameleondInterface(object):
       input_id: The ID of the input connector.
       total_frame: The total number of frames to capture, should not larger
                    than value of GetMaxFrameLimit.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
 
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
@@ -235,21 +242,19 @@ class ChameleondInterface(object):
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.
 
+    If a cropping area is specified on capturing, returns the cropped
+    resolution.
+
     Returns:
       A (width, height) tuple.
     """
     raise NotImplementedError('GetCapturedResolution')
 
-  def ReadCapturedFrame(self, frame_index, x=None, y=None, width=None,
-                        height=None):
+  def ReadCapturedFrame(self, frame_index):
     """Reads the content of the captured frames from the buffer.
 
     Args:
       frame_index: The index of the frame to read.
-      x: The X position of the top-left corner.
-      y: The Y position of the top-left corner.
-      width: The width of the area.
-      height: The height of the area.
 
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
