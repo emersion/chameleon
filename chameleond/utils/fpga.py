@@ -152,7 +152,8 @@ class VideoDumper(object):
   _REG_CROP_YRANGE = 0x28
 
   # Frame hash buffer
-  _REG_HASH_BASE = 0x400
+  _REG_HASH_BUF_BASE = 0x400
+  _REG_HASH_BUF_SIZE = 1024
 
   #  Input                           | DP1 | DP2 | HDMI | CRT |
   # -----------------------------------------------------------
@@ -301,17 +302,24 @@ class VideoDumper(object):
   def GetFrameHash(self, index, dual_pixel_mode):
     """Gets the frame hash of the given frame index.
 
+    FPGA overwrites the old hash values when exceeding the hash buffer
+    size. The caller should save the old values before that happens.
+
+    Args:
+      index: The index of frame. The index can exceed the hash buffer size.
+      dual_pixel_mode: True if using the dual pixel mode; otherwise, False.
+
     Returns:
       A list of hash16 values.
     """
+    hash_addr = lambda x: (self._REGS_BASE[self._index] +
+        self._REG_HASH_BUF_BASE + (x * 4) % self._REG_HASH_BUF_SIZE)
+
     if dual_pixel_mode:
-      hash32 = self._memory.Read(self._REGS_BASE[self._index] +
-                                 self._REG_HASH_BASE + index * 4)
+      hash32 = self._memory.Read(hash_addr(index))
       return [hash32 >> 16, hash32 & 0xffff]
     else:
-      hash32s = [self._memory.Read(self._REGS_BASE[self._index] +
-                                   self._REG_HASH_BASE + (index * 2 + i) * 4)
-                 for i in (0, 1)]
+      hash32s = [self._memory.Read(hash_addr(index * 2 + i)) for i in (0, 1)]
       return [hash32s[1] >> 16, hash32s[1] & 0xffff,
               hash32s[0] >> 16, hash32s[0] & 0xffff]
 

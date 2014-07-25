@@ -41,8 +41,8 @@ class InputFlow(object):
     ids.VGA: io.MuxIo.CONFIG_VGA
   }
 
-  # Delay in second to ensure at least one frame is dumped.
-  _DELAY_VIDEO_DUMP_PROBE = 0.1
+  # Delay in second to check the frame count, using 120-fps.
+  _DELAY_VIDEO_DUMP_PROBE = 1.0 / 120
 
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
     """Constructs a InputFlow object.
@@ -58,6 +58,8 @@ class InputFlow(object):
     self._power_io = self._main_bus.GetSlave(io.PowerIo.SLAVE_ADDRESSES[0])
     self._mux_io = self._main_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
     self._rx = self._main_bus.GetSlave(self._RX_SLAVES[self._input_id])
+    self._saved_hashes = []
+    self._last_frame = 0
 
   def Initialize(self):
     """Initializes the input flow."""
@@ -126,8 +128,8 @@ class InputFlow(object):
       width = width / 2
     return fpga.VideoDumper.GetMaxFrameLimit(width, height)
 
-  def GetFrameHash(self, index):
-    """Gets the frame hash of the given frame index.
+  def _ComputeFrameHash(self, index):
+    """Computes the frame hash of the given frame index, from FPGA.
 
     Returns:
       A list of hash16 values.
@@ -140,6 +142,10 @@ class InputFlow(object):
       # [Odd MSB, Even MSB, Odd LSB, Odd LSB]
       return [hashes[1][0], hashes[0][0], hashes[1][1], hashes[0][1]]
 
+  def GetSavedHashes(self, start, stop):
+    """Returns the list of the saved hashes."""
+    return self._saved_hashes[start:stop]
+
   def _StopVideoDump(self):
     """Stops video dump."""
     for vdump in self._GetEffectiveVideoDumpers():
@@ -150,25 +156,30 @@ class InputFlow(object):
     for vdump in self._GetEffectiveVideoDumpers():
       vdump.Start(self._input_id, self.IsDualPixelMode())
 
-  def _HasFramesDumpedAtLess(self, frame_count):
+  def _HasFramesDumpedAtLeast(self, frame_count):
     """Returns true if FPGA dumps at least the given frame count.
 
     The function assumes that the frame count starts at zero.
     """
     dumpers = self._GetEffectiveVideoDumpers()
-    for dumper in dumpers:
-      if dumper.GetFrameCount() < frame_count:
-        return False
-    return True
+    current_frame = min(dumper.GetFrameCount() for dumper in dumpers)
+    if current_frame > self._last_frame:
+      for i in xrange(self._last_frame, current_frame):
+        self._saved_hashes.append(self._ComputeFrameHash(i))
+        logging.info('Saved frame hash #%d: %r', i, self._saved_hashes[i])
+      self._last_frame = current_frame
+    return current_frame >= frame_count
 
-  def WaitForVideoDumpFrameReady(self, frame_count, timeout):
+  def _WaitForFrameCount(self, frame_count, timeout):
     """Waits until FPGA dumps at least the given frame count or timeout."""
+    self._saved_hashes = []
+    self._last_frame = 0
     common.WaitForCondition(
-        lambda: self._HasFramesDumpedAtLess(frame_count),
+        lambda: self._HasFramesDumpedAtLeast(frame_count),
         True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
 
-  def RestartVideoDump(self, frame_limit, x, y, width, height):
-    """Restarts video dump.
+  def DumpFramesToLimit(self, frame_limit, x, y, width, height, timeout):
+    """Dumps frames and waits for the given limit being reached or timeout.
 
     Args:
       frame_limit: The limitation of frame to dump.
@@ -176,7 +187,12 @@ class InputFlow(object):
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
       height: The height of the area of crop.
+      timeout: Time in second of timeout.
+
+    Raises:
+      common.TimeoutError on timeout.
     """
+    self.WaitVideoOutputStable()
     self._StopVideoDump()
     for vdump in self._GetEffectiveVideoDumpers():
       vdump.SetFrameLimit(frame_limit)
@@ -188,6 +204,7 @@ class InputFlow(object):
         else:
           vdump.EnableCrop(x, y, width, height)
     self._StartVideoDump()
+    self._WaitForFrameCount(frame_limit, timeout)
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.

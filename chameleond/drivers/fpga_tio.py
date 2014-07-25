@@ -358,12 +358,9 @@ class ChameleondDriver(ChameleondInterface):
         if any((x % 8, y % 8, width % 8, height % 8)):
           raise DriverError('Argument not aligned')
 
-    # Reset video dump such that it starts at beginning of the dump buffer.
-    self._input_flows[input_id].RestartVideoDump(
-        total_frame, x, y, width, height)
     # TODO(waihong): Make the timeout value based on the FPS rate.
-    self._input_flows[input_id].WaitForVideoDumpFrameReady(
-        total_frame, self._TIMEOUT_FRAME_DUMP_PROBE)
+    self._input_flows[input_id].DumpFramesToLimit(
+        total_frame, x, y, width, height, self._TIMEOUT_FRAME_DUMP_PROBE)
 
     if None in (width, height):
       width, height = self.DetectResolution(input_id)
@@ -424,20 +421,18 @@ class ChameleondDriver(ChameleondInterface):
       screen = f.read()
     return xmlrpclib.Binary(screen)
 
-  def GetCapturedChecksum(self, frame_index):
-    """Gets the checksum of pixels from the captured frame.
+  def GetCapturedChecksums(self, start_index, stop_index):
+    """Gets the list of checksums of the captured frames.
 
     Args:
-      frame_index: The index of the frame.
+      start_index: The index of the start frame.
+      stop_index: The index of the stop frame (excluded).
 
     Returns:
-      The checksum of the pixels.
+      The list of checksums of frames.
     """
-    # TODO(waihong): On dual-pixel-mode, only 256 checksums are recorded in
-    # FPGA. The checksums will be overrided when recording over 256 frames.
-    # Need to save the checksums into some local space.
     input_id = self._captured_params['input_id']
-    return self._input_flows[input_id].GetFrameHash(frame_index)
+    return self._input_flows[input_id].GetSavedHashes(start_index, stop_index)
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):
@@ -456,7 +451,8 @@ class ChameleondDriver(ChameleondInterface):
       The checksum of the pixels.
     """
     self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
-    return self.GetCapturedChecksum(self._DEFAULT_FRAME_INDEX)
+    return self.GetCapturedChecksums(self._DEFAULT_FRAME_INDEX,
+                                     self._DEFAULT_FRAME_INDEX + 1)[0]
 
   def DetectResolution(self, input_id):
     """Detects the source resolution.

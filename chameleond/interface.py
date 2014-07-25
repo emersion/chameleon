@@ -261,16 +261,17 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('ReadCapturedFrame')
 
-  def GetCapturedChecksum(self, frame_index):
-    """Gets the checksum of pixels from the captured frame.
+  def GetCapturedChecksums(self, start_index, stop_index):
+    """Gets the list of checksums of the captured frames.
 
     Args:
-      frame_index: The index of the frame.
+      start_index: The index of the start frame.
+      stop_index: The index of the stop frame (excluded).
 
     Returns:
-      The checksum of the pixels.
+      The list of checksums of frames.
     """
-    raise NotImplementedError('GetCapturedChecksum')
+    raise NotImplementedError('GetCapturedChecksums')
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):
