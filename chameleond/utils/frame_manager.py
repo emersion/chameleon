@@ -57,6 +57,27 @@ class FrameManager(object):
       # TODO(waihong): Wipe off the _input_id argument.
       vdump.Start(self._input_id, self._is_dual)
 
+  def _SetupFrameDump(self, frame_limit, x, y, width, height, loop):
+    """Restarts frame dump.
+
+    Args:
+      frame_limit: The limitation of frame to dump.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
+      loop: True to loop-back and continue dump.
+    """
+    for vdump in self._vdumps:
+      vdump.SetFrameLimit(frame_limit, loop)
+      if None in (x, y, width, height):
+        vdump.DisableCrop()
+      else:
+        if self._is_dual:
+          vdump.EnableCrop(x / 2, y, width / 2, height)
+        else:
+          vdump.EnableCrop(x, y, width, height)
+
   def _ComputeFrameHash(self, index):
     """Computes the frame hash of the given frame index, from FPGA.
 
@@ -125,14 +146,6 @@ class FrameManager(object):
       timeout: Time in second of timeout.
     """
     self._StopFrameDump()
-    for vdump in self._vdumps:
-      vdump.SetFrameLimit(frame_limit)
-      if None in (x, y, width, height):
-        vdump.DisableCrop()
-      else:
-        if self._is_dual:
-          vdump.EnableCrop(x / 2, y, width / 2, height)
-        else:
-          vdump.EnableCrop(x, y, width, height)
+    self._SetupFrameDump(frame_limit, x, y, width, height, loop=False)
     self._StartFrameDump()
     self._WaitForFrameCount(frame_limit, timeout)

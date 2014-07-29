@@ -179,8 +179,8 @@ class VideoDumper(object):
   _DUMP_BUFFER_SIZE = 0x1c000000
   _DUMP_START_ADDRESSES = (0x00000000,  # Dumper 0
                            0x20000000)  # Dumper 1
-  _DEFAULT_LOOP = 0
   _DEFAULT_LIMIT = 1
+  _DEFAULT_ENABLE_LOOP = False
 
   def __init__(self, index):
     """Constructs a VideoDumper object.
@@ -245,14 +245,18 @@ class VideoDumper(object):
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
     return cls._DUMP_BUFFER_SIZE / frame_size
 
-  def SetFrameLimit(self, frame_limit):
+  def SetFrameLimit(self, frame_limit, loop=False):
     """Sets the limitation of total frames to dump.
 
     Args:
       frame_limit: The number of frames to dump.
+      loop: When the frame_limit is reached, True to reset the dump pointer
+            to the start address; False to do nothing.
     """
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_LIMIT,
                        frame_limit)
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_LOOP,
+                       1 if loop else 0)
 
   def Select(self, input_id, dual_pixel_mode):
     """Selects the given input for dumping.
@@ -268,10 +272,7 @@ class VideoDumper(object):
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
                        self._DUMP_START_ADDRESSES[self._index] +
                          self._DUMP_BUFFER_SIZE)
-    self._memory.Write(self._REGS_BASE[self._index] + self._REG_LOOP,
-                       self._DEFAULT_LOOP)
-    self._memory.Write(self._REGS_BASE[self._index] + self._REG_LIMIT,
-                       self._DEFAULT_LIMIT)
+    self.SetFrameLimit(self._DEFAULT_LIMIT, self._DEFAULT_ENABLE_LOOP)
     # Use the proper CLK.
     if self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
       ctrl_value = self._BIT_CLK_NORMAL
