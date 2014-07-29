@@ -432,7 +432,7 @@ class ChameleondDriver(ChameleondInterface):
       The list of checksums of frames.
     """
     input_id = self._captured_params['input_id']
-    return self._input_flows[input_id].GetSavedHashes(start_index, stop_index)
+    return self._input_flows[input_id].GetFrameHashes(start_index, stop_index)
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
         height=None):

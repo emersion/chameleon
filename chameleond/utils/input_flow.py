@@ -10,6 +10,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import common
 from chameleond.utils import edid
 from chameleond.utils import fpga
+from chameleond.utils import frame_manager
 from chameleond.utils import ids
 from chameleond.utils import io
 from chameleond.utils import rx
@@ -41,9 +42,6 @@ class InputFlow(object):
     ids.VGA: io.MuxIo.CONFIG_VGA
   }
 
-  # Delay in second to check the frame count, using 120-fps.
-  _DELAY_VIDEO_DUMP_PROBE = 1.0 / 120
-
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
     """Constructs a InputFlow object.
 
@@ -58,8 +56,20 @@ class InputFlow(object):
     self._power_io = self._main_bus.GetSlave(io.PowerIo.SLAVE_ADDRESSES[0])
     self._mux_io = self._main_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
     self._rx = self._main_bus.GetSlave(self._RX_SLAVES[self._input_id])
-    self._saved_hashes = []
-    self._last_frame = 0
+    self._frame_manager = frame_manager.FrameManager(
+        input_id, self._GetEffectiveVideoDumpers())
+
+  def _GetEffectiveVideoDumpers(self):
+    """Gets effective video dumpers on the flow."""
+    if self.IsDualPixelMode():
+      if fpga.VideoDumper.EVEN_PIXELS_FLOW_INDEXES[self._input_id] == 0:
+        return [self._fpga.vdump0, self._fpga.vdump1]
+      else:
+        return [self._fpga.vdump1, self._fpga.vdump0]
+    elif fpga.VideoDumper.PRIMARY_FLOW_INDEXES[self._input_id] == 0:
+      return [self._fpga.vdump0]
+    else:
+      return [self._fpga.vdump1]
 
   def Initialize(self):
     """Initializes the input flow."""
@@ -86,39 +96,10 @@ class InputFlow(object):
     """Returns the human readable string for the connector type."""
     return cls._CONNECTOR_TYPE
 
-  def _GetResolutionFromFpgaForDualPixelMode(self):
-    """Gets the resolution reported from the FPGA for dual pixel mode."""
-    resolution0 = (self._fpga.vdump0.GetWidth(), self._fpga.vdump0.GetHeight())
-    resolution1 = (self._fpga.vdump1.GetWidth(), self._fpga.vdump1.GetHeight())
-    if self._input_id != ids.VGA and resolution0 != resolution1:
-      logging.warn('Different resolutions between paths: %dx%d != %dx%d',
-                   *(resolution0 + resolution1))
-    return (resolution0[0] + resolution1[0], resolution0[1])
-
-  def _GetResolutionFromFpga(self):
-    """Gets the resolution reported from the FPGA."""
-    if self.IsDualPixelMode():
-      return self._GetResolutionFromFpgaForDualPixelMode()
-    else:
-      vdump = self._GetEffectiveVideoDumpers()[0]
-      return (vdump.GetWidth(), vdump.GetHeight())
-
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
-    return self._GetResolutionFromFpga()
-
-  def _GetEffectiveVideoDumpers(self):
-    """Gets effective video dumpers on the flow."""
-    if self.IsDualPixelMode():
-      if fpga.VideoDumper.EVEN_PIXELS_FLOW_INDEXES[self._input_id] == 0:
-        return [self._fpga.vdump0, self._fpga.vdump1]
-      else:
-        return [self._fpga.vdump1, self._fpga.vdump0]
-    elif fpga.VideoDumper.PRIMARY_FLOW_INDEXES[self._input_id] == 0:
-      return [self._fpga.vdump0]
-    else:
-      return [self._fpga.vdump1]
+    return self._frame_manager.ComputeResolution()
 
   def GetMaxFrameLimit(self, width=None, height=None):
     """Returns of the maximal number of frames which can be dumped."""
@@ -128,55 +109,17 @@ class InputFlow(object):
       width = width / 2
     return fpga.VideoDumper.GetMaxFrameLimit(width, height)
 
-  def _ComputeFrameHash(self, index):
-    """Computes the frame hash of the given frame index, from FPGA.
+  def GetFrameHashes(self, start, stop):
+    """Returns the list of the frame hashes.
+
+    Args:
+      start: The index of the start frame.
+      stop: The index of the stop frame (excluded).
 
     Returns:
-      A list of hash16 values.
+      A list of frame hashes.
     """
-    hashes = [v.GetFrameHash(index, self.IsDualPixelMode())
-              for v in self._GetEffectiveVideoDumpers()]
-    if len(hashes) == 1:
-      return hashes[0]
-    else:
-      # [Odd MSB, Even MSB, Odd LSB, Odd LSB]
-      return [hashes[1][0], hashes[0][0], hashes[1][1], hashes[0][1]]
-
-  def GetSavedHashes(self, start, stop):
-    """Returns the list of the saved hashes."""
-    return self._saved_hashes[start:stop]
-
-  def _StopVideoDump(self):
-    """Stops video dump."""
-    for vdump in self._GetEffectiveVideoDumpers():
-      vdump.Stop()
-
-  def _StartVideoDump(self):
-    """Starts video dump."""
-    for vdump in self._GetEffectiveVideoDumpers():
-      vdump.Start(self._input_id, self.IsDualPixelMode())
-
-  def _HasFramesDumpedAtLeast(self, frame_count):
-    """Returns true if FPGA dumps at least the given frame count.
-
-    The function assumes that the frame count starts at zero.
-    """
-    dumpers = self._GetEffectiveVideoDumpers()
-    current_frame = min(dumper.GetFrameCount() for dumper in dumpers)
-    if current_frame > self._last_frame:
-      for i in xrange(self._last_frame, current_frame):
-        self._saved_hashes.append(self._ComputeFrameHash(i))
-        logging.info('Saved frame hash #%d: %r', i, self._saved_hashes[i])
-      self._last_frame = current_frame
-    return current_frame >= frame_count
-
-  def _WaitForFrameCount(self, frame_count, timeout):
-    """Waits until FPGA dumps at least the given frame count or timeout."""
-    self._saved_hashes = []
-    self._last_frame = 0
-    common.WaitForCondition(
-        lambda: self._HasFramesDumpedAtLeast(frame_count),
-        True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
+    return self._frame_manager.GetFrameHashes(start, stop)
 
   def DumpFramesToLimit(self, frame_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.
@@ -193,18 +136,8 @@ class InputFlow(object):
       common.TimeoutError on timeout.
     """
     self.WaitVideoOutputStable()
-    self._StopVideoDump()
-    for vdump in self._GetEffectiveVideoDumpers():
-      vdump.SetFrameLimit(frame_limit)
-      if None in (x, y, width, height):
-        vdump.DisableCrop()
-      else:
-        if self.IsDualPixelMode():
-          vdump.EnableCrop(x / 2, y, width / 2, height)
-        else:
-          vdump.EnableCrop(x, y, width, height)
-    self._StartVideoDump()
-    self._WaitForFrameCount(frame_limit, timeout)
+    self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
+                                          timeout)
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
@@ -378,7 +311,7 @@ class HdmiInputFlow(InputFlow):
     Returns:
       True if the frame is locked; otherwise, False.
     """
-    resolution_fpga = self._GetResolutionFromFpga()
+    resolution_fpga = self._frame_manager.ComputeResolution()
     resolution_rx = self._rx.GetResolution()
     if resolution_fpga == resolution_rx:
       logging.info('same resolution: %dx%d', *resolution_fpga)
