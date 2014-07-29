@@ -27,7 +27,16 @@ is_already_running () {
     start-stop-daemon --stop --test --quiet --pidfile "${PIDFILE}"
 }
 
+is_ip_found () {
+    ip addr | grep inet | grep eth0 > /dev/null
+}
+
 do_start () {
+    if ! is_ip_found; then
+        echo "No IP found, try to restart network..."
+        /etc/init.d/networking restart
+    fi
+
     if ! is_already_running; then
         start-stop-daemon --start --background --pidfile "${PIDFILE}" \
             --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \
