@@ -36,6 +36,7 @@ class FpgaController(object):
     self.vpass = VideoPasser()
     self.vdump0 = VideoDumper(0)
     self.vdump1 = VideoDumper(1)
+    self.adump = AudioDumper()
     self.hdmi_edid = EdidController(EdidController.HDMI_BASE)
     self.vga_edid = EdidController(EdidController.VGA_BASE)
 
@@ -384,3 +385,136 @@ class EdidController(object):
       value = self._memory.Read(self._edid_base + self._EDID_MEM + offset)
       all_value += struct.pack('>I', value)
     return all_value
+
+
+class AudioDumperError(Exception):
+  """Exception raised when any error on AudioDumper."""
+  pass
+
+
+class AudioDumper(object):
+  """A class to control audio dumper."""
+
+  _REGS_BASE = 0xff212000
+
+  # Control register
+  _REG_CTRL = 0x0
+  _BIT_RUN = 1 << 1
+
+  # Register which stores the offsets relative to _DUMP_BASE_ADDRESS for dump.
+  # The valid value is in the range of 0x00000000 to _DUMP_BUFFER_SIZE.
+  # Also, the address should be 4K aligned.
+  # Note that VideoDumper and AudioDumper share dump memory. Be careful to
+  # use these two dumpers at the same time.
+  _REG_START_ADDR = 0x8
+  _REG_END_ADDR = 0xc
+
+  _DUMP_BASE_ADDRESS = 0xc0000000
+  _DUMP_BUFFER_SIZE = 0x3c000000
+
+  # If set to 1, the dump pointer is reset to Dump Start Address after it
+  # reaches Dump End Address. If set to 0, the dump pointer does not reset.
+  _REG_LOOP = 0x10
+
+  # Number of pages have been dumped. It starts from 0 when Run bit is set and
+  # wraps around at 65536.
+  _REG_PAGE_COUNT = 0x14
+
+  # The default address for audio dump. This area is 32 MBytes.
+  _DEFAULT_START_ADDRESS = 0x1c000000
+  _DEFAULT_END_ADDRESS = 0x1e000000
+
+  # The rate of audio data is
+  # 8 channel * 4 bytes/sample * 48000 samples/sec = 1500 KBytes/sec.
+  # So default area which contains 0x2000 4K pages can dump
+  # 32 MBytes / 1500 KBytes = 21 sec of data.
+  SIMPLE_DUMP_PAGE_LIMIT = 0x2000
+  SIMPLE_DUMP_TIME_LIMIT_SECS = 21
+
+  # Set loop to 1 so page count will increase over 0x2000 and we can detect the
+  # case where page count exceeds the limit.
+  # However, since page count will overflow at 65535, the number will not be
+  # reliable after that point.
+  _DEFAULT_LOOP = 1
+
+  # Page size is 4K bytes. Address should be 4K-aligned.
+  PAGE_SIZE = 0x1000
+
+  def __init__(self):
+    """Constructs an AudioDumper object."""
+    self._memory = mem.Memory
+
+  def _Stop(self):
+    """Stops dumping."""
+    self._memory.ClearMask(self._REGS_BASE + self._REG_CTRL, self._BIT_RUN)
+
+  def _Start(self):
+    """Starts dumping."""
+    self._memory.SetMask(self._REGS_BASE + self._REG_CTRL, self._BIT_RUN)
+
+  def _CheckAddressValid(self, name, address):
+    """Checks an address is within valid range, and is aligned.
+
+    Args:
+      name: The address name.
+      address: An address.
+
+    Raises:
+      AudioDumperError if address is not valid.
+    """
+    if address < 0 or address >= self._DUMP_BUFFER_SIZE:
+      raise AudioDumperError(
+          '%s address 0x%x is not in the range of 0 to 0x%x' % (
+              name, address, self._DUMP_BUFFER_SIZE))
+    if address & (self.PAGE_SIZE - 1):
+      raise AudioDumperError(
+          '%s address 0x%x is not aligned with 0x%x' % (
+              name, address, self.PAGE_SIZE))
+
+  def StartDumpingToMemory(self):
+    """Starts dumping to memory."""
+    #TODO(cychiang) Implement rotation dumping for long recording.
+    self._Stop()
+
+    start_address = self._DEFAULT_START_ADDRESS
+    end_address = self._DEFAULT_END_ADDRESS
+    loop = self._DEFAULT_LOOP
+
+    # Checks address is valid.
+    for name, address in [('start', start_address),
+                          ('end', end_address)]:
+      self._CheckAddressValid(name, address)
+
+    # Sets the memory addresses, loop for dump.
+    self._memory.Write(self._REGS_BASE + self._REG_START_ADDR, start_address)
+    self._memory.Write(self._REGS_BASE + self._REG_END_ADDR, end_address)
+    self._memory.Write(self._REGS_BASE + self._REG_LOOP, loop)
+
+    self._Start()
+
+  def StopDumpingToMemory(self):
+    """Stops dumping to memory.
+
+    Returns:
+      A tuple of (Mapped start address, Page count)
+    """
+    # Reads out the address and page count before stop, otherwise page_count
+    # will be cleared.
+    start_address = self._memory.Read(
+        self._REGS_BASE + self._REG_START_ADDR)
+    page_count = self._memory.Read(
+        self._REGS_BASE + self._REG_PAGE_COUNT)
+    self._Stop()
+    return AudioDumper.GetMappedAddress(start_address), page_count
+
+  @classmethod
+  def GetMappedAddress(cls, address):
+    """Gets mapped address for a given address.
+
+    Args:
+      address: An address relative to _DUMP_BASE_ADDRESS.
+
+    Returns:
+      A mapped address which is the input address shifted by _DUMP_BASE_ADDRESS.
+    """
+    return address + cls._DUMP_BASE_ADDRESS

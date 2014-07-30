@@ -36,6 +36,9 @@ class ChameleondDriver(ChameleondInterface):
   _DEFAULT_FRAME_INDEX = 0
   _DEFAULT_FRAME_LIMIT = _DEFAULT_FRAME_INDEX + 1
 
+  # Inputs that support audio.
+  _INPUTS_AUDIO_SUPPORTED = [ids.HDMI]
+
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._selected_input = None
@@ -469,3 +472,38 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('Something wrong with the resolution: %dx%d' %
                         (width, height))
     return (width, height)
+
+  def _CheckInputIdSupportAudio(self, input_id):
+    """Checks if the input has audio support.
+
+    Args:
+      input_id: The ID of the input connector.
+    """
+    if input_id not in self._INPUTS_AUDIO_SUPPORTED:
+      raise DriverError('Not a valid input_id for audio operation.')
+
+  def StartCapturingAudio(self, input_id):
+    """Starts capturing audio.
+
+    Args:
+      input_id: The ID of the input connector.
+    """
+    self._CheckInputIdSupportAudio(input_id)
+    self._SelectInput(input_id)
+    self._input_flows[input_id].StartCapturingAudio()
+
+  def StopCapturingAudio(self, input_id):
+    """Stops capturing audio and returns recorded audio raw data.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      A tuple (data, format).
+      data: The captured audio data wrapped in an xmlrpclib.Binary object.
+      format: The dict representation of AudioDataFormat. Refer to docstring
+        of utils.audio.AudioDataFormat for detail.
+    """
+    self._CheckInputIdSupportAudio(input_id)
+    data, data_format = self._input_flows[input_id].StopCapturingAudio()
+    return xmlrpclib.Binary(data), data_format

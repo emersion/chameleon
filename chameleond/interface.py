@@ -301,3 +301,25 @@ class ChameleondInterface(object):
       A (width, height) tuple.
     """
     raise NotImplementedError('DetectResolution')
+
+  def StartCapturingAudio(self, input_id):
+    """Starts capturing audio.
+
+    Args:
+      input_id: The ID of the input connector.
+    """
+    raise NotImplementedError('StartCapturingAudio')
+
+  def StopCapturingAudio(self, input_id):
+    """Stops capturing audio and returns recorded audio raw data.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      A tuple (data, format).
+      data: The captured audio data wrapped in an xmlrpclib.Binary object.
+      format: The dict representation of AudioDataFormat. Refer to docstring
+        of utils.audio.AudioDataFormat for detail.
+    """
+    raise NotImplementedError('StopCapturingAudio')
