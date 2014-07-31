@@ -37,6 +37,9 @@ class ChameleondDriver(ChameleondInterface):
   _DEFAULT_FRAME_INDEX = 0
   _DEFAULT_FRAME_LIMIT = _DEFAULT_FRAME_INDEX + 1
 
+  # Limit the period of async capture to 3min (in 60fps).
+  _MAX_CAPTURED_FRAME_COUNT = 3 * 60 * 60
+
   # Inputs that support audio.
   _INPUTS_AUDIO_SUPPORTED = [ids.HDMI]
 
@@ -307,8 +310,32 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
+    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
     self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
     return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX)
+
+  def _AutoFillArea(self, input_id, x, y, width, height):
+    """Verifies the area argument correctness and fills the default values.
+
+    Args:
+      input_id: The ID of the input connector.
+      x: The X position of the top-left corner.
+      y: The Y position of the top-left corner.
+      width: The width of the area.
+      height: The height of the area.
+
+    Returns:
+      A tuple of (x, y, width, height)
+
+    Raises:
+      DriverError if the area is not specified correctly.
+    """
+    if (x, y, width, height) == (None, ) * 4:
+      return (0, 0) + self.DetectResolution(input_id)
+    elif None not in (x, y, width, height):
+      return (x, y, width, height)
+    else:
+      raise DriverError('Some of area arguments are not specified.')
 
   def GetMaxFrameLimit(self, input_id, width, height):
     """Gets the maximal number of frames which are accommodated in the buffer.
@@ -325,6 +352,76 @@ class ChameleondDriver(ChameleondInterface):
       A number of the frame limit.
     """
     return self._input_flows[input_id].GetMaxFrameLimit(width, height)
+
+  def _PrepareCapturingVideo(self, input_id, x, y, width, height):
+    """Prepares capturing video on the given input.
+
+    Args:
+      input_id: The ID of the input connector.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
+    """
+    self._SelectInput(input_id)
+    if not self.IsPlugged(input_id):
+      raise DriverError('HPD is unplugged. No signal is expected.')
+
+    is_dual_pixel_mode = self._input_flows[input_id].IsDualPixelMode()
+    if is_dual_pixel_mode:
+      if any((x % 16, y % 8, width % 16, height % 8)):
+        raise DriverError('Argument not aligned')
+    else:
+      if any((x % 8, y % 8, width % 8, height % 8)):
+        raise DriverError('Argument not aligned')
+
+    self._captured_params = {
+      'input_id': input_id,
+      'resolution': (width, height),
+      'is_dual_pixel': is_dual_pixel_mode,
+      'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
+    }
+
+  def StartCapturingVideo(self, input_id, x=None, y=None, width=None,
+                          height=None):
+    """Starts video capturing continuously on the given input.
+
+    This API is an asynchronous call. It returns after the video starts
+    capturing. The caller should call StopCapturingVideo to stop it.
+
+    The example of usage:
+      chameleon.StartCapturingVideo(hdmi_input)
+      time.sleep(2)
+      chameleon.StopCapturingVideo()
+      for i in xrange(chameleon.GetCapturedFrameCount()):
+        frame = chameleon.ReadCapturedFrame(i, *area).data
+        CompareFrame(frame, golden_frames[i])
+
+    Args:
+      input_id: The ID of the input connector.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
+    """
+    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
+    self._PrepareCapturingVideo(input_id, x, y, width, height)
+
+    max_frame_limit = self.GetMaxFrameLimit(input_id, width, height)
+    self._input_flows[input_id].StartDumpingFrames(
+        max_frame_limit, x, y, width, height, self._MAX_CAPTURED_FRAME_COUNT)
+
+  def StopCapturingVideo(self):
+    """Stops video capturing which was started previously.
+
+    Raises:
+      DriverError if the capture period is longer than the capture limitation.
+    """
+    input_id = self._captured_params['input_id']
+    self._input_flows[input_id].StopDumpingFrames()
+    if self.GetCapturedFrameCount() >= self._MAX_CAPTURED_FRAME_COUNT:
+      raise DriverError('Exceeded the limit of capture, frame_count >= %d' %
+                        self._MAX_CAPTURED_FRAME_COUNT)
 
   def CaptureVideo(self, input_id, total_frame, x=None, y=None, width=None,
                    height=None):
@@ -347,42 +444,26 @@ class ChameleondDriver(ChameleondInterface):
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
       height: The height of the area of crop.
-
-    Returns:
-      A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    self._SelectInput(input_id)
-    if not self.IsPlugged(input_id):
-      raise DriverError('HPD is unplugged. No signal is expected.')
-
+    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
     max_frame_limit = self.GetMaxFrameLimit(input_id, width, height)
     if total_frame > max_frame_limit:
       raise DriverError('Exceed the max frame limit %d > %d',
                         total_frame, max_frame_limit)
 
-    is_dual_pixel_mode = self._input_flows[input_id].IsDualPixelMode()
-    if None not in (x, y, width, height):
-      if is_dual_pixel_mode:
-        if any((x % 16, y % 8, width % 16, height % 8)):
-          raise DriverError('Argument not aligned')
-      else:
-        if any((x % 8, y % 8, width % 8, height % 8)):
-          raise DriverError('Argument not aligned')
-
+    self._PrepareCapturingVideo(input_id, x, y, width, height)
     # TODO(waihong): Make the timeout value based on the FPS rate.
     self._input_flows[input_id].DumpFramesToLimit(
         total_frame, x, y, width, height, self._TIMEOUT_FRAME_DUMP_PROBE)
 
-    if None in (width, height):
-      width, height = self._input_flows[input_id].GetResolution()
+  def GetCapturedFrameCount(self):
+    """Gets the total count of the captured frames.
 
-    self._captured_params = {
-      'total_frame': total_frame,
-      'input_id': input_id,
-      'resolution': (width, height),
-      'is_dual_pixel': is_dual_pixel_mode,
-      'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
-    }
+    Returns:
+      The number of frames captured.
+    """
+    input_id = self._captured_params['input_id']
+    return self._input_flows[input_id].GetDumpedFrameCount()
 
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.
@@ -404,7 +485,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    total_frame = self._captured_params['total_frame']
+    total_frame = self.GetCapturedFrameCount()
     if not 0 <= frame_index < total_frame:
       raise DriverError('The frame index is out-of-range: %d not in [0, %d)' %
                         (frame_index, total_frame))
@@ -443,6 +524,13 @@ class ChameleondDriver(ChameleondInterface):
       The list of checksums of frames.
     """
     input_id = self._captured_params['input_id']
+    total_frame = self.GetCapturedFrameCount()
+    if not 0 <= start_index < total_frame:
+      raise DriverError('The start index is out-of-range: %d not in [0, %d)' %
+                        (start_index, total_frame))
+    if not 0 < stop_index <= total_frame:
+      raise DriverError('The stop index is out-of-range: %d not in (0, %d]' %
+                        (stop_index, total_frame))
     return self._input_flows[input_id].GetFrameHashes(start_index, stop_index)
 
   def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,

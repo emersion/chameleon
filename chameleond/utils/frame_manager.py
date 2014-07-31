@@ -4,9 +4,15 @@
 """Frame manager module which manages the frame dump and monitor logic."""
 
 import logging
+from multiprocessing import Process, Value, Array
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import common
+
+
+class FrameManagerError(Exception):
+  """Exception raised when any error on FrameManager."""
+  pass
 
 
 class FrameManager(object):
@@ -15,6 +21,8 @@ class FrameManager(object):
   It acts as an intermediate layer between an InputFlow and VideoDumpers.
   It simplifies the logic of handling dual-pixel-mode and single-pixel-mode.
   """
+
+  _HASH_SIZE = 4
 
   # Delay in second to check the frame count, using 120-fps.
   _DELAY_VIDEO_DUMP_PROBE = 1.0 / 120
@@ -31,8 +39,10 @@ class FrameManager(object):
     self._input_id = input_id
     self._vdumps = vdumps
     self._is_dual = len(vdumps) == 2
-    self._saved_hashes = []
-    self._last_frame = 0
+    self._saved_hashes = None
+    self._last_frame = Value('i', -1)
+    self._timeout_in_frame = None
+    self._process = None
 
   def ComputeResolution(self):
     """Computes the resolution from FPGA."""
@@ -50,6 +60,13 @@ class FrameManager(object):
     """Stops frame dump."""
     for vdump in self._vdumps:
       vdump.Stop()
+    # We can't just stop the video dumpers as some functions, like detecting
+    # resolution, need the video dumpers continue to run. So select them again
+    # to re-initialize the default setting, i.e. single frame non-loop dumping.
+    # TODO(waihong): The first frame is overwritten. Fix it.
+    # TODO(waihong): Simplify the above logic.
+    for vdump in self._vdumps:
+      vdump.Select(self._input_id, self._is_dual)
 
   def _StartFrameDump(self):
     """Starts frame dump."""
@@ -93,7 +110,7 @@ class FrameManager(object):
       return hashes[0]
 
   def GetFrameHashes(self, start, stop):
-    """Returns the list of the frame hashes.
+    """Returns the saved list of the frame hashes.
 
     Args:
       start: The index of the start frame.
@@ -102,9 +119,17 @@ class FrameManager(object):
     Returns:
       A list of frame hashes.
     """
-    return self._saved_hashes[start:stop]
+    # Convert to a list, in which each element is a frame hash.
+    return [self._saved_hashes[i : i + self._HASH_SIZE]
+            for i in xrange(start * self._HASH_SIZE,
+                            stop * self._HASH_SIZE,
+                            self._HASH_SIZE)]
 
-  def _GetFrameCount(self):
+  def GetFrameCount(self):
+    """Returns the saved number of frame dumped."""
+    return self._last_frame.value
+
+  def _ComputeFrameCount(self):
     """Returns the current number of frame dumped."""
     return min(vdump.GetFrameCount() for vdump in self._vdumps)
 
@@ -113,12 +138,16 @@ class FrameManager(object):
 
     The function assumes that the frame count starts at zero.
     """
-    current_frame = self._GetFrameCount()
-    if current_frame > self._last_frame:
-      for i in xrange(self._last_frame, current_frame):
-        self._saved_hashes.append(self._ComputeFrameHash(i))
-        logging.info('Saved frame hash #%d: %r', i, self._saved_hashes[i])
-      self._last_frame = current_frame
+    current_frame = self._ComputeFrameCount()
+    if current_frame > self._last_frame.value:
+      for i in xrange(self._last_frame.value, current_frame):
+        hash64 = self._ComputeFrameHash(i)
+        for j in xrange(self._HASH_SIZE):
+          self._saved_hashes[i * self._HASH_SIZE + j] = hash64[j]
+        logging.info(
+            'Saved frame hash #%d: %r', i,
+            self._saved_hashes[i * self._HASH_SIZE : (i + 1) * self._HASH_SIZE])
+      self._last_frame.value = current_frame
     return current_frame >= frame_count
 
   def _WaitForFrameCount(self, frame_count, timeout):
@@ -128,17 +157,42 @@ class FrameManager(object):
       frame_count: A number of frames to wait.
       timeout: Time in second of timeout.
     """
-    self._saved_hashes = []
-    self._last_frame = 0
+    self._last_frame.value = 0
     common.WaitForCondition(
         lambda: self._HasFramesDumpedAtLeast(frame_count),
         True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
 
-  def DumpFramesToLimit(self, frame_limit, x, y, width, height, timeout):
+  def _CreateSavedHashes(self, frame_count):
+    """Creates the saved hashes, a sharable object of multiple processes."""
+    # Store the hashes in a flat array, limitation of the shared variable.
+    if self._saved_hashes:
+      del self._saved_hashes
+    array_size = frame_count * self._HASH_SIZE
+    self._saved_hashes = Array('H', array_size)
+
+  def _StartMonitoringFrames(self, hash_buffer_limit):
+    """Starts a process to monitor frames."""
+    self._StopMonitoringFrames()
+    self._CreateSavedHashes(hash_buffer_limit)
+    # Keep 5 seconds margin for timeout.
+    timeout_in_second = hash_buffer_limit / 60 + 5
+    self._timeout_in_frame = hash_buffer_limit
+    self._process = Process(target=self._WaitForFrameCount,
+                            args=(hash_buffer_limit,
+                                  timeout_in_second))
+    self._process.start()
+
+  def _StopMonitoringFrames(self):
+    """Stops the previous process which monitors frames."""
+    if self._process and self._process.is_alive():
+      self._process.terminate()
+      self._process.join()
+
+  def DumpFramesToLimit(self, frame_buffer_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.
 
     Args:
-      frame_limit: The limitation of frame to dump.
+      frame_buffer_limit: The limitation of frame to dump.
       x: The X position of the top-left corner of crop.
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
@@ -146,6 +200,33 @@ class FrameManager(object):
       timeout: Time in second of timeout.
     """
     self._StopFrameDump()
-    self._SetupFrameDump(frame_limit, x, y, width, height, loop=False)
+    self._SetupFrameDump(frame_buffer_limit, x, y, width, height, loop=False)
     self._StartFrameDump()
-    self._WaitForFrameCount(frame_limit, timeout)
+    self._CreateSavedHashes(frame_buffer_limit)
+    self._WaitForFrameCount(frame_buffer_limit, timeout)
+
+  def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
+                         hash_buffer_limit):
+    """Starts dumping frames continuously.
+
+    Args:
+      frame_buffer_limit: The size of the buffer which stores the frame.
+                          Frames will be dumped to the beginning when full.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
+      hash_buffer_limit: The maximum number of hashes to monitor. Stop
+                         capturing when this limitation is reached.
+    """
+    self._StopFrameDump()
+    self._SetupFrameDump(frame_buffer_limit, x, y, width, height, loop=True)
+    self._StartFrameDump()
+    self._StartMonitoringFrames(hash_buffer_limit)
+
+  def StopDumpingFrames(self):
+    """Stops dumping frames."""
+    if self._last_frame.value == -1:
+      raise FrameManagerError('Not started capuring video yet.')
+    self._StopFrameDump()
+    self._StopMonitoringFrames()

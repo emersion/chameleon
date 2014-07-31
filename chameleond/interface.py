@@ -215,6 +215,38 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetMaxFrameLimit')
 
+  def StartCapturingVideo(self, input_id, x=None, y=None, width=None,
+                          height=None):
+    """Starts video capturing continuously on the given input.
+
+    This API is an asynchronous call. It returns after the video starts
+    capturing. The caller should call StopCapturingVideo to stop it.
+
+    The example of usage:
+      chameleon.StartCapturingVideo(hdmi_input)
+      time.sleep(2)
+      chameleon.StopCapturingVideo()
+      for i in xrange(chameleon.GetCapturedFrameCount()):
+        frame = chameleon.ReadCapturedFrame(i, *area).data
+        CompareFrame(frame, golden_frames[i])
+
+    Args:
+      input_id: The ID of the input connector.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
+    """
+    raise NotImplementedError('StartCapturingVideo')
+
+  def StopCapturingVideo(self):
+    """Stops video capturing which was started previously.
+
+    Raises:
+      DriverError if the capture period is longer than the capture limitation.
+    """
+    raise NotImplementedError('StopCapturingVideo')
+
   def CaptureVideo(self, input_id, total_frame, x=None, y=None, width=None,
                    height=None):
     """Captures the video stream on the given input to the buffer.
@@ -236,11 +268,16 @@ class ChameleondInterface(object):
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
       height: The height of the area of crop.
-
-    Returns:
-      A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
     raise NotImplementedError('CaptureVideo')
+
+  def GetCapturedFrameCount(self):
+    """Gets the total count of the captured frames.
+
+    Returns:
+      The number of frames captured.
+    """
+    raise NotImplementedError('GetCapturedFrameCount')
 
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.

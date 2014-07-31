@@ -215,6 +215,32 @@ class InputFlow(object):
                    os.path.getsize(f.name) / 1024.0 / 1024.0)
       return f.read(), self._AUDIO_DATA_FORMAT.AsDict()
 
+  def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
+                         hash_buffer_limit):
+    """Starts dumping frames continuously.
+
+    Args:
+      frame_buffer_limit: The size of the buffer which stores the frame.
+                          Frames will be dumped to the beginning when full.
+      x: The X position of the top-left corner of crop.
+      y: The Y position of the top-left corner of crop.
+      width: The width of the area of crop.
+      height: The height of the area of crop.
+      hash_buffer_limit: The maximum number of hashes to monitor. Stop
+                         capturing when this limitation is reached.
+    """
+    self.WaitVideoOutputStable()
+    self._frame_manager.StartDumpingFrames(
+        frame_buffer_limit, x, y, width, height, hash_buffer_limit)
+
+  def StopDumpingFrames(self):
+    """Stops dumping frames."""
+    self._frame_manager.StopDumpingFrames()
+
+  def GetDumpedFrameCount(self):
+    """Gets the number of frames which is dumped."""
+    return self._frame_manager.GetFrameCount()
+
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
