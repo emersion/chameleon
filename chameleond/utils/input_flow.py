@@ -318,6 +318,7 @@ class HdmiInputFlow(InputFlow):
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
+  _DELAY_WAITING_GOOD_PIXELS = 3
 
   def __init__(self, *args):
     super(HdmiInputFlow, self).__init__(*args)
@@ -363,6 +364,9 @@ class HdmiInputFlow(InputFlow):
     if self.WaitVideoInputStable():
       self._rx.Do_FSM()
       self.WaitVideoOutputStable()
+      # TODO(waihong): Remove this hack only for Nyan-Big.
+      # http://crbug.com/402152
+      time.sleep(self._DELAY_WAITING_GOOD_PIXELS)
     else:
       logging.warn('Skip doing receiver FSM as video input not stable.')
 
