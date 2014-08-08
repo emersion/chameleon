@@ -114,7 +114,11 @@ class InputFlow(object):
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
-    return self._frame_manager.ComputeResolution()
+    width, height = self._frame_manager.ComputeResolution()
+    if width == 0 or height == 0:
+      raise InputFlowError('Something wrong with the resolution: %dx%d' %
+                           (width, height))
+    return (width, height)
 
   def GetMaxFrameLimit(self, width=None, height=None):
     """Returns of the maximal number of frames which can be dumped."""

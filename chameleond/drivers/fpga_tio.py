@@ -375,7 +375,7 @@ class ChameleondDriver(ChameleondInterface):
         total_frame, x, y, width, height, self._TIMEOUT_FRAME_DUMP_PROBE)
 
     if None in (width, height):
-      width, height = self.DetectResolution(input_id)
+      width, height = self._input_flows[input_id].GetResolution()
 
     self._captured_params = {
       'total_frame': total_frame,
@@ -476,11 +476,7 @@ class ChameleondDriver(ChameleondInterface):
       A (width, height) tuple.
     """
     self._SelectInput(input_id)
-    width, height = self._input_flows[input_id].GetResolution()
-    if width == 0 or height == 0:
-      raise DriverError('Something wrong with the resolution: %dx%d' %
-                        (width, height))
-    return (width, height)
+    return self._input_flows[input_id].GetResolution()
 
   def _CheckInputIdSupportAudio(self, input_id):
     """Checks if the input has audio support.
