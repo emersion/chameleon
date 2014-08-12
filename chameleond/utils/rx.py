@@ -238,6 +238,11 @@ class VgaRx(i2c_fpga.I2cSlave):
 
   SLAVE_ADDRESSES = (0x4c, )
 
+  _REG_SYNC_DETECT = 0x14
+  _BIT_HSYNC_DETECTED = 1 << 7
+  _BIT_VSYNC_DETECTED = 1 << 4
+  _BITS_SYNC_MASK = _BIT_HSYNC_DETECTED | _BIT_VSYNC_DETECTED
+
   def Initialize(self, unused_dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize CRT RX chip.')
@@ -259,3 +264,7 @@ class VgaRx(i2c_fpga.I2cSlave):
     self.Set(0x0f, 0x86)  # Tweak: max driving strength
 
     # TODO(waihong): Configure the proper mode setting.
+
+  def IsSyncDetected(self):
+    """Returns True if Hsync or Vsync is detected."""
+    return bool(self.Get(self._REG_SYNC_DETECT) & self._BITS_SYNC_MASK)

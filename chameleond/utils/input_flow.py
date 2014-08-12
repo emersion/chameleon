@@ -455,11 +455,9 @@ class VgaInputFlow(InputFlow):
     """Returns if the input flow uses dual pixel mode."""
     return self._IS_DUAL_PIXEL_MODE
 
-  # TODO(waihong): Implement the following methods for VGA.
-
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
-    return True
+    return self._rx.IsSyncDetected()
 
   def IsPlugged(self):
     """Returns if the HPD line is plugged."""
@@ -480,6 +478,8 @@ class VgaInputFlow(InputFlow):
   def WriteEdid(self, data):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
+
+  # TODO(waihong): Implement the following methods for VGA.
 
   def WaitVideoInputStable(self, unused_timeout=None):
     """Waits the video input stable or timeout."""
