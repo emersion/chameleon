@@ -63,7 +63,6 @@ class FrameManager(object):
     # We can't just stop the video dumpers as some functions, like detecting
     # resolution, need the video dumpers continue to run. So select them again
     # to re-initialize the default setting, i.e. single frame non-loop dumping.
-    # TODO(waihong): The first frame is overwritten. Fix it.
     # TODO(waihong): Simplify the above logic.
     for vdump in self._vdumps:
       vdump.Select(self._input_id, self._is_dual)
@@ -86,6 +85,7 @@ class FrameManager(object):
       loop: True to loop-back and continue dump.
     """
     for vdump in self._vdumps:
+      vdump.SetDumpAddressForCapture()
       vdump.SetFrameLimit(frame_limit, loop)
       if None in (x, y, width, height):
         vdump.DisableCrop()

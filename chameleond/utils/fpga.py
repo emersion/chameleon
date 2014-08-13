@@ -195,9 +195,17 @@ class VideoDumper(object):
   }
 
   _DUMP_BASE_ADDRESS = 0xc0000000
-  _DUMP_BUFFER_SIZE = 0x1c000000
+
   _DUMP_START_ADDRESSES = (0x00000000,  # Dumper 0
                            0x20000000)  # Dumper 1
+  _DUMP_BUFFER_SIZE = 0x1b400000
+
+  # For tempoary dump, don't interfere with the above buffer for capturing.
+  _DUMP_TEMP_START_ADDRESSES = (0x1b400000,  # Dumper 0
+                                0x3b400000)  # Dumper 1
+  # The size of a half of a 3840x2160 image is 0xbdd800.
+  _DUMP_TEMP_BUFFER_SIZE = 0x00c00000
+
   _DEFAULT_LIMIT = 1
   _DEFAULT_ENABLE_LOOP = False
 
@@ -277,6 +285,22 @@ class VideoDumper(object):
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_LOOP,
                        1 if loop else 0)
 
+  def SetDumpAddressForTemp(self):
+    """Sets the dump memory address space for temporary dump."""
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_START_ADDR,
+                       self._DUMP_TEMP_START_ADDRESSES[self._index])
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
+                       self._DUMP_TEMP_START_ADDRESSES[self._index] +
+                         self._DUMP_TEMP_BUFFER_SIZE)
+
+  def SetDumpAddressForCapture(self):
+    """Sets the dump memory address space for capture."""
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_START_ADDR,
+                       self._DUMP_START_ADDRESSES[self._index])
+    self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
+                       self._DUMP_START_ADDRESSES[self._index] +
+                         self._DUMP_BUFFER_SIZE)
+
   def Select(self, input_id, dual_pixel_mode):
     """Selects the given input for dumping.
 
@@ -285,12 +309,7 @@ class VideoDumper(object):
       dual_pixel_mode: True to use dual pixel mode; otherwise, False.
     """
     self.Stop()
-    # Set the memory addresses, loop, and limit for dump.
-    self._memory.Write(self._REGS_BASE[self._index] + self._REG_START_ADDR,
-                       self._DUMP_START_ADDRESSES[self._index])
-    self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
-                       self._DUMP_START_ADDRESSES[self._index] +
-                         self._DUMP_BUFFER_SIZE)
+    self.SetDumpAddressForTemp()
     self.SetFrameLimit(self._DEFAULT_LIMIT, self._DEFAULT_ENABLE_LOOP)
     # Use the proper CLK.
     if self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
