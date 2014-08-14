@@ -254,6 +254,20 @@ class InputFlow(object):
     """Deasserts HPD line to low, emulating unplug."""
     raise NotImplementedError('Unplug')
 
+  def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
+          repeat_count, end_level):
+    """Fires one or more HPD pulse (low -> high -> low -> ...).
+
+    Args:
+      deassert_interval_usec: The time in microsecond of the deassert pulse.
+      assert_interval_usec: The time in microsecond of the assert pulse.
+                            If None, then use the same value as
+                            deassert_interval_usec.
+      repeat_count: The count of HPD pulses to fire.
+      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
+    """
+    raise NotImplementedError('FireHpdPulse')
+
   def ReadEdid(self):
     """Reads the EDID content."""
     raise NotImplementedError('ReadEdid')
@@ -471,6 +485,20 @@ class VgaInputFlow(InputFlow):
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
+    pass
+
+  def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
+          repeat_count, end_level):
+    """Fires one or more HPD pulse (low -> high -> low -> ...).
+
+    Args:
+      deassert_interval_usec: The time in microsecond of the deassert pulse.
+      assert_interval_usec: The time in microsecond of the assert pulse.
+                            If None, then use the same value as
+                            deassert_interval_usec.
+      repeat_count: The count of HPD pulses to fire.
+      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
+    """
     pass
 
   def ReadEdid(self):

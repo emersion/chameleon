@@ -271,7 +271,7 @@ class ChameleondDriver(ChameleondInterface):
       assert_interval_usec = deassert_interval_usec
 
     return self._input_flows[input_id].FireHpdPulse(deassert_interval_usec,
-            assert_interval_usec, repeat_count, end_level)
+        assert_interval_usec, repeat_count, end_level)
 
   def _SelectInput(self, input_id):
     """Selects the input on Chameleon.
