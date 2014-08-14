@@ -310,17 +310,16 @@ class ChameleondDriver(ChameleondInterface):
     self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
     return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX)
 
-  def GetMaxFrameLimit(self, input_id, width=None, height=None):
-    """Returns of the maximal number of frames which can be dumped.
+  def GetMaxFrameLimit(self, input_id, width, height):
+    """Gets the maximal number of frames which are accommodated in the buffer.
 
     It depends on the size of the internal buffer on the board and the
-    current resolution of the display input. It may change once the
-    resolution changes.
+    size of area to capture (full screen or cropped area).
 
     Args:
       input_id: The ID of the input connector.
-      width: The width of the area of crop.
-      height: The height of the area of crop.
+      width: The width of the area to capture.
+      height: The height of the area to capture.
 
     Returns:
       A number of the frame limit.
