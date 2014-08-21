@@ -78,8 +78,8 @@ class FrameManager(object):
 
     Args:
       frame_limit: The limitation of frame to dump.
-      x: The X position of the top-left corner of crop.
-      y: The Y position of the top-left corner of crop.
+      x: The X position of the top-left corner of crop; None for a full-screen.
+      y: The Y position of the top-left corner of crop; None for a full-screen.
       width: The width of the area of crop.
       height: The height of the area of crop.
       loop: True to loop-back and continue dump.
@@ -87,7 +87,7 @@ class FrameManager(object):
     for vdump in self._vdumps:
       vdump.SetDumpAddressForCapture()
       vdump.SetFrameLimit(frame_limit, loop)
-      if None in (x, y, width, height):
+      if None in (x, y):
         vdump.DisableCrop()
       else:
         if self._is_dual:
@@ -193,8 +193,8 @@ class FrameManager(object):
 
     Args:
       frame_buffer_limit: The limitation of frame to dump.
-      x: The X position of the top-left corner of crop.
-      y: The Y position of the top-left corner of crop.
+      x: The X position of the top-left corner of crop; None for a full-screen.
+      y: The Y position of the top-left corner of crop; None for a full-screen.
       width: The width of the area of crop.
       height: The height of the area of crop.
       timeout: Time in second of timeout.
@@ -212,8 +212,8 @@ class FrameManager(object):
     Args:
       frame_buffer_limit: The size of the buffer which stores the frame.
                           Frames will be dumped to the beginning when full.
-      x: The X position of the top-left corner of crop.
-      y: The Y position of the top-left corner of crop.
+      x: The X position of the top-left corner of crop; None for a full-screen.
+      y: The Y position of the top-left corner of crop; None for a full-screen.
       width: The width of the area of crop.
       height: The height of the area of crop.
       hash_buffer_limit: The maximum number of hashes to monitor. Stop

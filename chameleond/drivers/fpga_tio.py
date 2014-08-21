@@ -317,6 +317,9 @@ class ChameleondDriver(ChameleondInterface):
   def _AutoFillArea(self, input_id, x, y, width, height):
     """Verifies the area argument correctness and fills the default values.
 
+    It keeps x=None and y=None if all of the x, y, width, and height are None.
+    That hints FPGA to use a full-screen capture, not a cropped-sccren capture.
+
     Args:
       input_id: The ID of the input connector.
       x: The X position of the top-left corner.
@@ -331,8 +334,8 @@ class ChameleondDriver(ChameleondInterface):
       DriverError if the area is not specified correctly.
     """
     if (x, y, width, height) == (None, ) * 4:
-      return (0, 0) + self.DetectResolution(input_id)
-    elif None not in (x, y, width, height):
+      return (None, None) + self.DetectResolution(input_id)
+    elif (x, y) == (None, ) * 2 or None not in (x, y, width, height):
       return (x, y, width, height)
     else:
       raise DriverError('Some of area arguments are not specified.')
@@ -368,12 +371,14 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('HPD is unplugged. No signal is expected.')
 
     is_dual_pixel_mode = self._input_flows[input_id].IsDualPixelMode()
-    if is_dual_pixel_mode:
-      if any((x % 16, y % 8, width % 16, height % 8)):
-        raise DriverError('Argument not aligned')
-    else:
-      if any((x % 8, y % 8, width % 8, height % 8)):
-        raise DriverError('Argument not aligned')
+    # Check the alignment for a cropped-screen capture.
+    if None not in (x, y):
+      if is_dual_pixel_mode:
+        if any((x % 16, y % 8, width % 16, height % 8)):
+          raise DriverError('Argument not aligned')
+      else:
+        if any((x % 8, y % 8, width % 8, height % 8)):
+          raise DriverError('Argument not aligned')
 
     self._captured_params = {
       'input_id': input_id,
@@ -549,6 +554,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The checksum of the pixels.
     """
+    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
     self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
     return self.GetCapturedChecksums(self._DEFAULT_FRAME_INDEX,
                                      self._DEFAULT_FRAME_INDEX + 1)[0]
