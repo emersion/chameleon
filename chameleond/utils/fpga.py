@@ -108,6 +108,24 @@ class HpdController(object):
             self._HPD_OFFSETS[input_id], int(deassert_interval_usec),
             int(assert_interval_usec), repeat_count, end_level)
 
+  def FireMixedHpdPulses(self, input_id, widths):
+    """Fires one or more HPD pulses, starting at low, of mixed widths.
+
+    One must specify a list of segment widths in the widths argument where
+    widths[0] is the width of the first low segment, widths[1] is that of the
+    first high segment, widths[2] is that of the second low segment, ... etc.
+    The HPD line stops at low if even number of segment widths are specified;
+    otherwise, it stops at high.
+
+    Args:
+      input_id: The ID of the input connector.
+      widths: list of pulse segment widths in usec.
+    """
+    system_tools.SystemTools.Call(
+            'hpd_control_tio', 'pulse',
+            self._HPD_OFFSETS[input_id],
+            *tuple(widths))
+
 class VideoPasser(object):
   """A class to abstract the behavior of video pass-through.
 

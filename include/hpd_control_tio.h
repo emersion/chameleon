@@ -29,6 +29,7 @@ int cmd_status(const int argc, const char **argv);
 int cmd_plug(const int argc, const char **argv);
 int cmd_unplug(const int argc, const char **argv);
 int cmd_repeat_pulse(const int argc, const char **argv);
+int cmd_pulse(const int argc, const char **argv);
 
 #ifdef __cplusplus
 }

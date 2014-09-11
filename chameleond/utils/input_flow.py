@@ -295,6 +295,20 @@ class InputFlow(object):
     """
     raise NotImplementedError('FireHpdPulse')
 
+  def FireMixedHpdPulses(self, widths):
+    """Fires one or more HPD pulses, starting at low, of mixed widths.
+
+    One must specify a list of segment widths in the widths argument where
+    widths[0] is the width of the first low segment, widths[1] is that of the
+    first high segment, widths[2] is that of the second low segment, ... etc.
+    The HPD line stops at low if even number of segment widths are specified;
+    otherwise, it stops at high.
+
+    Args:
+      widths: list of pulse segment widths in usec.
+    """
+    raise NotImplementedError('FireMixedHpdPulses')
+
   def ReadEdid(self):
     """Reads the EDID content."""
     raise NotImplementedError('ReadEdid')
@@ -348,6 +362,20 @@ class DpInputFlow(InputFlow):
     """
     self._fpga.hpd.FireHpdPulse(self._input_id, deassert_interval_usec,
             assert_interval_usec, repeat_count, end_level)
+
+  def FireMixedHpdPulses(self, widths):
+    """Fires one or more HPD pulses, starting at low, of mixed widths.
+
+    One must specify a list of segment widths in the widths argument where
+    widths[0] is the width of the first low segment, widths[1] is that of the
+    first high segment, widths[2] is that of the second low segment, ... etc.
+    The HPD line stops at low if even number of segment widths are specified;
+    otherwise, it stops at high.
+
+    Args:
+      widths: list of pulse segment widths in usec.
+    """
+    self._fpga.hpd.FireMixedHpdPulses(self._input_id, widths)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -416,6 +444,20 @@ class HdmiInputFlow(InputFlow):
     """
     self._fpga.hpd.FireHpdPulse(self._input_id, deassert_interval_usec,
             assert_interval_usec, repeat_count, end_level)
+
+  def FireMixedHpdPulses(self, widths):
+    """Fires one or more HPD pulses, starting at low, of mixed widths.
+
+    One must specify a list of segment widths in the widths argument where
+    widths[0] is the width of the first low segment, widths[1] is that of the
+    first high segment, widths[2] is that of the second low segment, ... etc.
+    The HPD line stops at low if even number of segment widths are specified;
+    otherwise, it stops at high.
+
+    Args:
+      widths: list of pulse segment widths in usec.
+    """
+    self._fpga.hpd.FireMixedHpdPulses(self._input_id, widths)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -525,6 +567,20 @@ class VgaInputFlow(InputFlow):
                             deassert_interval_usec.
       repeat_count: The count of HPD pulses to fire.
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
+    """
+    pass
+
+  def FireMixedHpdPulses(self, widths):
+    """Fires one or more HPD pulses, starting at low, of mixed widths.
+
+    One must specify a list of segment widths in the widths argument where
+    widths[0] is the width of the first low segment, widths[1] is that of the
+    first high segment, widths[2] is that of the second low segment, ... etc.
+    The HPD line stops at low if even number of segment widths are specified;
+    otherwise, it stops at high.
+
+    Args:
+      widths: list of pulse segment widths in usec.
     """
     pass
 

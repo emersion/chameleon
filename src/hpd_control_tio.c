@@ -23,6 +23,13 @@ static const char *USAGE =
 "                      TA: The time in usec of the assert pulse.\n"
 "                       C: The repeat count.\n"
 "                      EL: End level: 0 for LOW or 1 for HIGH.\n"
+"  pulse OFFSET W[0] W[1] ... \n"
+"                        - Generate HPD pulses, starting at LOW, of mixed widths.\n"
+"                      W[n]: segment widths in usec. W[0] is the width of the\n"
+"                            first LOW segment; W[1] is that of the first HIGH\n"
+"                            segment, W[2] is that of the second LOW segment, etc.\n"
+"                            If even number of segments are specified, then the\n"
+"                            HPD line stops at LOW; otherwise, it stops at HIGH.\n"
 "\n"
 "OFFSET:\n"
 "   DP1:  4\n"
@@ -44,12 +51,15 @@ static const char *USAGE =
  */
 #define DURATION_NEED_RT 50000  // 50 msec
 
+#define MAX_SEGMENT_COUNT 20 // for pulses of mixed widths
+
 /* Commands and their dispatch functions */
 static const struct cmd COMMAND_LIST[] = {
   { "status", cmd_status, 0 },
   { "plug", cmd_plug, 0 },
   { "unplug", cmd_unplug, 0 },
   { "repeat_pulse", cmd_repeat_pulse, 4 },
+  { "pulse", cmd_pulse, 1 },
   { NULL, NULL, 0 }  // end-of-list
 };
 
@@ -157,6 +167,38 @@ int cmd_repeat_pulse(const int argc, const char **argv)
   return 0;
 }
 
+/* Function to generate HPD pulses, starting at L, of mixed widths */
+int cmd_pulse(int argc, const char **argv)
+{
+  int segments[MAX_SEGMENT_COUNT];
+  int i;
+  if (argc > MAX_SEGMENT_COUNT) {
+    fprintf(stderr, "exceed max segment count %d < %d\n", MAX_SEGMENT_COUNT,
+        argc);
+    return 1;
+  }
+  for (i = 0; i < argc; i++) {
+    int p = atoi(argv[i]);
+    if (p <= 0) {
+      fprintf(stderr, "zero/negative width is not allowed: %d\n", p);
+      return 1;
+    }
+    segments[i] = p;
+  }
+  for (i = 0; i < argc; ) {
+    g_gpio_ptr[hpd_offset] &= ~BIT_HPD_MASK;
+    usleep(segments[i++]);
+    g_gpio_ptr[hpd_offset] |= BIT_HPD_MASK;
+    if (i < argc) {
+      usleep(segments[i++]);
+    }
+  }
+  if (i % 2 == 0) {
+    g_gpio_ptr[hpd_offset] &= ~BIT_HPD_MASK;
+  }
+  return 0;
+}
+
 /* Main program */
 int main(const int argc, const char **argv)
 {
@@ -182,8 +224,9 @@ int main(const int argc, const char **argv)
   // Hand off to the proper function.
   for (cur_cmd = COMMAND_LIST; cur_cmd->name; ++cur_cmd) {
     if (!strcmp(command, cur_cmd->name)) {
-      if (argc - optind != cur_cmd->argc) {
-        fprintf(stderr, "Number of parameters not correct.\n\n");
+      if (argc - optind < cur_cmd->argc) {
+        fprintf(stderr, "Expect at least %d parameters but got %d.\n\n",
+            cur_cmd->argc, argc - optind);
         usage();
         return 1;
       }
