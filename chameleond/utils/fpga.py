@@ -16,6 +16,7 @@ Usage:
   fpga_ctrl.vpass.Select(input_id)
 """
 
+import logging
 import struct
 
 import chameleon_common  # pylint: disable=W0611
@@ -38,6 +39,7 @@ class FpgaController(object):
     self.vdump0 = VideoDumper(0)
     self.vdump1 = VideoDumper(1)
     self.adump = AudioDumper()
+    self.asrc = AudioSourceController()
     self.hdmi_edid = EdidController(EdidController.HDMI_BASE)
     self.vga_edid = EdidController(EdidController.VGA_BASE)
 
@@ -555,3 +557,63 @@ class AudioDumper(object):
       A mapped address which is the input address shifted by _DUMP_BASE_ADDRESS.
     """
     return address + cls._DUMP_BASE_ADDRESS
+
+
+class AudioSource(object):
+  """Audio sources available on audio source controller."""
+  # Receives audio data from DP1, DP2 and HDMI.
+  RX_I2S = 'I2S Receiver'
+  # Audio generator.
+  GENERATOR = 'Audio generator'
+  # Audio codec, which records data from mic or linein.
+  CODEC = 'Audio codec'
+  # Audio streamer, which reads data from memory.
+  MEMORY = 'Audio streamer'
+
+
+class AudioSourceControllerError(Exception):
+  """Exception raised when any error on AudioSourceController."""
+  pass
+
+
+class AudioSourceController(object):
+  """A class to control audio source controller."""
+  _REGS_BASE = 0xff213000
+
+  # Output selection register
+  _REG_OUTPUT_SELECT = 0x0
+  _VALUE_OUTPUT_SELECT = {
+      AudioSource.RX_I2S: 0,
+      AudioSource.GENERATOR: 1,
+      AudioSource.CODEC: 2,
+      AudioSource.MEMORY: 3}
+
+  def __init__(self):
+    """Constructs an AudioSourceController object."""
+    self._memory = mem.Memory
+
+  def Select(self, input_id):
+    """Selects audio source given input_id.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+
+    Raises:
+      AudioSourceControllerError if input_id is not supported.
+    """
+    if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
+      return self._SelectOutput(AudioSource.RX_I2S)
+    #TODO(cychiang): Implement other audio source.
+    raise AudioSourceControllerError(
+        'input_id %s is not supported in AudioSourceController' % input_id)
+
+  def _SelectOutput(self, audio_source):
+    """Selects audio source.
+
+    Args:
+      audio_source: An audio source in AudioSource.
+    """
+    logging.info('Select audio source %r', audio_source)
+    self._memory.Write(
+        self._REGS_BASE + self._REG_OUTPUT_SELECT,
+        self._VALUE_OUTPUT_SELECT[audio_source])
