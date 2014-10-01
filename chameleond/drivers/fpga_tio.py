@@ -11,6 +11,7 @@ import xmlrpclib
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
+from chameleond.utils import codec_flow
 from chameleond.utils import fpga
 from chameleond.utils import i2c_fpga as i2c
 from chameleond.utils import ids
@@ -27,6 +28,7 @@ class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for FPGA customized platform."""
 
   _I2C_BUS_MAIN = 0
+  _I2C_BUS_AUDIO = 1
 
   _PIXEL_FORMAT = 'rgb'
 
@@ -41,7 +43,7 @@ class ChameleondDriver(ChameleondInterface):
   _MAX_CAPTURED_FRAME_COUNT = 3 * 60 * 60
 
   # Inputs that support audio.
-  _INPUTS_AUDIO_SUPPORTED = [ids.HDMI]
+  _INPUTS_AUDIO_SUPPORTED = [ids.HDMI, ids.MIC, ids.LINEIN]
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
@@ -52,12 +54,15 @@ class ChameleondDriver(ChameleondInterface):
 
     self._tools = system_tools.SystemTools
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
+    audio_bus = i2c.I2cBus(self._I2C_BUS_AUDIO)
     fpga_ctrl = fpga.FpgaController()
     self._input_flows = {
       ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
       ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
       ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
-      ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl)
+      ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
+      ids.MIC: codec_flow.CodecFlow(ids.MIC, audio_bus, fpga_ctrl),
+      ids.LINEIN: codec_flow.CodecFlow(ids.LINEIN, audio_bus, fpga_ctrl)
     }
 
     for flow in self._input_flows.itervalues():
@@ -213,7 +218,7 @@ class ChameleondDriver(ChameleondInterface):
     """Applies the default EDID to all inputs."""
     logging.info('Apply the default EDID to all inputs.')
     for flow in self._input_flows.itervalues():
-      if flow:
+      if flow and isinstance(flow, input_flow.InputFlow):
         flow.WriteEdid(self._all_edids[0])
 
   def ApplyEdid(self, input_id, edid_id):

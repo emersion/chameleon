@@ -7,3 +7,5 @@ DP1 = 1
 DP2 = 2
 HDMI = 3
 VGA = 4
+MIC = 5
+LINEIN = 6

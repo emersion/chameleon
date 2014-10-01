@@ -621,6 +621,11 @@ class AudioSourceController(object):
       AudioSource.CODEC: 2,
       AudioSource.MEMORY: 3}
 
+  _REG_GENERATOR_ENABLE = 0x4
+  _VALUE_GENERATOR_ENABLE = {
+      True: 1,
+      False: 0}
+
   def __init__(self):
     """Constructs an AudioSourceController object."""
     self._memory = mem.Memory
@@ -636,6 +641,12 @@ class AudioSourceController(object):
     """
     if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
       return self._SelectOutput(AudioSource.RX_I2S)
+    if input_id in [ids.MIC, ids.LINEIN]:
+      # The audio codec needs us feed its I2S clock 48K when recording.
+      # Generator generates a fixed 48K clock once it is turned on and it
+      # is not controlled by divisor or volume control.
+      self._EnableGenerator(True)
+      return self._SelectOutput(AudioSource.CODEC)
     #TODO(cychiang): Implement other audio source.
     raise AudioSourceControllerError(
         'input_id %s is not supported in AudioSourceController' % input_id)
@@ -650,3 +661,13 @@ class AudioSourceController(object):
     self._memory.Write(
         self._REGS_BASE + self._REG_OUTPUT_SELECT,
         self._VALUE_OUTPUT_SELECT[audio_source])
+
+  def _EnableGenerator(self, enable):
+    """Enables generator.
+
+    Args:
+      enable: True to enable.
+    """
+    self._memory.Write(
+        self._REGS_BASE + self._REG_GENERATOR_ENABLE,
+        self._VALUE_GENERATOR_ENABLE[enable])
