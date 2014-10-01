@@ -4,13 +4,11 @@
 """Input flow module which abstracts the entire flow for a specific input."""
 
 import logging
-import os
-import tempfile
 import time
 from abc import ABCMeta
 
 import chameleon_common  # pylint: disable=W0611
-from chameleond.utils import audio
+from chameleond.utils import audio_utils
 from chameleond.utils import common
 from chameleond.utils import edid
 from chameleond.utils import fpga
@@ -18,7 +16,6 @@ from chameleond.utils import frame_manager
 from chameleond.utils import ids
 from chameleond.utils import io
 from chameleond.utils import rx
-from chameleond.utils import system_tools
 
 
 class InputFlowError(Exception):
@@ -52,10 +49,6 @@ class InputFlow(object):
     ids.VGA: io.MuxIo.CONFIG_VGA
   }
 
-  # Audio data format.
-  _AUDIO_DATA_FORMAT = audio.AudioDataFormat(
-      file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
-
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
     """Constructs a InputFlow object.
 
@@ -70,7 +63,8 @@ class InputFlow(object):
     self._power_io = self._main_bus.GetSlave(io.PowerIo.SLAVE_ADDRESSES[0])
     self._mux_io = self._main_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
     self._rx = self._main_bus.GetSlave(self._RX_SLAVES[self._input_id])
-    self._capture_audio_start_time = None
+    self._audio_capture_manager = audio_utils.AudioCaptureManager(
+        self._fpga.adump)
     self._frame_manager = frame_manager.FrameManager(
         input_id, self._GetEffectiveVideoDumpers())
 
@@ -159,9 +153,7 @@ class InputFlow(object):
 
   def StartCapturingAudio(self):
     """Starts capturing audio."""
-    self._capture_audio_start_time = time.time()
-    self._fpga.adump.StartDumpingToMemory()
-    logging.info('Started capturing audio.')
+    self._audio_capture_manager.StartCapturingAudio()
 
   def StopCapturingAudio(self):
     """Stops capturing audio.
@@ -173,48 +165,10 @@ class InputFlow(object):
         of utils.audio.AudioDataFormat for detail.
 
     Raises:
-      InputFlowError: If captured time or page exceeds the limit.
-      InputFlowError: If there is no captured data.
+      AudioCaptureManagerError: If captured time or page exceeds the limit.
+      AudioCaptureManagerError: If there is no captured data.
     """
-    if not self._capture_audio_start_time:
-      raise InputFlowError('Stop Capturing audio before Start')
-
-    captured_time_secs = time.time() - self._capture_audio_start_time
-    self._capture_audio_start_time = None
-
-    start_address, page_count = self._fpga.adump.StopDumpingToMemory()
-
-    if page_count > self._fpga.adump.SIMPLE_DUMP_PAGE_LIMIT:
-      raise InputFlowError(
-          'Dumped number of pages %d exceeds the limit %d',
-          page_count, self._fpga.adump.SIMPLE_DUMP_PAGE_LIMIT)
-
-    if captured_time_secs > self._fpga.adump.SIMPLE_DUMP_TIME_LIMIT_SECS:
-      raise InputFlowError(
-          'Capture time %f seconds exceeds time limit %f secs' % (
-              captured_time_secs, self._fpga.adump.SIMPLE_DUMP_TIME_LIMIT_SECS))
-
-    logging.info(
-        'Stopped capturing audio. Captured duration: %f seconds; '
-        '4K page count: %d', captured_time_secs, page_count)
-
-    # The page count should increase even if there is no audio data
-    # sent to this input.
-    if page_count == 0:
-      raise InputFlowError(
-          'No audio data was captured. Perhaps this input is not plugged ?')
-
-    # Use pixeldump to dump a range of memory into file.
-    # Originally, the area size is
-    # screen_width * screen_height * byte_per_pixel.
-    # In our use case, the area size is page_size * page_count * 1.
-    with tempfile.NamedTemporaryFile() as f:
-      system_tools.SystemTools.Call(
-          'pixeldump', '-a', start_address, f.name, self._fpga.adump.PAGE_SIZE,
-          page_count, 1)
-      logging.info('Captured audio data size: %f MBytes',
-                   os.path.getsize(f.name) / 1024.0 / 1024.0)
-      return f.read(), self._AUDIO_DATA_FORMAT.AsDict()
+    return self._audio_capture_manager.StopCapturingAudio()
 
   def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
                          hash_buffer_limit):

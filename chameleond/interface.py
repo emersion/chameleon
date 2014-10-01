@@ -376,5 +376,7 @@ class ChameleondInterface(object):
       data: The captured audio data wrapped in an xmlrpclib.Binary object.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
+        Currently, the data format supported is
+        dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
     """
     raise NotImplementedError('StopCapturingAudio')

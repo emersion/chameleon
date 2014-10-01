@@ -616,7 +616,12 @@ class ChameleondDriver(ChameleondInterface):
       data: The captured audio data wrapped in an xmlrpclib.Binary object.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
+        Currently, the data format supported is
+        dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
     """
     self._CheckInputIdSupportAudio(input_id)
+    if (self._selected_input != input_id):
+      raise DriverError(
+          'The input is selected to %r not %r', self._selected_input, input_id)
     data, data_format = self._input_flows[input_id].StopCapturingAudio()
     return xmlrpclib.Binary(data), data_format

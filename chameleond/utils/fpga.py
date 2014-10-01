@@ -20,6 +20,7 @@ import logging
 import struct
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.utils import audio
 from chameleond.utils import ids
 from chameleond.utils import mem_native as mem
 from chameleond.utils import system_tools
@@ -497,6 +498,11 @@ class AudioDumper(object):
   # Page size is 4K bytes. Address should be 4K-aligned.
   PAGE_SIZE = 0x1000
 
+  # Audio data format of dumped data. Chameleond API user needs to get
+  # the format to read data correctly.
+  AUDIO_DATA_FORMAT = audio.AudioDataFormat(
+      file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+
   def __init__(self):
     """Constructs an AudioDumper object."""
     self._memory = mem.Memory
@@ -576,6 +582,15 @@ class AudioDumper(object):
     """
     return address + cls._DUMP_BASE_ADDRESS
 
+  @property
+  def audio_data_format_as_dict(self):
+    """Format of the audio data dumped by this dumper.
+
+    Returns:
+      A dict containing file_type, sample_format, channel, rate contained in
+      AUDIO_DATA_FORMAT. Refer to audio.AudioDataFormat docstring for details.
+    """
+    return self.AUDIO_DATA_FORMAT.AsDict()
 
 class AudioSource(object):
   """Audio sources available on audio source controller."""
