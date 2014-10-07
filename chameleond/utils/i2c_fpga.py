@@ -108,7 +108,7 @@ class I2cSlave(object):
       slave: The number of slave address.
     """
     self._i2c_bus = i2c_bus
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
     self._base_addr = self._i2c_bus.base_addr
     self._slave = slave
 

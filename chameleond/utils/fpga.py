@@ -59,7 +59,7 @@ class HpdController(object):
 
   def __init__(self):
     """Constructs a HpdController object."""
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
 
   def IsPlugged(self, input_id):
     """Returns if the HPD line is plugged.
@@ -149,7 +149,7 @@ class VideoPasser(object):
 
   def __init__(self):
     """Constructs a VideoPasser object."""
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
 
   def Select(self, input_id):
     """Selects the given input for pass-through.
@@ -236,7 +236,7 @@ class VideoDumper(object):
     Args:
       index: 0 for Dumper A and 1 for Dumper B.
     """
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
     self._index = index
 
   def EnableCrop(self, x, y, width, height):
@@ -418,7 +418,7 @@ class EdidController(object):
     Args:
       edid_base: The base of the memory address which stores the EDID.
     """
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
     self._edid_base = edid_base
 
   def WriteEdid(self, data):
@@ -505,7 +505,7 @@ class AudioDumper(object):
 
   def __init__(self):
     """Constructs an AudioDumper object."""
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
 
   def _Stop(self):
     """Stops dumping."""
@@ -628,7 +628,7 @@ class AudioSourceController(object):
 
   def __init__(self):
     """Constructs an AudioSourceController object."""
-    self._memory = mem.Memory
+    self._memory = mem.MemoryForController
 
   def Select(self, input_id):
     """Selects audio source given input_id.
