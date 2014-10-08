@@ -746,6 +746,13 @@ class AudioStreamController(object):
   AUDIO_DATA_FORMAT = audio.AudioDataFormat(
       file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
 
+  # The rate of audio data is
+  # 8 channel * 4 bytes/sample * 48000 samples/sec = 1500 KBytes/sec.
+  # So default area which contains 0x2000000 bytes can stream
+  # 32 MBytes / 1500 KBytes = 21 sec of data.
+  MAX_STREAM_TIME_SECS = int(
+      MAX_STREAM_BUFFER_SIZE / (8 * 4 * 48000))
+
   def __init__(self):
     """Constructs an AudioStreamController object."""
     self._memory = mem.MemoryForController
