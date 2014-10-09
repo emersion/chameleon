@@ -150,6 +150,10 @@ class InputFlow(object):
     self.WaitVideoOutputStable()
     self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
                                           timeout)
+  @property
+  def is_capturing_audio(self):
+    """Is input flow capturing audio?"""
+    return self._audio_capture_manager.is_capturing
 
   def StartCapturingAudio(self):
     """Starts capturing audio."""

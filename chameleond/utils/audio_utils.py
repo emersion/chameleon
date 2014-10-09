@@ -35,6 +35,15 @@ class AudioCaptureManager(object):
     self._adump = audio_dumper
     self._capture_audio_start_time = None
 
+  @property
+  def is_capturing(self):
+    """True if audio dumper is dumping data.
+
+    Returns:
+      True if audio dumper is dumping data.
+    """
+    return self._adump.is_dumping
+
   def StartCapturingAudio(self):
     """Starts capturing audio."""
     self._capture_audio_start_time = time.time()

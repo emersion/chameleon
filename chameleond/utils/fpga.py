@@ -514,6 +514,7 @@ class AudioDumper(object):
   def __init__(self):
     """Constructs an AudioDumper object."""
     self._memory = mem.MemoryForController
+    self._Stop()
 
   def _Stop(self):
     """Stops dumping."""
@@ -522,6 +523,11 @@ class AudioDumper(object):
   def _Start(self):
     """Starts dumping."""
     self._memory.SetMask(self._REGS_BASE + self._REG_CTRL, self._BIT_RUN)
+
+  @property
+  def is_dumping(self):
+    """Is dumper running?"""
+    return self._memory.Read(self._REGS_BASE + self._REG_CTRL) & self._BIT_RUN
 
   def _CheckAddressValid(self, name, address):
     """Checks an address is within valid range, and is aligned.
