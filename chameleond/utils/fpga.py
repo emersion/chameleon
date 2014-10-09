@@ -646,6 +646,7 @@ class AudioDumper(object):
     """
     return self.AUDIO_DATA_FORMAT.AsDict()
 
+
 class AudioSource(object):
   """Audio sources available on audio source controller."""
   # Receives audio data from DP1, DP2 and HDMI.
@@ -682,7 +683,7 @@ class AudioSourceController(object):
     """Constructs an AudioSourceController object."""
     self._memory = mem.MemoryForController
 
-  def Select(self, input_id):
+  def SelectFromInput(self, input_id):
     """Selects audio source given input_id.
 
     Args:
@@ -692,18 +693,23 @@ class AudioSourceController(object):
       AudioSourceControllerError if input_id is not supported.
     """
     if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
-      return self._SelectOutput(AudioSource.RX_I2S)
+      self._SelectAudioSource(AudioSource.RX_I2S)
+      return
     if input_id in [ids.MIC, ids.LINEIN]:
       # The audio codec needs us feed its I2S clock 48K when recording.
       # Generator generates a fixed 48K clock once it is turned on and it
       # is not controlled by divisor or volume control.
       self.EnableGenerator(True)
-      return self._SelectOutput(AudioSource.CODEC)
-    #TODO(cychiang): Implement other audio source.
+      self._SelectAudioSource(AudioSource.CODEC)
+      return
     raise AudioSourceControllerError(
         'input_id %s is not supported in AudioSourceController' % input_id)
 
-  def _SelectOutput(self, audio_source):
+  def SelectMemory(self):
+    """Selects memory as audio source."""
+    self._SelectAudioSource(AudioSource.MEMORY)
+
+  def _SelectAudioSource(self, audio_source):
     """Selects audio source.
 
     Args:

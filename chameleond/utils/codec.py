@@ -17,6 +17,11 @@ class CodecInput(object):
   LINEIN = 'LineIn'
 
 
+class CodecOutput(object):
+  """Available audio codec output options."""
+  LINEOUT = 'LineOut'
+
+
 class AudioCodecException(Exception):
   """Exception raised when any error in AudioCodec."""
   pass

@@ -9,13 +9,14 @@ HDMI = 3
 VGA = 4
 MIC = 5
 LINEIN = 6
+LINEOUT = 7
 
 # Input/output ports
 INPUT_PORTS = [DP1, DP2, HDMI, VGA, MIC, LINEIN]
-OUTPUT_PORTS = []
+OUTPUT_PORTS = [LINEOUT]
 
 # Ports that support audio/video.
-AUDIO_PORTS = [HDMI, MIC, LINEIN]
+AUDIO_PORTS = [HDMI, MIC, LINEIN, LINEOUT]
 VIDEO_PORTS = [DP1, DP2, HDMI, VGA]
 
 # Convenience methods
