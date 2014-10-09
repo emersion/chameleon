@@ -640,9 +640,7 @@ class AudioSourceController(object):
       AudioSource.MEMORY: 3}
 
   _REG_GENERATOR_ENABLE = 0x4
-  _VALUE_GENERATOR_ENABLE = {
-      True: 1,
-      False: 0}
+  _BIT_GENERATOR_ENABLE = 1
 
   def __init__(self):
     """Constructs an AudioSourceController object."""
@@ -663,7 +661,7 @@ class AudioSourceController(object):
       # The audio codec needs us feed its I2S clock 48K when recording.
       # Generator generates a fixed 48K clock once it is turned on and it
       # is not controlled by divisor or volume control.
-      self._EnableGenerator(True)
+      self.EnableGenerator(True)
       return self._SelectOutput(AudioSource.CODEC)
     #TODO(cychiang): Implement other audio source.
     raise AudioSourceControllerError(
@@ -680,16 +678,20 @@ class AudioSourceController(object):
         self._REGS_BASE + self._REG_OUTPUT_SELECT,
         self._VALUE_OUTPUT_SELECT[audio_source])
 
-  def _EnableGenerator(self, enable):
+  def EnableGenerator(self, enable):
     """Enables generator.
 
     Args:
       enable: True to enable.
     """
-    self._memory.Write(
-        self._REGS_BASE + self._REG_GENERATOR_ENABLE,
-        self._VALUE_GENERATOR_ENABLE[enable])
-
+    if enable:
+      self._memory.SetMask(
+          self._REGS_BASE + self._REG_GENERATOR_ENABLE,
+          self._BIT_GENERATOR_ENABLE)
+    else:
+      self._memory.ClearMask(
+          self._REGS_BASE + self._REG_GENERATOR_ENABLE,
+          self._BIT_GENERATOR_ENABLE)
 
 class AudioStreamControllerError(Exception):
   """Exception raised when any error on AudioStreamController."""
