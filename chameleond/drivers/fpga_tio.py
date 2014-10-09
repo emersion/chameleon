@@ -25,14 +25,28 @@ class DriverError(Exception):
   pass
 
 
-def _AudioMethod(func):
-  """Decorator that checks the port_id argument is an audio port."""
-  @functools.wraps(func)
-  def wrapper(instance, port_id, *args, **kwargs):
-    if not ids.IsAudioPort(port_id):
-      raise DriverError('Not a valid port_id for audio operation: %d' % port_id)
-    return func(instance, port_id, *args, **kwargs)
-  return wrapper
+def _AudioMethod(input_only=False, output_only=False):
+  """Decorator that checks the port_id argument is an audio port.
+
+  Args:
+    input_only: True to check if port is an input port.
+    output_only: True to check if port is an output port.
+  """
+  def _ActualDecorator(func):
+    @functools.wraps(func)
+    def wrapper(instance, port_id, *args, **kwargs):
+      if not ids.IsAudioPort(port_id):
+        raise DriverError(
+            'Not a valid port_id for audio operation: %d' % port_id)
+      if input_only and not ids.IsInputPort(port_id):
+        raise DriverError(
+            'Not a valid port_id for input operation: %d' % port_id)
+      elif output_only and not ids.IsOutputPort(port_id):
+        raise DriverError(
+            'Not a valid port_id for output operation: %d' % port_id)
+      return func(instance, port_id, *args, **kwargs)
+    return wrapper
+  return _ActualDecorator
 
 
 def _VideoMethod(func):
@@ -66,6 +80,7 @@ class ChameleondDriver(ChameleondInterface):
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
     self._selected_input = None
+    self._selected_output = None
     self._captured_params = {}
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
@@ -79,8 +94,9 @@ class ChameleondDriver(ChameleondInterface):
       ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
       ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
       ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
-      ids.MIC: codec_flow.CodecFlow(ids.MIC, audio_bus, fpga_ctrl),
-      ids.LINEIN: codec_flow.CodecFlow(ids.LINEIN, audio_bus, fpga_ctrl)
+      ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_bus, fpga_ctrl),
+      ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_bus, fpga_ctrl),
+      ids.LINEOUT: codec_flow.OutputCodecFlow(ids.LINEOUT, audio_bus, fpga_ctrl)
     }
 
     for flow in self._flows.itervalues():
@@ -385,6 +401,17 @@ class ChameleondDriver(ChameleondInterface):
       self._selected_input = port_id
     self._flows[port_id].Do_FSM()
 
+  def _SelectOutput(self, port_id):
+    """Selects the output on Chameleon.
+
+    Args:
+      port_id: The ID of the output port.
+    """
+    if port_id != self._selected_output:
+      self._flows[port_id].Select()
+      self._selected_output = port_id
+    self._flows[port_id].Do_FSM()
+
   @_VideoMethod
   def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
@@ -667,17 +694,46 @@ class ChameleondDriver(ChameleondInterface):
     self._SelectInput(port_id)
     return self._flows[port_id].GetResolution()
 
-  @_AudioMethod
+  def _CheckNotCapturingAudio(self):
+    """Checks there is no audio input port capturing audio.
+
+    Raises:
+      DriverError: If there is any audio input port capturing audio.
+    """
+    for input_port in self.GetSupportedInputs():
+      if (self.HasAudioSupport(input_port) and
+          self._flows[input_port].is_capturing_audio):
+        raise DriverError(
+            'Chameleon is recording audio from port #%d', input_port)
+
+  def _CheckNotStreaming(self):
+    """Checks there is no audio output port playing audio from memory.
+
+    Raises:
+      DriverError: If there is any audio output port playing audio from memory.
+    """
+    for output_port in self.GetSupportedOutputs():
+      if (self.HasAudioSupport(output_port) and
+          self._flows[output_port].is_playing_audio_from_memory):
+        raise DriverError(
+            'Chameleon is playing audio from memory from port #%d', output_port)
+
+  @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id):
     """Starts capturing audio.
+
+    Since input and output share AudioSourceController, playback from memory
+    and recording from rx/codec can not happen at the same time.
 
     Args:
       port_id: The ID of the audio input port.
     """
+    self._CheckNotStreaming()
     self._SelectInput(port_id)
+    logging.info('Start capturing audio from port #%d', port_id)
     self._flows[port_id].StartCapturingAudio()
 
-  @_AudioMethod
+  @_AudioMethod(input_only=True)
   def StopCapturingAudio(self, port_id):
     """Stops capturing audio and returns recorded audio raw data.
 
@@ -691,9 +747,82 @@ class ChameleondDriver(ChameleondInterface):
         of utils.audio.AudioDataFormat for detail.
         Currently, the data format supported is
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+
+    Raises:
+      DriverError: Input is selected to port other than port_id.
+        This happens if user has used API related to input operation on
+        other port. The API includes CaptureVideo, StartCapturingVideo,
+        DetectResolution, StartCapturingAudio, StartPlayingEcho.
     """
     if (self._selected_input != port_id):
       raise DriverError(
           'The input is selected to %r not %r', self._selected_input, port_id)
     data, data_format = self._flows[port_id].StopCapturingAudio()
+    logging.info('Stopped capturing audio from port #%d', port_id)
     return xmlrpclib.Binary(data), data_format
+
+  @_AudioMethod(output_only=True)
+  def StartPlayingAudio(self, port_id, data, data_format):
+    """Playing audio data from an output port.
+
+    Unwrap audio data and play that data from port_id port.
+    Since input and output share AudioSourceController, playback from memory
+    and recording from rx/codec can not happen at the same time.
+
+    Args:
+      port_id: The ID of the output connector.
+      data: The audio data to play wrapped in xmlrpclib.Binary.
+      data_format: The dict representation of AudioDataFormat.
+        Refer to docstring of utils.audio.AudioDataFormat for detail.
+        Currently Chameleon only accepts data format if it meets
+        dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+        Chameleon user should do the format conversion to minimize work load
+        on Chameleon board.
+
+    Raises:
+      DriverError: There is any audio input port recording.
+    """
+    self._CheckNotCapturingAudio()
+    self._SelectOutput(port_id)
+    logging.info('Start playing audio from port #%d', port_id)
+    self._flows[port_id].StartPlayingAudioData((data.data, data_format))
+
+  @_AudioMethod(output_only=True)
+  def StartPlayingEcho(self, port_id, input_id):
+    """Echoes audio data received from input_id and plays to port_id.
+
+    Echoes audio data received from input_id and plays to port_id.
+
+    Args:
+      port_id: The ID of the output connector. Check the value in ids.py.
+      input_id: The ID of the input connector. Check the value in ids.py.
+
+    Raises:
+      DriverError: input_id is not valid for audio operation.
+    """
+    if not ids.IsAudioPort(input_id) or not ids.IsInputPort(input_id):
+      raise DriverError(
+          'Not a valid input_id for audio operation: %d' % input_id)
+    self._SelectInput(input_id)
+    self._SelectOutput(port_id)
+    logging.info('Start playing echo from port #%d using source from port#%d',
+                 port_id, input_id)
+    self._flows[port_id].StartPlayingEcho(input_id)
+
+  @_AudioMethod(output_only=True)
+  def StopPlayingAudio(self, port_id):
+    """Stops playing audio from port_id port.
+
+    Args:
+      port_id: The ID of the output connector.
+
+    Raises:
+      DriverError: Output is selected to port other than port_id.
+        This happens if user has used API related to output operation on other
+        port. The API includes StartPlayingAudio, StartPlayingEcho.
+    """
+    if (self._selected_output != port_id):
+      raise DriverError(
+          'The output is selected to %r not %r', self._selected_output, port_id)
+    logging.info('Stop playing audio from port #%d', port_id)
+    self._flows[port_id].StopPlayingAudio()

@@ -433,3 +433,41 @@ class ChameleondInterface(object):
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
     """
     raise NotImplementedError('StopCapturingAudio')
+
+  def StartPlayingAudio(self, port_id, data, data_format):
+    """Playing audio data from an output port.
+
+    Unwrap audio data and play that data from output_id port.
+    Since input and output share AudioSourceController, playback from memory
+    and recording from rx/codec can not happen at the same time.
+
+    Args:
+      port_id: The ID of the output connector.
+      data: The audio data to play wrapped in xmlrpclib.Binary.
+      data_format: The dict representation of AudioDataFormat.
+        Refer to docstring of utils.audio.AudioDataFormat for detail.
+        Currently Chameleon only accepts data format if it meets
+        dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+        Chameleon user should do the format conversion to minimize work load
+        on Chameleon board.
+    """
+    raise NotImplementedError('StartPlayingAudio')
+
+  def StartPlayingEcho(self, port_id, input_id):
+    """Echoes audio data received from input_id and plays to port_id.
+
+    Echoes audio data received from input_id and plays to port_id.
+
+    Args:
+      port_id: The ID of the output connector. Check the value in ids.py.
+      input_id: The ID of the input connector. Check the value in ids.py.
+    """
+    raise NotImplementedError('StartPlayingEcho')
+
+  def StopPlayingAudio(self, port_id):
+    """Stops playing audio from port_id port.
+
+    Args:
+      port_id: The ID of the output connector.
+    """
+    raise NotImplementedError('StopPlayingAudio')
