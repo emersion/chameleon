@@ -42,8 +42,9 @@ class ChameleondDriver(ChameleondInterface):
   # Limit the period of async capture to 3min (in 60fps).
   _MAX_CAPTURED_FRAME_COUNT = 3 * 60 * 60
 
-  # Inputs that support audio.
+  # Inputs that support audio/video.
   _INPUTS_AUDIO_SUPPORTED = [ids.HDMI, ids.MIC, ids.LINEIN]
+  _INPUTS_VIDEO_SUPPORTED = [ids.DP1, ids.DP2, ids.HDMI, ids.VGA]
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
@@ -151,6 +152,28 @@ class ChameleondDriver(ChameleondInterface):
       A string, like "VGA", "DVI", "HDMI", or "DP".
     """
     return self._input_flows[input_id].GetConnectorType()
+
+  def HasAudioSupport(self, input_id):
+    """Returns true if the input has audio support.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      True if the input has audio support; otherwise, False.
+    """
+    return input_id in self._INPUTS_AUDIO_SUPPORTED
+
+  def HasVideoSupport(self, input_id):
+    """Returns true if the input has video support.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      True if the input has video support; otherwise, False.
+    """
+    return input_id in self._INPUTS_VIDEO_SUPPORTED
 
   def WaitVideoInputStable(self, input_id, timeout=None):
     """Waits the video input stable or timeout.
@@ -597,7 +620,7 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       input_id: The ID of the input connector.
     """
-    if input_id not in self._INPUTS_AUDIO_SUPPORTED:
+    if not self.HasAudioSupport(input_id):
       raise DriverError('Not a valid input_id for audio operation.')
 
   def StartCapturingAudio(self, input_id):

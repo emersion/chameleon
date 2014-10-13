@@ -76,6 +76,28 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('StrInterface')
 
+  def HasAudioSupport(self, input_id):
+    """Returns true if the input has audio support.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      True if the input has audio support; otherwise, False.
+    """
+    raise NotImplementedError('HasAudioSupport')
+
+  def HasVideoSupport(self, input_id):
+    """Returns true if the input has video support.
+
+    Args:
+      input_id: The ID of the input connector.
+
+    Returns:
+      True if the input has video support; otherwise, False.
+    """
+    raise NotImplementedError('HasVideoSupport')
+
   def WaitVideoInputStable(self, input_id, timeout=None):
     """Waits the video input stable or timeout.
 
