@@ -34,7 +34,6 @@ class CodecFlow(object):
       _audio_capture_manager: A AudioCaptureManager object which controls audio
         data capturing using AudioDumper in FPGAController.
   """
-  _CONNECTOR_TYPE = 'Codec Unknown Input/Output'
   _CODEC_INPUTS = {
       ids.MIC: codec.CodecInput.MIC,
       ids.LINEIN: codec.CodecInput.LINEIN
@@ -65,6 +64,10 @@ class CodecFlow(object):
     self._fpga.asrc.Select(self._input_id)
     self._audio_codec.SelectInput(self._CODEC_INPUTS[self._input_id])
     # TODO(cychiang): Handle output case for ids.LINEOUT
+
+  def GetConnectorType(self):
+    """Returns the human readable string for the connector type."""
+    return self._CODEC_INPUTS[self._input_id]
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
