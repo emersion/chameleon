@@ -117,6 +117,21 @@ class _Memory(object):
     time.sleep(delay_secs)
     self.ClearMask(address, mask)
 
+  def Fill(self, address, data):
+    """Fills memory with data.
+
+    Args:
+      address: The memory address.
+      data: The data to be filled to memory starting from that address.
+    """
+    local_addr = self._GetLocalAddress(address)
+    end_addr = address + len(data)
+    if end_addr >= self._mmap_end:
+      raise IOError(
+          'Address %r exceeds end of mmap %r' % (end_addr, self._mmap_end))
+    ctypes.memmove(local_addr, data, len(data))
+
+
 # Address space for memory-mapped I/O for controller.
 _MMAP_START_CONTROLLER = 0xff210000
 _MMAP_SIZE_CONTROLLER = 0x10000
