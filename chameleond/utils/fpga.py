@@ -42,6 +42,7 @@ class FpgaController(object):
     self.adump = AudioDumper()
     self.asrc = AudioSourceController()
     self.astream = AudioStreamController()
+    self.aiis = AudioI2SController()
     self.hdmi_edid = EdidController(EdidController.HDMI_BASE)
     self.vga_edid = EdidController(EdidController.VGA_BASE)
 
@@ -444,6 +445,41 @@ class EdidController(object):
       value = self._memory.Read(self._edid_base + self._EDID_MEM + offset)
       all_value += struct.pack('>I', value)
     return all_value
+
+
+# Audio Routing
+#
+# HDMI DP1 DP2                       MIC  LineIn          Memory
+#  |   |   |                          |    |                |
+#  V   V   V                          V    V                V
+#  ----------     --------------      -------       ---------------------
+# |  RX I2S  |   |AudioGenerator|    | Codec |     |AudioStreamController|
+#  ----------     --------------      -------       ---------------------
+#      |                |                |                  |
+#      |                |_____       ____|                  |
+#      |_________________     |     |      _________________|
+#                        |    |     |     |
+#                        V    V     V     V
+#                      ---------------------
+#                     |AudioSourceController|
+#                      ---------------------
+#                               |
+#                       ________|__________
+#       (8-channel)    |                   | (8-channel)
+#                      V                   V
+#             ------------------      -----------
+#            |AudioI2SController|    |AudioDumper|
+#             ------------------      -----------
+#       (2-channel)    |                   |
+#                      V                   V
+#                   -------              Memory
+#                  | Codec |
+#                   -------
+#                      |
+#                      V
+#                   LineOut
+#
+# TODO(cychiang): Update this chart and routing using 20141016 fpga image.
 
 
 class AudioDumperError(Exception):
@@ -891,3 +927,26 @@ class AudioStreamController(object):
       Number of streamed pages.
     """
     return self._memory.Read(self._REGS_BASE + self._REG_PAGE_COUNT)
+
+
+class AudioI2SController(object):
+  """A class to control I2S data sent to codec output."""
+  _REGS_BASE = 0xff21e000
+
+  # Sets enable bit to 0 to mute output. 1 to unmute.
+  _REG_ENABLE = 0x0
+  _BIT_ENABLE = 1
+
+  def __init__(self):
+    """Constructs an AudioI2SController object."""
+    self._memory = mem.MemoryForController
+
+  def Enable(self):
+    """Enables I2S data to codec output."""
+    self._memory.SetMask(self._REGS_BASE + self._REG_ENABLE,
+                         self._BIT_ENABLE)
+
+  def Disable(self):
+    """Disables I2S data to codec output."""
+    self._memory.ClearMask(self._REGS_BASE + self._REG_ENABLE,
+                           self._BIT_ENABLE)
