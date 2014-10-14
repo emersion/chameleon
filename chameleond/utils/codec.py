@@ -7,7 +7,7 @@ import logging
 import time
 
 import chameleon_common  # pylint: disable=W0611
-from chameleond.utils import i2c_fpga
+from chameleond.utils import i2c
 
 
 class CodecInput(object):
@@ -22,7 +22,7 @@ class AudioCodecException(Exception):
   pass
 
 
-class AudioCodec(i2c_fpga.I2cSlave):
+class AudioCodec(i2c.I2cSlave):
   """A class to control SSM2603 audio codec on chameleon."""
 
   SLAVE_ADDRESSES = (0x1a,)

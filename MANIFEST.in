@@ -1,7 +1,6 @@
 include Makefile
 include *.txt
-include bin/hpd_control_tio
-include bin/hpd_control_hdmi
+include bin/hpd_control
 include bin/pixeldump
 include deploy/deploy
 include deploy/init.d/chameleond

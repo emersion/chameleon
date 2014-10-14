@@ -8,11 +8,11 @@ import struct
 import time
 
 import chameleon_common  # pylint: disable=W0611
-from chameleond.utils import i2c_fpga
+from chameleond.utils import i2c
 from chameleond.utils import ids
 
 
-class IoExpander(i2c_fpga.I2cSlave):
+class IoExpander(i2c.I2cSlave):
   """A class to abstract the behavior of the TCA6416A I/O expander."""
 
   SLAVE_ADDRESSES = (0x20, 0x21)
@@ -146,7 +146,7 @@ class PowerIo(IoExpander):
           self.MASK_EN_PP3300 | self.MASK_EN_PP1800 | self.MASK_EN_PP1200 |
           self.MASK_DP1_RST_L | self.MASK_DP2_RST_L | self.MASK_HDMI_RST_L |
           self.MASK_VGA_RST_L)
-    except i2c_fpga.I2cBusError:
+    except i2c.I2cBusError:
       # This is to work around a problem where rx may pull i2c low for a short
       # amount of time (<3ms) when powered up for the very first time so
       # writing these two bytes out may cause the second byte to fail.

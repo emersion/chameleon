@@ -7,10 +7,10 @@ import logging
 import time
 
 import chameleon_common  # pylint: disable=W0611
-from chameleond.utils import i2c_fpga
+from chameleond.utils import i2c
 
 
-class DpRx(i2c_fpga.I2cSlave):
+class DpRx(i2c.I2cSlave):
   """A class to control ITE IT6506 DisplayPort Receiver."""
 
   SLAVE_ADDRESSES = (0x58, 0x59)
@@ -71,7 +71,7 @@ class DpRx(i2c_fpga.I2cSlave):
     return bool(self.Get(0xc8) & (1 << 3))
 
 
-class HdmiRx(i2c_fpga.I2cSlave):
+class HdmiRx(i2c.I2cSlave):
   """A class to control ITE IT6803 HDMI Receiver."""
 
   SLAVE_ADDRESSES = (0x48, )
@@ -233,7 +233,7 @@ class HdmiRx(i2c_fpga.I2cSlave):
     return (width, height)
 
 
-class VgaRx(i2c_fpga.I2cSlave):
+class VgaRx(i2c.I2cSlave):
   """A class to control ITE CAT9883C CRT Receiver."""
 
   SLAVE_ADDRESSES = (0x4c, )

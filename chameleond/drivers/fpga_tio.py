@@ -13,7 +13,7 @@ from chameleond.interface import ChameleondInterface
 
 from chameleond.utils import codec_flow
 from chameleond.utils import fpga
-from chameleond.utils import i2c_fpga as i2c
+from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import input_flow
 from chameleond.utils import system_tools
