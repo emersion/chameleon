@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 """Connect to Chameleond and capture screenshot."""
 
+from __future__ import print_function
+
 import argparse
 import errno
 import subprocess
@@ -31,14 +33,14 @@ def main():
 
   options = parser.parse_args()
   if options.host is None:
-    print 'No chameleon_host is specified.'
+    print('No chameleon_host is specified.')
     parser.print_help()
     sys.exit(errno.EINVAL)
   area_args = []
   if options.area:
     area_args = [int(s) for s in options.area.split(',')]
     if len(area_args) != 4:
-      print 'Invalid area parameter.'
+      print('Invalid area parameter.')
       parser.print_help()
       sys.exit(errno.EINVAL)
 
@@ -46,23 +48,23 @@ def main():
       'http://%s:%d' % (options.host, options.port))
   inputs = chameleon.ProbeInputs()
   main_input = inputs[0]
-  print 'Use the main port:', chameleon.GetConnectorType(main_input)
+  print('Use the main port:', chameleon.GetConnectorType(main_input))
   if options.replug:
-    print 'Replugging...'
+    print('Replugging...')
     chameleon.FireHpdPulse(main_input, 1000000)
     time.sleep(5)
   width, height = chameleon.DetectResolution(main_input)
-  print 'Detected screen size %dx%d' % (width, height)
+  print('Detected screen size %dx%d' % (width, height))
   if area_args:
     size_str = '%dx%d' % (area_args[2], area_args[3])
   else:
     size_str = '%dx%d' % (width, height)
-  print 'Capturing the screen size %s...' % size_str
+  print('Capturing the screen size %s...' % size_str)
   pixels = chameleon.DumpPixels(main_input, *area_args).data
-  print 'Got pixel size %d' % len(pixels)
+  print('Got pixel size %d' % len(pixels))
   suffix = '.' + chameleon.GetPixelFormat()
   with tempfile.NamedTemporaryFile(suffix=suffix) as f:
-    print 'Temporarily write to file:', f.name
+    print('Temporarily write to file:', f.name)
     f.write(pixels)
     f.flush()
     command = ['convert', '-size', size_str, '-depth', '8']
@@ -70,7 +72,7 @@ def main():
       command += ['-alpha', 'off']
     command += [f.name, options.output]
     subprocess.check_call(command)
-    print 'Outputted to file:', options.output
+    print('Outputted to file:', options.output)
 
 
 if __name__ == '__main__':
