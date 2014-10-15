@@ -17,7 +17,7 @@ class ChameleondInterface(object):
     raise NotImplementedError('Reset')
 
   def IsHealthy(self):
-    """Returns if the Chameleon is healthy or any repair is needed.
+    """Returns true if the Chameleon is healthy or any repair is needed.
 
     Returns:
       True if the Chameleon is healthy; otherwise, False, need to repair.
@@ -36,73 +36,112 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('Repair')
 
-  def GetSupportedInputs(self):
-    """Returns all supported connectors on the board.
+  def GetSupportedPorts(self):
+    """Returns all supported ports on the board.
 
-    Not like the ProbeInputs() method which only returns the connectors which
-    are connected, this method returns all supported connectors on the board.
+    Not like the ProbePorts() method which only returns the ports which
+    are connected, this method returns all supported ports on the board.
 
     Returns:
-      A tuple of input_id, for all supported connectors on the board.
+      A tuple of port_id, for all supported ports on the board.
+    """
+    raise NotImplementedError('GetSupportedPorts')
+
+  def GetSupportedInputs(self):
+    """Returns all supported input ports on the board.
+
+    Not like the ProbeInputs() method which only returns the input ports which
+    are connected, this method returns all supported input ports on the board.
+
+    Returns:
+      A tuple of port_id, for all supported input port on the board.
     """
     raise NotImplementedError('GetSupportedInputs')
 
-  def IsPhysicalPlugged(self, input_id):
-    """Returns if the physical cable is plugged.
+  def GetSupportedOutputs(self):
+    """Returns all supported output ports on the board.
 
-    It checks the source power +5V/+3.3V pin.
+    Not like the ProbeOutputs() method which only returns the output ports which
+    are connected, this method returns all supported output ports on the board.
+
+    Returns:
+      A tuple of port_id, for all supported output port on the board.
+    """
+    raise NotImplementedError('GetSupportedOutputs')
+
+  def IsPhysicalPlugged(self, port_id):
+    """Returns true if the physical cable is plugged between DUT and Chameleon.
+
+    Args:
+      port_id: The ID of the input/output port.
 
     Returns:
       True if the physical cable is plugged; otherwise, False.
     """
     raise NotImplementedError('IsPhysicalPlugged')
 
-  def ProbeInputs(self):
-    """Probes all the display connectors on Chameleon board.
+  def ProbePorts(self):
+    """Probes all the connected ports on Chameleon board.
 
     Returns:
-      A tuple of input_id, for the connectors connected to DUT.
+      A tuple of port_id, for the ports connected to DUT.
+    """
+    raise NotImplementedError('ProbePorts')
+
+  def ProbeInputs(self):
+    """Probes all the connected input ports on Chameleon board.
+
+    Returns:
+      A tuple of port_id, for the input ports connected to DUT.
     """
     raise NotImplementedError('ProbeInputs')
 
-  def GetConnectorType(self, input_id):
+  def ProbeOutputs(self):
+    """Probes all the connected output ports on Chameleon board.
+
+    Returns:
+      A tuple of port_id, for the output ports connected to DUT.
+    """
+    raise NotImplementedError('ProbeOutputs')
+
+  def GetConnectorType(self, port_id):
     """Returns the human readable string for the connector type.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      A string, like "VGA", "DVI", "HDMI", or "DP".
+      A string, like "HDMI", "DP", "MIC", etc.
     """
-    raise NotImplementedError('StrInterface')
+    raise NotImplementedError('GetConnectorType')
 
-  def HasAudioSupport(self, input_id):
-    """Returns true if the input has audio support.
+  def HasAudioSupport(self, port_id):
+    """Returns true if the port has audio support.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      True if the input has audio support; otherwise, False.
+      True if the input/output port has audio support; otherwise, False.
     """
     raise NotImplementedError('HasAudioSupport')
 
-  def HasVideoSupport(self, input_id):
-    """Returns true if the input has video support.
+  def HasVideoSupport(self, port_id):
+    """Returns true if the port has video support.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      True if the input has video support; otherwise, False.
+      True if the input/output port has video support; otherwise, False.
     """
     raise NotImplementedError('HasVideoSupport')
 
-  def WaitVideoInputStable(self, input_id, timeout=None):
+  def WaitVideoInputStable(self, port_id, timeout=None):
     """Waits the video input stable or timeout.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       timeout: The time period to wait for.
 
     Returns:
@@ -130,63 +169,63 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DestroyEdid')
 
-  def ReadEdid(self, input_id):
-    """Reads the EDID content of the selected input on Chameleon.
+  def ReadEdid(self, port_id):
+    """Reads the EDID content of the selected video input on Chameleon.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
 
     Returns:
       A byte array of EDID data, wrapped in a xmlrpclib.Binary object.
     """
     raise NotImplementedError('ReadEdid')
 
-  def ApplyEdid(self, input_id, edid_id):
-    """Applies the EDID to the selected input.
+  def ApplyEdid(self, port_id, edid_id):
+    """Applies the EDID to the selected video input.
 
     Note that this method doesn't pulse the HPD line. Should call Plug(),
     Unplug(), or FireHpdPulse() later.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       edid_id: The ID of the EDID.
     """
     raise NotImplementedError('ApplyEdid')
 
-  def IsPlugged(self, input_id):
-    """Returns if the HPD line is plugged.
+  def IsPlugged(self, port_id):
+    """Returns true if the port is emulated as plugged.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      True if the HPD line is plugged; otherwise, False.
+      True if the port is emualted as plugged; otherwise, False.
     """
     raise NotImplementedError('IsPlugged')
 
-  def Plug(self, input_id):
-    """Asserts HPD line to high, emulating plug.
+  def Plug(self, port_id):
+    """Emualtes plug, like asserting HPD line to high on a video port.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
     """
     raise NotImplementedError('Plug')
 
-  def Unplug(self, input_id):
-    """Deasserts HPD line to low, emulating unplug.
+  def Unplug(self, port_id):
+    """Emulates unplug, like deasserting HPD line to low on a video port.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
     """
     raise NotImplementedError('Unplug')
 
-  def FireHpdPulse(self, input_id, deassert_interval_usec,
+  def FireHpdPulse(self, port_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1,
                    end_level=1):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       deassert_interval_usec: The time in microsecond of the deassert pulse.
       assert_interval_usec: The time in microsecond of the assert pulse.
                             If None, then use the same value as
@@ -196,7 +235,7 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('FireHpdPulse')
 
-  def FireMixedHpdPulses(self, input_id, widths):
+  def FireMixedHpdPulses(self, port_id, widths):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
 
     One must specify a list of segment widths in the widths argument where
@@ -206,7 +245,7 @@ class ChameleondInterface(object):
     otherwise, it stops at high.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       widths: list of pulse segment widths in usec.
     """
     raise NotImplementedError('FireMixedHpdPulses')
@@ -219,13 +258,13 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetPixelFormat')
 
-  def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
+  def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
 
     If not given the area, default to capture the whole screen.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner.
       y: The Y position of the top-left corner.
       width: The width of the area.
@@ -236,14 +275,14 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DumpPixels')
 
-  def GetMaxFrameLimit(self, input_id, width, height):
+  def GetMaxFrameLimit(self, port_id, width, height):
     """Gets the maximal number of frames which are accommodated in the buffer.
 
     It depends on the size of the internal buffer on the board and the
     size of area to capture (full screen or cropped area).
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       width: The width of the area to capture.
       height: The height of the area to capture.
 
@@ -252,9 +291,9 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetMaxFrameLimit')
 
-  def StartCapturingVideo(self, input_id, x=None, y=None, width=None,
+  def StartCapturingVideo(self, port_id, x=None, y=None, width=None,
                           height=None):
-    """Starts video capturing continuously on the given input.
+    """Starts video capturing continuously on the given video input.
 
     This API is an asynchronous call. It returns after the video starts
     capturing. The caller should call StopCapturingVideo to stop it.
@@ -268,7 +307,7 @@ class ChameleondInterface(object):
         CompareFrame(frame, golden_frames[i])
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner of crop.
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
@@ -284,9 +323,9 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('StopCapturingVideo')
 
-  def CaptureVideo(self, input_id, total_frame, x=None, y=None, width=None,
+  def CaptureVideo(self, port_id, total_frame, x=None, y=None, width=None,
                    height=None):
-    """Captures the video stream on the given input to the buffer.
+    """Captures the video stream on the given video input to the buffer.
 
     This API is a synchronous call. It returns after all the frames are
     captured. The frames can be read using the ReadCapturedFrame API.
@@ -298,7 +337,7 @@ class ChameleondInterface(object):
         CompareFrame(frame, golden_frames[i])
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       total_frame: The total number of frames to capture, should not larger
                    than value of GetMaxFrameLimit.
       x: The X position of the top-left corner of crop.
@@ -350,14 +389,14 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetCapturedChecksums')
 
-  def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
+  def ComputePixelChecksum(self, port_id, x=None, y=None, width=None,
         height=None):
     """Computes the checksum of pixels in the selected area.
 
     If not given the area, default to compute the whole screen.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner.
       y: The Y position of the top-left corner.
       width: The width of the area.
@@ -368,30 +407,30 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('ComputePixelChecksum')
 
-  def DetectResolution(self, input_id):
-    """Detects the source resolution.
+  def DetectResolution(self, port_id):
+    """Detects the video source resolution.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
 
     Returns:
       A (width, height) tuple.
     """
     raise NotImplementedError('DetectResolution')
 
-  def StartCapturingAudio(self, input_id):
+  def StartCapturingAudio(self, port_id):
     """Starts capturing audio.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the audio input port.
     """
     raise NotImplementedError('StartCapturingAudio')
 
-  def StopCapturingAudio(self, input_id):
+  def StopCapturingAudio(self, port_id):
     """Stops capturing audio and returns recorded audio raw data.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the audio input port.
 
     Returns:
       A tuple (data, format).

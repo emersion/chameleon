@@ -42,9 +42,13 @@ class ChameleondDriver(ChameleondInterface):
   # Limit the period of async capture to 3min (in 60fps).
   _MAX_CAPTURED_FRAME_COUNT = 3 * 60 * 60
 
-  # Inputs that support audio/video.
-  _INPUTS_AUDIO_SUPPORTED = [ids.HDMI, ids.MIC, ids.LINEIN]
-  _INPUTS_VIDEO_SUPPORTED = [ids.DP1, ids.DP2, ids.HDMI, ids.VGA]
+  # Input/output ports
+  _INPUT_PORTS = [ids.DP1, ids.DP2, ids.HDMI, ids.VGA, ids.MIC, ids.LINEIN]
+  _OUTPUT_PORTS = []
+
+  # Ports that support audio/video.
+  _AUDIO_PORTS = [ids.HDMI, ids.MIC, ids.LINEIN]
+  _VIDEO_PORTS = [ids.DP1, ids.DP2, ids.HDMI, ids.VGA]
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
@@ -57,7 +61,7 @@ class ChameleondDriver(ChameleondInterface):
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
     audio_bus = i2c.I2cBus(self._I2C_BUS_AUDIO)
     fpga_ctrl = fpga.FpgaController()
-    self._input_flows = {
+    self._flows = {
       ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
       ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
       ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
@@ -66,16 +70,15 @@ class ChameleondDriver(ChameleondInterface):
       ids.LINEIN: codec_flow.CodecFlow(ids.LINEIN, audio_bus, fpga_ctrl)
     }
 
-    for flow in self._input_flows.itervalues():
+    for flow in self._flows.itervalues():
       if flow:
         flow.Initialize()
 
     self.Reset()
 
     # Set all ports unplugged on initialization.
-    for input_id in self.ProbeInputs():
-      self.Unplug(input_id)
-
+    for port_id in self.ProbePorts():
+      self.Unplug(port_id)
 
   def Reset(self):
     """Resets Chameleon board."""
@@ -83,9 +86,8 @@ class ChameleondDriver(ChameleondInterface):
     # TODO(waihong): Add other reset routines.
     self._ApplyDefaultEdid()
 
-
   def IsHealthy(self):
-    """Returns if the Chameleon is healthy or any repair is needed.
+    """Returns true if the Chameleon is healthy or any repair is needed.
 
     Returns:
       True if the Chameleon is healthy; otherwise, False, need to repair.
@@ -106,87 +108,122 @@ class ChameleondDriver(ChameleondInterface):
     # TODO(waihong): Add the repair routine when needed.
     return 0
 
-  def GetSupportedInputs(self):
-    """Returns all supported connectors on the board.
+  def GetSupportedPorts(self):
+    """Returns all supported ports on the board.
 
-    Not like the ProbeInputs() method which only returns the connectors which
-    are connected, this method returns all supported connectors on the board.
+    Not like the ProbePorts() method which only returns the ports which
+    are connected, this method returns all supported ports on the board.
 
     Returns:
-      A tuple of input_id, for all supported connectors on the board.
+      A tuple of port_id, for all supported ports on the board.
     """
-    return self._input_flows.keys()
+    return self._flows.keys()
 
-  def IsPhysicalPlugged(self, input_id):
-    """Returns if the physical cable is plugged.
+  def GetSupportedInputs(self):
+    """Returns all supported input ports on the board.
 
-    It checks the source power +5V/+3.3V pin.
+    Not like the ProbeInputs() method which only returns the input ports which
+    are connected, this method returns all supported input ports on the board.
+
+    Returns:
+      A tuple of port_id, for all supported input port on the board.
+    """
+    return self._INPUT_PORTS
+
+  def GetSupportedOutputs(self):
+    """Returns all supported output ports on the board.
+
+    Not like the ProbeOutputs() method which only returns the output ports which
+    are connected, this method returns all supported output ports on the board.
+
+    Returns:
+      A tuple of port_id, for all supported output port on the board.
+    """
+    return self._OUTPUT_PORTS
+
+  def IsPhysicalPlugged(self, port_id):
+    """Returns true if the physical cable is plugged between DUT and Chameleon.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
       True if the physical cable is plugged; otherwise, False.
     """
-    return self._input_flows[input_id].IsPhysicalPlugged()
+    return self._flows[port_id].IsPhysicalPlugged()
 
-  def ProbeInputs(self):
-    """Probes all the display connectors on Chameleon board.
+  def ProbePorts(self):
+    """Probes all the connected ports on Chameleon board.
 
     Returns:
-      A tuple of input_id, for the connectors connected to DUT.
+      A tuple of port_id, for the ports connected to DUT.
     """
-    input_ids = []
-    for input_id in self.GetSupportedInputs():
-      if self.IsPhysicalPlugged(input_id):
-        input_ids.append(input_id)
-    return tuple(input_ids)
+    return tuple(port_id for port_id in self.GetSupportedPorts()
+                 if self.IsPhysicalPlugged(port_id))
 
-  def GetConnectorType(self, input_id):
+  def ProbeInputs(self):
+    """Probes all the connected input ports on Chameleon board.
+
+    Returns:
+      A tuple of port_id, for the input ports connected to DUT.
+    """
+    return tuple(port_id for port_id in self.GetSupportedInputs()
+                 if self.IsPhysicalPlugged(port_id))
+
+  def ProbeOutputs(self):
+    """Probes all the connected output ports on Chameleon board.
+
+    Returns:
+      A tuple of port_id, for the output ports connected to DUT.
+    """
+    return tuple(port_id for port_id in self.GetSupportedOutputs()
+                 if self.IsPhysicalPlugged(port_id))
+
+  def GetConnectorType(self, port_id):
     """Returns the human readable string for the connector type.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      A string, like "VGA", "DVI", "HDMI", or "DP".
+      A string, like "HDMI", "DP", "MIC", etc.
     """
-    return self._input_flows[input_id].GetConnectorType()
+    return self._flows[port_id].GetConnectorType()
 
-  def HasAudioSupport(self, input_id):
-    """Returns true if the input has audio support.
+  def HasAudioSupport(self, port_id):
+    """Returns true if the port has audio support.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      True if the input has audio support; otherwise, False.
+      True if the input/output port has audio support; otherwise, False.
     """
-    return input_id in self._INPUTS_AUDIO_SUPPORTED
+    return port_id in self._AUDIO_PORTS
 
-  def HasVideoSupport(self, input_id):
-    """Returns true if the input has video support.
+  def HasVideoSupport(self, port_id):
+    """Returns true if the port has video support.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      True if the input has video support; otherwise, False.
+      True if the input/output port has video support; otherwise, False.
     """
-    return input_id in self._INPUTS_VIDEO_SUPPORTED
+    return port_id in self._VIDEO_PORTS
 
-  def WaitVideoInputStable(self, input_id, timeout=None):
+  def WaitVideoInputStable(self, port_id, timeout=None):
     """Waits the video input stable or timeout.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       timeout: The time period to wait for.
 
     Returns:
       True if the video input becomes stable within the timeout period;
       otherwise, False.
     """
-    return self._input_flows[input_id].WaitVideoInputStable(timeout)
+    return self._flows[port_id].WaitVideoInputStable(timeout)
 
   def _ReadDefaultEdid(self):
     """Reads the default EDID from file.
@@ -226,70 +263,70 @@ class ChameleondDriver(ChameleondInterface):
     else:
       raise DriverError('Not a valid edid_id.')
 
-  def ReadEdid(self, input_id):
-    """Reads the EDID content of the selected input on Chameleon.
+  def ReadEdid(self, port_id):
+    """Reads the EDID content of the selected video input on Chameleon.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
 
     Returns:
       A byte array of EDID data, wrapped in a xmlrpclib.Binary object.
     """
-    return xmlrpclib.Binary(self._input_flows[input_id].ReadEdid())
+    return xmlrpclib.Binary(self._flows[port_id].ReadEdid())
 
   def _ApplyDefaultEdid(self):
-    """Applies the default EDID to all inputs."""
+    """Applies the default EDID to all video inputs."""
     logging.info('Apply the default EDID to all inputs.')
-    for flow in self._input_flows.itervalues():
+    for flow in self._flows.itervalues():
       if flow and isinstance(flow, input_flow.InputFlow):
         flow.WriteEdid(self._all_edids[0])
 
-  def ApplyEdid(self, input_id, edid_id):
-    """Applies the EDID to the selected input.
+  def ApplyEdid(self, port_id, edid_id):
+    """Applies the EDID to the selected video input.
 
     Note that this method doesn't pulse the HPD line. Should call Plug(),
     Unplug(), or FireHpdPulse() later.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       edid_id: The ID of the EDID.
     """
-    self._input_flows[input_id].WriteEdid(self._all_edids[edid_id])
+    self._flows[port_id].WriteEdid(self._all_edids[edid_id])
 
-  def IsPlugged(self, input_id):
-    """Returns if the HPD line is plugged.
+  def IsPlugged(self, port_id):
+    """Returns true if the port is emulated as plugged.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
 
     Returns:
-      True if the HPD line is plugged; otherwise, False.
+      True if the port is emualted as plugged; otherwise, False.
     """
-    return self._input_flows[input_id].IsPlugged()
+    return self._flows[port_id].IsPlugged()
 
-  def Plug(self, input_id):
-    """Asserts HPD line to high, emulating plug.
+  def Plug(self, port_id):
+    """Emualtes plug, like asserting HPD line to high on a video port.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
     """
-    return self._input_flows[input_id].Plug()
+    return self._flows[port_id].Plug()
 
-  def Unplug(self, input_id):
-    """Deasserts HPD line to low, emulating unplug.
+  def Unplug(self, port_id):
+    """Emulates unplug, like deasserting HPD line to low on a video port.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input/output port.
     """
-    return self._input_flows[input_id].Unplug()
+    return self._flows[port_id].Unplug()
 
-  def FireHpdPulse(self, input_id, deassert_interval_usec,
+  def FireHpdPulse(self, port_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1,
                    end_level=1):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       deassert_interval_usec: The time in microsecond of the deassert pulse.
       assert_interval_usec: The time in microsecond of the assert pulse.
                             If None, then use the same value as
@@ -301,10 +338,10 @@ class ChameleondDriver(ChameleondInterface):
       # Fall back to use the same value as deassertion if not given.
       assert_interval_usec = deassert_interval_usec
 
-    return self._input_flows[input_id].FireHpdPulse(deassert_interval_usec,
+    return self._flows[port_id].FireHpdPulse(deassert_interval_usec,
         assert_interval_usec, repeat_count, end_level)
 
-  def FireMixedHpdPulses(self, input_id, widths):
+  def FireMixedHpdPulses(self, port_id, widths):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
 
     One must specify a list of segment widths in the widths argument where
@@ -314,21 +351,21 @@ class ChameleondDriver(ChameleondInterface):
     otherwise, it stops at high.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       widths: list of pulse segment widths in usec.
     """
-    return self._input_flows[input_id].FireMixedHpdPulses(widths)
+    return self._flows[port_id].FireMixedHpdPulses(widths)
 
-  def _SelectInput(self, input_id):
+  def _SelectInput(self, port_id):
     """Selects the input on Chameleon.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the input port.
     """
-    if input_id != self._selected_input:
-      self._input_flows[input_id].Select()
-      self._selected_input = input_id
-    self._input_flows[input_id].Do_FSM()
+    if port_id != self._selected_input:
+      self._flows[port_id].Select()
+      self._selected_input = port_id
+    self._flows[port_id].Do_FSM()
 
   def GetPixelFormat(self):
     """Returns the pixel format for the output of DumpPixels.
@@ -338,13 +375,13 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._PIXEL_FORMAT
 
-  def DumpPixels(self, input_id, x=None, y=None, width=None, height=None):
+  def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
 
     If not given the area, default to capture the whole screen.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner.
       y: The Y position of the top-left corner.
       width: The width of the area.
@@ -353,18 +390,18 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
-    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
-    self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
+    x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
+    self.CaptureVideo(port_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
     return self.ReadCapturedFrame(self._DEFAULT_FRAME_INDEX)
 
-  def _AutoFillArea(self, input_id, x, y, width, height):
+  def _AutoFillArea(self, port_id, x, y, width, height):
     """Verifies the area argument correctness and fills the default values.
 
     It keeps x=None and y=None if all of the x, y, width, and height are None.
     That hints FPGA to use a full-screen capture, not a cropped-sccren capture.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner.
       y: The Y position of the top-left corner.
       width: The width of the area.
@@ -377,43 +414,43 @@ class ChameleondDriver(ChameleondInterface):
       DriverError if the area is not specified correctly.
     """
     if (x, y, width, height) == (None, ) * 4:
-      return (None, None) + self.DetectResolution(input_id)
+      return (None, None) + self.DetectResolution(port_id)
     elif (x, y) == (None, ) * 2 or None not in (x, y, width, height):
       return (x, y, width, height)
     else:
       raise DriverError('Some of area arguments are not specified.')
 
-  def GetMaxFrameLimit(self, input_id, width, height):
+  def GetMaxFrameLimit(self, port_id, width, height):
     """Gets the maximal number of frames which are accommodated in the buffer.
 
     It depends on the size of the internal buffer on the board and the
     size of area to capture (full screen or cropped area).
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       width: The width of the area to capture.
       height: The height of the area to capture.
 
     Returns:
       A number of the frame limit.
     """
-    return self._input_flows[input_id].GetMaxFrameLimit(width, height)
+    return self._flows[port_id].GetMaxFrameLimit(width, height)
 
-  def _PrepareCapturingVideo(self, input_id, x, y, width, height):
-    """Prepares capturing video on the given input.
+  def _PrepareCapturingVideo(self, port_id, x, y, width, height):
+    """Prepares capturing video on the given video input.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner of crop.
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
       height: The height of the area of crop.
     """
-    self._SelectInput(input_id)
-    if not self.IsPlugged(input_id):
+    self._SelectInput(port_id)
+    if not self.IsPlugged(port_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
 
-    is_dual_pixel_mode = self._input_flows[input_id].IsDualPixelMode()
+    is_dual_pixel_mode = self._flows[port_id].IsDualPixelMode()
     # Check the alignment for a cropped-screen capture.
     if None not in (x, y):
       if is_dual_pixel_mode:
@@ -424,15 +461,15 @@ class ChameleondDriver(ChameleondInterface):
           raise DriverError('Argument not aligned')
 
     self._captured_params = {
-      'input_id': input_id,
+      'port_id': port_id,
       'resolution': (width, height),
       'is_dual_pixel': is_dual_pixel_mode,
-      'pixeldump_args': self._input_flows[input_id].GetPixelDumpArgs(),
+      'pixeldump_args': self._flows[port_id].GetPixelDumpArgs(),
     }
 
-  def StartCapturingVideo(self, input_id, x=None, y=None, width=None,
+  def StartCapturingVideo(self, port_id, x=None, y=None, width=None,
                           height=None):
-    """Starts video capturing continuously on the given input.
+    """Starts video capturing continuously on the given video input.
 
     This API is an asynchronous call. It returns after the video starts
     capturing. The caller should call StopCapturingVideo to stop it.
@@ -446,17 +483,17 @@ class ChameleondDriver(ChameleondInterface):
         CompareFrame(frame, golden_frames[i])
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner of crop.
       y: The Y position of the top-left corner of crop.
       width: The width of the area of crop.
       height: The height of the area of crop.
     """
-    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
-    self._PrepareCapturingVideo(input_id, x, y, width, height)
+    x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
+    self._PrepareCapturingVideo(port_id, x, y, width, height)
 
-    max_frame_limit = self.GetMaxFrameLimit(input_id, width, height)
-    self._input_flows[input_id].StartDumpingFrames(
+    max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
+    self._flows[port_id].StartDumpingFrames(
         max_frame_limit, x, y, width, height, self._MAX_CAPTURED_FRAME_COUNT)
 
   def StopCapturingVideo(self):
@@ -465,15 +502,15 @@ class ChameleondDriver(ChameleondInterface):
     Raises:
       DriverError if the capture period is longer than the capture limitation.
     """
-    input_id = self._captured_params['input_id']
-    self._input_flows[input_id].StopDumpingFrames()
+    port_id = self._captured_params['port_id']
+    self._flows[port_id].StopDumpingFrames()
     if self.GetCapturedFrameCount() >= self._MAX_CAPTURED_FRAME_COUNT:
       raise DriverError('Exceeded the limit of capture, frame_count >= %d' %
                         self._MAX_CAPTURED_FRAME_COUNT)
 
-  def CaptureVideo(self, input_id, total_frame, x=None, y=None, width=None,
+  def CaptureVideo(self, port_id, total_frame, x=None, y=None, width=None,
                    height=None):
-    """Captures the video stream on the given input to the buffer.
+    """Captures the video stream on the given video input to the buffer.
 
     This API is a synchronous call. It returns after all the frames are
     captured. The frames can be read using the ReadCapturedFrame API.
@@ -485,7 +522,7 @@ class ChameleondDriver(ChameleondInterface):
         CompareFrame(frame, golden_frames[i])
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       total_frame: The total number of frames to capture, should not larger
                    than value of GetMaxFrameLimit.
       x: The X position of the top-left corner of crop.
@@ -493,15 +530,15 @@ class ChameleondDriver(ChameleondInterface):
       width: The width of the area of crop.
       height: The height of the area of crop.
     """
-    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
-    max_frame_limit = self.GetMaxFrameLimit(input_id, width, height)
+    x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
+    max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
     if total_frame > max_frame_limit:
       raise DriverError('Exceed the max frame limit %d > %d',
                         total_frame, max_frame_limit)
 
-    self._PrepareCapturingVideo(input_id, x, y, width, height)
+    self._PrepareCapturingVideo(port_id, x, y, width, height)
     # TODO(waihong): Make the timeout value based on the FPS rate.
-    self._input_flows[input_id].DumpFramesToLimit(
+    self._flows[port_id].DumpFramesToLimit(
         total_frame, x, y, width, height, self._TIMEOUT_FRAME_DUMP_PROBE)
 
   def GetCapturedFrameCount(self):
@@ -510,8 +547,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The number of frames captured.
     """
-    input_id = self._captured_params['input_id']
-    return self._input_flows[input_id].GetDumpedFrameCount()
+    port_id = self._captured_params['port_id']
+    return self._flows[port_id].GetDumpedFrameCount()
 
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.
@@ -571,7 +608,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The list of checksums of frames.
     """
-    input_id = self._captured_params['input_id']
+    port_id = self._captured_params['port_id']
     total_frame = self.GetCapturedFrameCount()
     if not 0 <= start_index < total_frame:
       raise DriverError('The start index is out-of-range: %d not in [0, %d)' %
@@ -579,16 +616,16 @@ class ChameleondDriver(ChameleondInterface):
     if not 0 < stop_index <= total_frame:
       raise DriverError('The stop index is out-of-range: %d not in (0, %d]' %
                         (stop_index, total_frame))
-    return self._input_flows[input_id].GetFrameHashes(start_index, stop_index)
+    return self._flows[port_id].GetFrameHashes(start_index, stop_index)
 
-  def ComputePixelChecksum(self, input_id, x=None, y=None, width=None,
+  def ComputePixelChecksum(self, port_id, x=None, y=None, width=None,
         height=None):
     """Computes the checksum of pixels in the selected area.
 
     If not given the area, default to compute the whole screen.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
       x: The X position of the top-left corner.
       y: The Y position of the top-left corner.
       width: The width of the area.
@@ -597,47 +634,50 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       The checksum of the pixels.
     """
-    x, y, width, height = self._AutoFillArea(input_id, x, y, width, height)
-    self.CaptureVideo(input_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
+    x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
+    self.CaptureVideo(port_id, self._DEFAULT_FRAME_LIMIT, x, y, width, height)
     return self.GetCapturedChecksums(self._DEFAULT_FRAME_INDEX,
                                      self._DEFAULT_FRAME_INDEX + 1)[0]
 
-  def DetectResolution(self, input_id):
-    """Detects the source resolution.
+  def DetectResolution(self, port_id):
+    """Detects the video source resolution.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the video input port.
 
     Returns:
       A (width, height) tuple.
     """
-    self._SelectInput(input_id)
-    return self._input_flows[input_id].GetResolution()
+    self._SelectInput(port_id)
+    return self._flows[port_id].GetResolution()
 
-  def _CheckInputIdSupportAudio(self, input_id):
-    """Checks if the input has audio support.
+  def _CheckAudioSupport(self, port_id):
+    """Checks if the input/output port has audio support.
 
     Args:
-      input_id: The ID of the input connector.
-    """
-    if not self.HasAudioSupport(input_id):
-      raise DriverError('Not a valid input_id for audio operation.')
+      port_id: The ID of the input/output port.
 
-  def StartCapturingAudio(self, input_id):
+    Raises:
+      DriverError if the port has no audio support.
+    """
+    if not self.HasAudioSupport(port_id):
+      raise DriverError('Not a valid port_id for audio operation.')
+
+  def StartCapturingAudio(self, port_id):
     """Starts capturing audio.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the audio input port.
     """
-    self._CheckInputIdSupportAudio(input_id)
-    self._SelectInput(input_id)
-    self._input_flows[input_id].StartCapturingAudio()
+    self._CheckAudioSupport(port_id)
+    self._SelectInput(port_id)
+    self._flows[port_id].StartCapturingAudio()
 
-  def StopCapturingAudio(self, input_id):
+  def StopCapturingAudio(self, port_id):
     """Stops capturing audio and returns recorded audio raw data.
 
     Args:
-      input_id: The ID of the input connector.
+      port_id: The ID of the audio input port.
 
     Returns:
       A tuple (data, format).
@@ -647,9 +687,9 @@ class ChameleondDriver(ChameleondInterface):
         Currently, the data format supported is
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
     """
-    self._CheckInputIdSupportAudio(input_id)
-    if (self._selected_input != input_id):
+    self._CheckAudioSupport(port_id)
+    if (self._selected_input != port_id):
       raise DriverError(
-          'The input is selected to %r not %r', self._selected_input, input_id)
-    data, data_format = self._input_flows[input_id].StopCapturingAudio()
+          'The input is selected to %r not %r', self._selected_input, port_id)
+    data, data_format = self._flows[port_id].StopCapturingAudio()
     return xmlrpclib.Binary(data), data_format
