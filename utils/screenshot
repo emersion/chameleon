@@ -62,14 +62,11 @@ def main():
   print('Capturing the screen size %s...' % size_str)
   pixels = chameleon.DumpPixels(main_input, *area_args).data
   print('Got pixel size %d' % len(pixels))
-  suffix = '.' + chameleon.GetPixelFormat()
-  with tempfile.NamedTemporaryFile(suffix=suffix) as f:
+  with tempfile.NamedTemporaryFile(suffix='.rgb') as f:
     print('Temporarily write to file:', f.name)
     f.write(pixels)
     f.flush()
     command = ['convert', '-size', size_str, '-depth', '8']
-    if 'a' in suffix:
-      command += ['-alpha', 'off']
     command += [f.name, options.output]
     subprocess.check_call(command)
     print('Outputted to file:', options.output)

@@ -51,7 +51,7 @@ class ChameleondDriver(ChameleondInterface):
   _I2C_BUS_MAIN = 0
   _I2C_BUS_AUDIO = 1
 
-  _PIXEL_FORMAT = 'rgb'
+  _PIXEL_LEN = 3
 
   # Time to wait for video frame dump to start before a timeout error is raised
   _TIMEOUT_FRAME_DUMP_PROBE = 60.0
@@ -385,14 +385,6 @@ class ChameleondDriver(ChameleondInterface):
       self._selected_input = port_id
     self._flows[port_id].Do_FSM()
 
-  def GetPixelFormat(self):
-    """Returns the pixel format for the output of DumpPixels.
-
-    Returns:
-      A string of the format, like 'rgba', 'bgra', 'rgb', etc.
-    """
-    return self._PIXEL_FORMAT
-
   @_VideoMethod
   def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
@@ -603,7 +595,7 @@ class ChameleondDriver(ChameleondInterface):
 
     # Modify the memory offset to match the frame.
     PAGE_SIZE = 4096
-    frame_size = width * height * len(self._PIXEL_FORMAT)
+    frame_size = width * height * self._PIXEL_LEN
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
     offset = frame_size * frame_index
     offset_args = []
@@ -616,7 +608,7 @@ class ChameleondDriver(ChameleondInterface):
 
     with tempfile.NamedTemporaryFile() as f:
       self._tools.Call('pixeldump', f.name, width, height,
-                       len(self._PIXEL_FORMAT), *offset_args)
+                       self._PIXEL_LEN, *offset_args)
       screen = f.read()
     return xmlrpclib.Binary(screen)
 
