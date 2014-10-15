@@ -77,6 +77,18 @@ class CodecFlow(object):
         ' Always returns True')
     return True
 
+  def IsPlugged(self):
+    """Returns true if audio codec is emualted plug."""
+    # TODO(cychiang): Implement this using audio board interface.
+    logging.warning('Always return True for IsPlugged on AudioCodecInputFlow.')
+    return True
+
+  def Plug(self):
+    """Emulates plug on audio codec."""
+    # TODO(cychiang): Implement this using audio board interface.
+    logging.warning(
+        'Plug on AudioCodecInputFlow is not implemented. Do nothing.')
+
   def Unplug(self):
     """Emulates unplug on audio codec."""
     # TODO(cychiang): Implement this using audio board interface.
