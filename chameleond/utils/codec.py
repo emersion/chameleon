@@ -36,6 +36,7 @@ class AudioCodec(i2c.I2cSlave):
     """Runs the initialization sequence for the chip."""
     if self._Enabled():
       logging.info('Already enabled')
+      self._SelectInputNone()
       return
     logging.info('Initialize audio codec chip.')
     self.Set(0x17, 0x0c) # power on clock, crystal, dac
@@ -67,6 +68,7 @@ class AudioCodec(i2c.I2cSlave):
     Raises:
       AudioCodecException if input_path is not valid.
     """
+    logging.info('Select codec input path to %r', input_path)
     if not self._Enabled():
       raise AudioCodecException('Codec is not initialized')
     if input_path == CodecInput.NONE:
