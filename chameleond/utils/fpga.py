@@ -105,7 +105,7 @@ class HpdController(object):
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
     system_tools.SystemTools.Call(
-            'hpd_control_tio', 'repeat_pulse',
+            'hpd_control', 'repeat_pulse',
             self._HPD_OFFSETS[input_id], int(deassert_interval_usec),
             int(assert_interval_usec), repeat_count, end_level)
 
@@ -123,7 +123,7 @@ class HpdController(object):
       widths: list of pulse segment widths in usec.
     """
     system_tools.SystemTools.Call(
-            'hpd_control_tio', 'pulse',
+            'hpd_control', 'pulse',
             self._HPD_OFFSETS[input_id],
             *tuple(widths))
 
