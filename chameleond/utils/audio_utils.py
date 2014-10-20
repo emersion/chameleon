@@ -60,15 +60,15 @@ class AudioCaptureManager(object):
 
     start_address, page_count = self._adump.StopDumpingToMemory()
 
-    if page_count > self._adump.SIMPLE_DUMP_PAGE_LIMIT:
+    if page_count > self._adump.MAX_DUMP_PAGES:
       raise AudioCaptureManagerError(
           'Dumped number of pages %d exceeds the limit %d',
-          page_count, self._adump.SIMPLE_DUMP_PAGE_LIMIT)
+          page_count, self._adump.MAX_DUMP_PAGES)
 
-    if captured_time_secs > self._adump.SIMPLE_DUMP_TIME_LIMIT_SECS:
+    if captured_time_secs > self._adump.MAX_DUMP_TIME_SECS:
       raise AudioCaptureManagerError(
           'Capture time %f seconds exceeds time limit %f secs' % (
-              captured_time_secs, self._adump.SIMPLE_DUMP_TIME_LIMIT_SECS))
+              captured_time_secs, self._adump.MAX_DUMP_TIME_SECS))
 
     logging.info(
         'Stopped capturing audio. Captured duration: %f seconds; '

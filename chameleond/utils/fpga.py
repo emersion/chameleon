@@ -41,6 +41,7 @@ class FpgaController(object):
     self.vdump1 = VideoDumper(1)
     self.adump = AudioDumper()
     self.asrc = AudioSourceController()
+    self.astream = AudioStreamController()
     self.hdmi_edid = EdidController(EdidController.HDMI_BASE)
     self.vga_edid = EdidController(EdidController.VGA_BASE)
 
@@ -467,6 +468,10 @@ class AudioDumper(object):
   _REG_START_ADDR = 0x8
   _REG_END_ADDR = 0xc
 
+  # This address is in ARM's address space.
+  # Address relative to _DUMP_BASE_ADDRESS is in dumper's address space.
+  # E.g. address 0xdc000000 in ARM's address space is 0x1c000000 in
+  # dumper's address space.
   _DUMP_BASE_ADDRESS = 0xc0000000
   _DUMP_BUFFER_SIZE = 0x3c000000
 
@@ -479,24 +484,27 @@ class AudioDumper(object):
   _REG_PAGE_COUNT = 0x14
 
   # The default address for audio dump. This area is 32 MBytes.
+  # These addresses are in dumper's address space.
   _DEFAULT_START_ADDRESS = 0x1c000000
   _DEFAULT_END_ADDRESS = 0x1e000000
+
+  # Page size is 4K bytes. Address should be 4K-aligned.
+  PAGE_SIZE = 0x1000
 
   # The rate of audio data is
   # 8 channel * 4 bytes/sample * 48000 samples/sec = 1500 KBytes/sec.
   # So default area which contains 0x2000 4K pages can dump
   # 32 MBytes / 1500 KBytes = 21 sec of data.
-  SIMPLE_DUMP_PAGE_LIMIT = 0x2000
-  SIMPLE_DUMP_TIME_LIMIT_SECS = 21
+  MAX_DUMP_PAGES = (
+      (_DEFAULT_END_ADDRESS - _DEFAULT_START_ADDRESS) / PAGE_SIZE)
+  MAX_DUMP_TIME_SECS = (
+      (_DEFAULT_END_ADDRESS - _DEFAULT_START_ADDRESS) / (8 * 4 * 48000))
 
   # Set loop to 1 so page count will increase over 0x2000 and we can detect the
   # case where page count exceeds the limit.
   # However, since page count will overflow at 65535, the number will not be
   # reliable after that point.
   _DEFAULT_LOOP = 1
-
-  # Page size is 4K bytes. Address should be 4K-aligned.
-  PAGE_SIZE = 0x1000
 
   # Audio data format of dumped data. Chameleond API user needs to get
   # the format to read data correctly.
@@ -568,17 +576,21 @@ class AudioDumper(object):
     page_count = self._memory.Read(
         self._REGS_BASE + self._REG_PAGE_COUNT)
     self._Stop()
-    return AudioDumper.GetMappedAddress(start_address), page_count
+    return AudioDumper._GetMappedAddress(start_address), page_count
 
   @classmethod
-  def GetMappedAddress(cls, address):
-    """Gets mapped address for a given address.
+  def _GetMappedAddress(cls, address):
+    """Gets mapped address in ARM's address space.
+
+    Gets address in ARM's address space for a given address in
+    dumper's address space.
 
     Args:
       address: An address relative to _DUMP_BASE_ADDRESS.
 
     Returns:
-      A mapped address which is the input address shifted by _DUMP_BASE_ADDRESS.
+      A mapped address which is the input address shifted by
+      _DUMP_BASE_ADDRESS. The address is in ARM's address space.
     """
     return address + cls._DUMP_BASE_ADDRESS
 
@@ -671,3 +683,196 @@ class AudioSourceController(object):
     self._memory.Write(
         self._REGS_BASE + self._REG_GENERATOR_ENABLE,
         self._VALUE_GENERATOR_ENABLE[enable])
+
+
+class AudioStreamControllerError(Exception):
+  """Exception raised when any error on AudioStreamController."""
+  pass
+
+
+class AudioStreamController(object):
+  """A class to control audio stream controller."""
+  _REGS_BASE = 0xff213000
+
+  _REG_STREAM_ENABLE = 0x10
+  _BIT_STREAM_ENABLE = 1
+
+  # Underflow bit is set to high by fpga when stream enable bit is high but
+  # the data from start address to end address are all streamed.
+  # If loop register is set to 1, then underflow will not happen.
+  _REG_STREAM_UNDERFLOW = 0x14
+  _BIT_STREAM_UNDERFLOW = 1
+
+  # Register which stores the offsets relative to _STREAM_BASE_ADDRESS.
+  # The valid value is in the range of 0x00000000 to _STREAM_BUFFER_SIZE.
+  # Also, the address should be 4K aligned.
+  # Note that VideoDumper and AudioDumper share dump memory, which is used
+  # as stream memory as well. Be careful to use these two dumpers and audio
+  # stream controller at the same time.
+  _REG_START_ADDR = 0x18
+  _REG_END_ADDR = 0x1c
+
+  # This address is in ARM's address space.
+  # Address relative to _STREAM_BASE_ADDRESS is in stream's address space.
+  # E.g. address 0xde000000 in ARM's address space is 0x1e000000 in
+  # stream's address space.
+  _STREAM_BASE_ADDRESS = 0xc0000000
+  _STREAM_BUFFER_SIZE = 0x3c000000
+
+  # If set to 1, the stream pointer is reset to stream start address after it
+  # reaches stream end address. If set to 0, the stream pointer does not reset.
+  _REG_LOOP = 0x20
+
+  # Set loop to 0 to playback only once.
+  _DEFAULT_LOOP = 0
+
+  # Number of pages have been streamed. It starts from 0 when Run bit is set and
+  # wraps around at 65536.
+  _REG_PAGE_COUNT = 0x14
+
+  # Page size is 4K bytes. Address should be 4K-aligned.
+  PAGE_SIZE = 0x1000
+
+  # The default address for audio stream. This area is 32 MBytes.
+  # These addresses are in stream's address space.
+  _DEFAULT_START_ADDRESS = 0x1e000000
+  _DEFAULT_END_ADDRESS = 0x20000000
+
+  # Default maximum size of stream in bytes.
+  MAX_STREAM_BUFFER_SIZE = _DEFAULT_END_ADDRESS - _DEFAULT_START_ADDRESS
+
+  # Audio data format of stream data. AudioStreamController user needs to know
+  # the format to write data correctly.
+  AUDIO_DATA_FORMAT = audio.AudioDataFormat(
+      file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+
+  def __init__(self):
+    """Constructs an AudioStreamController object."""
+    self._memory = mem.MemoryForController
+    self._Stop()
+
+  @classmethod
+  def _GetMappedAddress(cls, address):
+    """Gets mapped address in ARM's address space.
+
+    Gets address in ARM's address space for a given address in
+    stream's address space.
+
+    Args:
+      address: An address relative to _STREAM_BASE_ADDRESS.
+
+    Returns:
+      A mapped address which is the input address shifted by
+      _STREAM_BASE_ADDRESS. The address is in ARM's address space.
+    """
+    return address + cls._STREAM_BASE_ADDRESS
+
+  @property
+  def mapped_start_address(self):
+    """Returns mapped start address.
+
+    This is the start address of memory allocated for streaming in ARM's
+    address space.
+    """
+    return AudioStreamController._GetMappedAddress(self._DEFAULT_START_ADDRESS)
+
+  @property
+  def audio_data_format_as_dict(self):
+    """Format of the audio data used by this stream controller.
+
+    Returns:
+      A dict containing file_type, sample_format, channel, rate contained in
+      AUDIO_DATA_FORMAT. Refer to audio.AudioDataFormat docstring for details.
+    """
+    return self.AUDIO_DATA_FORMAT.AsDict()
+
+  @property
+  def is_streaming(self):
+    """Stream controller is streamming.
+
+    Stream is running when enable bit is on and there is no underflow.
+    Underflow bit is set to high by fpga when stream enable bit is high but
+    the data from start address to end address are all streamed.
+
+    Returns:
+      True if controller is streaming.
+    """
+    stream_run = (self._memory.Read(self._REGS_BASE + self._REG_STREAM_ENABLE) &
+                  self._BIT_STREAM_ENABLE)
+    underflow = (self._memory.Read(self._REGS_BASE +
+                                   self._REG_STREAM_UNDERFLOW) &
+                 self._BIT_STREAM_UNDERFLOW)
+    return (stream_run and not underflow)
+
+  def _Stop(self):
+    """Stops streaming."""
+    self._memory.ClearMask(self._REGS_BASE + self._REG_STREAM_ENABLE,
+                           self._BIT_STREAM_ENABLE)
+
+  def _Start(self):
+    """Starts streaming."""
+    self._memory.SetMask(self._REGS_BASE + self._REG_STREAM_ENABLE,
+                         self._BIT_STREAM_ENABLE)
+
+  def _CheckAddressValid(self, name, address):
+    """Checks an address is within valid range, and is aligned.
+
+    Args:
+      name: The address name.
+      address: An address.
+
+    Raises:
+      AudioStreamControllerError if address is not valid.
+    """
+    if address < 0 or address >= self._STREAM_BUFFER_SIZE:
+      raise AudioStreamControllerError(
+          '%s address 0x%x is not in the range of 0 to 0x%x' % (
+              name, address, self._STREAM_BUFFER_SIZE))
+    if address & (self.PAGE_SIZE - 1):
+      raise AudioStreamControllerError(
+          '%s address 0x%x is not aligned with 0x%x' % (
+              name, address, self.PAGE_SIZE))
+
+  def StartStreaming(self, size):
+    """Starts streaming a range of data from memory.
+
+    User is responsible to put data in the stream memory.
+
+    Args:
+      size: The size of data in bytes to be streamed.
+    """
+    self._Stop()
+
+    if size > self.MAX_STREAM_BUFFER_SIZE:
+      raise AudioStreamControllerError(
+          'Stream size %d bytes exceeds limit %d bytes' %(
+              size, self.MAX_STREAM_BUFFER_SIZE))
+
+    start_address = self._DEFAULT_START_ADDRESS
+    end_address = start_address + size
+    loop = self._DEFAULT_LOOP
+
+    # Checks address is valid.
+    for name, address in [('start', start_address),
+                          ('end', end_address)]:
+      self._CheckAddressValid(name, address)
+
+    # Sets the memory addresses, loop for streaming.
+    self._memory.Write(self._REGS_BASE + self._REG_START_ADDR, start_address)
+    self._memory.Write(self._REGS_BASE + self._REG_END_ADDR, end_address)
+    self._memory.Write(self._REGS_BASE + self._REG_LOOP, loop)
+
+    self._Start()
+
+  def StopStreaming(self):
+    """Stops streaming."""
+    self._Stop()
+    logging.info('Stopped streaming.')
+
+  def GetStreamedPages(self):
+    """Returns number of streamed pages
+
+    Returns:
+      Number of streamed pages.
+    """
+    return self._memory.Read(self._REGS_BASE + self._REG_PAGE_COUNT)
