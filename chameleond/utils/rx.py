@@ -76,6 +76,10 @@ class HdmiRx(i2c.I2cSlave):
 
   SLAVE_ADDRESSES = (0x48, )
 
+  _REG_P0_INTERRUPT = 0x05
+  _BIT_P0_RX_CLK_STABLE_CHG = 1 << 2
+  _BIT_P0_RX_CLK_ON_CHG = 1 << 1
+
   _REG_INTERNAL_STATUS = 0x0a
   _BIT_P0_PWR5V_DET = 1 << 0
 
@@ -214,13 +218,29 @@ class HdmiRx(i2c.I2cSlave):
     video_mode = self.Get(self._REG_VIDEO_MODE)
     return bool(video_mode & self._BIT_VIDEO_STABLE)
 
-  def Do_FSM(self):
-    """Does the Finite-State-Machine."""
-    # TODO: Remove this hack when we find a better way to keep receiver
-    # sending good signal.
-    logging.info('Hack to reset the receiver.')
+  def IsResetNeeded(self):
+    """Returns if the RX needs reset by checking the interrupt values."""
+    # TODO(waihong): Handle all the interrupts.
+    # Now we only handle 2 interrupts, i.e. clock-stable and clock-on changes,
+    # by forcing receiver reset.
+    interrupt = self.Get(self._REG_P0_INTERRUPT)
+    self._ClearInterrupt()
+    return bool(interrupt & (self._BIT_P0_RX_CLK_STABLE_CHG |
+                             self._BIT_P0_RX_CLK_ON_CHG))
+
+  def _ClearInterrupt(self):
+    """Clears the interrupt."""
+    interrupt = self.Get(self._REG_P0_INTERRUPT)
+    # W1C register
+    self.Set(interrupt, self._REG_P0_INTERRUPT)
+
+  def Reset(self):
+    """Resets the receiver."""
+    logging.info('Reset the receiver.')
     self.SetAndClear(self._REG_P0_RESET, self._BIT_P0_SWRST,
                      self._DELAY_SOFTWARE_RESET)
+    # Some interrupts are triggered on reset. Clear them.
+    self._ClearInterrupt()
 
   def GetResolution(self):
     """Gets the resolution reported from receiver."""

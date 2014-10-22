@@ -431,11 +431,12 @@ class HdmiInputFlow(InputFlow):
     frames.
     """
     if self.WaitVideoInputStable():
-      self._rx.Do_FSM()
-      self.WaitVideoOutputStable()
-      # TODO(waihong): Remove this hack only for Nyan-Big.
-      # http://crbug.com/402152
-      time.sleep(self._DELAY_WAITING_GOOD_PIXELS)
+      if self._rx.IsResetNeeded():
+        self._rx.Reset()
+        self.WaitVideoOutputStable()
+        # TODO(waihong): Remove this hack only for Nyan-Big.
+        # http://crbug.com/402152
+        time.sleep(self._DELAY_WAITING_GOOD_PIXELS)
     else:
       logging.warn('Skip doing receiver FSM as video input not stable.')
 
