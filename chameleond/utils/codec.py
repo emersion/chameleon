@@ -60,7 +60,7 @@ class AudioCodec(i2c.I2cSlave):
     """Selects an input path.
 
     By selecting an input path, codec will start recording data from that path
-    and output to CODEC input of AudioSourceController.
+    and output to CODEC input of AudioRouteController.
 
     Args:
       input_path: NONE, MIC, or LINEIN in CodecInput

@@ -694,41 +694,13 @@ class ChameleondDriver(ChameleondInterface):
     self._SelectInput(port_id)
     return self._flows[port_id].GetResolution()
 
-  def _CheckNotCapturingAudio(self):
-    """Checks there is no audio input port capturing audio.
-
-    Raises:
-      DriverError: If there is any audio input port capturing audio.
-    """
-    for input_port in self.GetSupportedInputs():
-      if (self.HasAudioSupport(input_port) and
-          self._flows[input_port].is_capturing_audio):
-        raise DriverError(
-            'Chameleon is recording audio from port #%d', input_port)
-
-  def _CheckNotStreaming(self):
-    """Checks there is no audio output port playing audio from memory.
-
-    Raises:
-      DriverError: If there is any audio output port playing audio from memory.
-    """
-    for output_port in self.GetSupportedOutputs():
-      if (self.HasAudioSupport(output_port) and
-          self._flows[output_port].is_playing_audio_from_memory):
-        raise DriverError(
-            'Chameleon is playing audio from memory from port #%d', output_port)
-
   @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id):
     """Starts capturing audio.
 
-    Since input and output share AudioSourceController, playback from memory
-    and recording from rx/codec can not happen at the same time.
-
     Args:
       port_id: The ID of the audio input port.
     """
-    self._CheckNotStreaming()
     self._SelectInput(port_id)
     logging.info('Start capturing audio from port #%d', port_id)
     self._flows[port_id].StartCapturingAudio()
@@ -766,8 +738,6 @@ class ChameleondDriver(ChameleondInterface):
     """Playing audio data from an output port.
 
     Unwrap audio data and play that data from port_id port.
-    Since input and output share AudioSourceController, playback from memory
-    and recording from rx/codec can not happen at the same time.
 
     Args:
       port_id: The ID of the output connector.
@@ -782,7 +752,6 @@ class ChameleondDriver(ChameleondInterface):
     Raises:
       DriverError: There is any audio input port recording.
     """
-    self._CheckNotCapturingAudio()
     self._SelectOutput(port_id)
     logging.info('Start playing audio from port #%d', port_id)
     self._flows[port_id].StartPlayingAudioData((data.data, data_format))

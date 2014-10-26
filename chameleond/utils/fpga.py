@@ -40,7 +40,7 @@ class FpgaController(object):
     self.vdump0 = VideoDumper(0)
     self.vdump1 = VideoDumper(1)
     self.adump = AudioDumper()
-    self.asrc = AudioSourceController()
+    self.aroute = AudioRouteController()
     self.astream = AudioStreamController()
     self.aiis = AudioI2SController()
     self.hdmi_edid = EdidController(EdidController.HDMI_BASE)
@@ -461,10 +461,10 @@ class EdidController(object):
 #                        |    |     |     |
 #                        V    V     V     V
 #                      ---------------------
-#                     |AudioSourceController|
+#                     | AudioRouteController|
 #                      ---------------------
-#                               |
-#                       ________|__________
+#                             |   |
+#                       ______|   |________
 #       (8-channel)    |                   | (8-channel)
 #                      V                   V
 #             ------------------      -----------
@@ -478,8 +478,6 @@ class EdidController(object):
 #                      |
 #                      V
 #                   LineOut
-#
-# TODO(cychiang): Update this chart and routing using 20141016 fpga image.
 
 
 class AudioDumperError(Exception):
@@ -648,7 +646,7 @@ class AudioDumper(object):
 
 
 class AudioSource(object):
-  """Audio sources available on audio source controller."""
+  """Audio inputs available on audio source controller."""
   # Receives audio data from DP1, DP2 and HDMI.
   RX_I2S = 'I2S Receiver'
   # Audio generator.
@@ -659,69 +657,120 @@ class AudioSource(object):
   MEMORY = 'Audio streamer'
 
 
-class AudioSourceControllerError(Exception):
-  """Exception raised when any error on AudioSourceController."""
+class AudioDestination(object):
+  """Audio destinations available on audio source controller."""
+  # Sends audio data to I2S controller.
+  I2S = 'I2S controller'
+  # Sends audio data to audio dumper.
+  DUMPER = 'Audio dumper'
+
+
+class AudioRouteControllerError(Exception):
+  """Exception raised when any error on AudioRouteController."""
   pass
 
 
-class AudioSourceController(object):
-  """A class to control audio source controller."""
+class AudioRouteController(object):
+  """A class to control audio source controller.
+
+  As shown in audio routing graph, this controller controls two destinations in
+  AudioDestination. They can be independently selected from four sources in
+  AudioSource.
+  """
   _REGS_BASE = 0xff213000
 
   # Output selection register
-  _REG_OUTPUT_SELECT = 0x0
-  _VALUE_OUTPUT_SELECT = {
+  _REG_INPUT_SELECT = 0x0
+  _VALUES_INPUT_SELECT = {
       AudioSource.RX_I2S: 0,
       AudioSource.GENERATOR: 1,
       AudioSource.CODEC: 2,
       AudioSource.MEMORY: 3}
 
+  _MASKS_INPUT_SELECT = {
+      AudioDestination.I2S: 0b00000011,
+      AudioDestination.DUMPER: 0b00001100}
+
+  _SHIFTS_INPUT_SELECT = {
+      AudioDestination.I2S: 0,
+      AudioDestination.DUMPER: 2}
+
   _REG_GENERATOR_ENABLE = 0x4
   _BIT_GENERATOR_ENABLE = 1
 
   def __init__(self):
-    """Constructs an AudioSourceController object."""
+    """Constructs an AudioRouteController object."""
     self._memory = mem.MemoryForController
 
-  def SelectFromInput(self, input_id):
-    """Selects audio source given input_id.
+  def SetupRouteFromInputToDumper(self, input_id):
+    """Sets up audio source given input_id for audio dumper.
 
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
-
-    Raises:
-      AudioSourceControllerError if input_id is not supported.
     """
-    if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
-      self._SelectAudioSource(AudioSource.RX_I2S)
-      return
-    if input_id in [ids.MIC, ids.LINEIN]:
-      # The audio codec needs us feed its I2S clock 48K when recording.
-      # Generator generates a fixed 48K clock once it is turned on and it
-      # is not controlled by divisor or volume control.
-      self.EnableGenerator(True)
-      self._SelectAudioSource(AudioSource.CODEC)
-      return
-    raise AudioSourceControllerError(
-        'input_id %s is not supported in AudioSourceController' % input_id)
+    self._SetupRouteFromInput(input_id, AudioDestination.DUMPER)
 
-  def SelectMemory(self):
-    """Selects memory as audio source."""
-    self._SelectAudioSource(AudioSource.MEMORY)
-
-  def _SelectAudioSource(self, audio_source):
-    """Selects audio source.
+  def SetupRouteFromInputToI2S(self, input_id):
+    """Sets up audio source given input_id for I2S controller.
 
     Args:
-      audio_source: An audio source in AudioSource.
+      input_id: The ID of the input connector. Check the value in ids.py.
     """
-    logging.info('Select audio source %r', audio_source)
-    self._memory.Write(
-        self._REGS_BASE + self._REG_OUTPUT_SELECT,
-        self._VALUE_OUTPUT_SELECT[audio_source])
+    # Check docstring of _EnableGenerator for the reason to enable generator.
+    self._EnableGenerator(True)
+    self._SetupRouteFromInput(input_id, AudioDestination.I2S)
 
-  def EnableGenerator(self, enable):
+  def _SetupRouteFromInput(self, input_id, destination):
+    """Sets up audio route given an input_id and a destination.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+      destination: A destination in AudioDestination.
+
+    Raises:
+      AudioRouteControllerError if input_id is not supported.
+    """
+    if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
+      self._SetupRoute(AudioSource.RX_I2S, destination)
+      return
+    if input_id in [ids.MIC, ids.LINEIN]:
+      self._SetupRoute(AudioSource.CODEC, destination)
+      return
+    raise AudioRouteControllerError(
+        'input_id %s is not supported in AudioRouteController' % input_id)
+
+  def SetupRouteFromMemoryToI2S(self):
+    """Sets up memory as audio source and I2S as destination."""
+    # Check docstring of _EnableGenerator for the reason to enable generator.
+    self._EnableGenerator(True)
+    self._SetupRoute(AudioSource.MEMORY, AudioDestination.I2S)
+
+  def _SetupRoute(self, source, destination):
+    """Sets up audio route given a source and a destination.
+
+    Args:
+      source: An audio source in AudioSource.
+      destination: An audio destination in AudioDestination.
+    """
+    logging.info('Select audio source: %r, destination: %r',
+                 source, destination)
+    old_value = self._memory.Read(
+        self._REGS_BASE + self._REG_INPUT_SELECT)
+    # Only modifies bits in self._MASKS_INPUT_SELECT[destination].
+    new_value = (
+        (old_value & ~self._MASKS_INPUT_SELECT[destination]) |
+        (self._VALUES_INPUT_SELECT[source] <<
+         self._SHIFTS_INPUT_SELECT[destination]))
+
+    self._memory.Write(
+        self._REGS_BASE + self._REG_INPUT_SELECT, new_value)
+
+  def _EnableGenerator(self, enable):
     """Enables generator.
+
+    The audio codec needs us feed its I2S clock 48K when recording/playing
+    audio. Generator generates a fixed 48K clock once it is turned on and it
+    is not controlled by divisor or volume control.
 
     Args:
       enable: True to enable.

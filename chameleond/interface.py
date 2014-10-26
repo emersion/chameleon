@@ -438,8 +438,6 @@ class ChameleondInterface(object):
     """Playing audio data from an output port.
 
     Unwrap audio data and play that data from output_id port.
-    Since input and output share AudioSourceController, playback from memory
-    and recording from rx/codec can not happen at the same time.
 
     Args:
       port_id: The ID of the output connector.

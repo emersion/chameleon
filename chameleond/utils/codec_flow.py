@@ -113,7 +113,7 @@ class InputCodecFlow(CodecFlow):
   def Select(self):
     """Selects the codec flow to set the proper codec path and FPGA paths."""
     logging.info('Select InputCodecFlow for input id #%d.', self._port_id)
-    self._fpga.asrc.SelectFromInput(self._port_id)
+    self._fpga.aroute.SetupRouteFromInputToDumper(self._port_id)
     self._audio_codec.SelectInput(self._CODEC_INPUTS[self._port_id])
 
   def GetConnectorType(self):
@@ -181,7 +181,7 @@ class OutputCodecFlow(CodecFlow):
     """
     logging.info('Start OutputFlow #%d to echo input source #%d.',
                   self._port_id, source_id)
-    self._fpga.asrc.SelectFromInput(source_id)
+    self._fpga.aroute.SetupRouteFromInputToI2S(source_id)
     self._fpga.aiis.Enable()
 
   def StartPlayingAudioData(self, audio_data):
@@ -197,7 +197,7 @@ class OutputCodecFlow(CodecFlow):
         format: The dict representation of AudioDataFormat. Refer to docstring
           of utils.audio.AudioDataFormat for detail.
     """
-    self._fpga.asrc.SelectMemory()
+    self._fpga.aroute.SetupRouteFromMemoryToI2S()
     self._fpga.aiis.Enable()
     self._audio_stream_manager.StartPlayingAudio(audio_data)
 
