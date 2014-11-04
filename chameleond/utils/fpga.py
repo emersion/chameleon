@@ -408,8 +408,7 @@ class EdidController(object):
   HDMI_BASE = 0xff217000
   VGA_BASE = 0xff219000
   _REG_CTRL = 0
-  _BIT_RESET = 0
-  _BIT_OPERATE = 1
+  _BIT_ENABLE = 1
   _EDID_MEM = 0x100
 
   _EDID_SIZE = 256
@@ -423,6 +422,14 @@ class EdidController(object):
     self._memory = mem.MemoryForController
     self._edid_base = edid_base
 
+  def Disable(self):
+    """Disables the EDID response."""
+    self._memory.ClearMask(self._edid_base + self._REG_CTRL, self._BIT_ENABLE)
+
+  def Enable(self):
+    """Enables the EDID response."""
+    self._memory.SetMask(self._edid_base + self._REG_CTRL, self._BIT_ENABLE)
+
   def WriteEdid(self, data):
     """Writes the EDID content.
 
@@ -432,7 +439,6 @@ class EdidController(object):
     for offset in range(0, len(data), 4):
       value = struct.unpack('>I', data[offset:offset+4])[0]
       self._memory.Write(self._edid_base + self._EDID_MEM + offset, value)
-    self._memory.Write(self._edid_base + self._REG_CTRL, self._BIT_OPERATE)
 
   def ReadEdid(self):
     """Reads the EDID content.

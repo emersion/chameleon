@@ -228,7 +228,15 @@ class VgaEdid(object):
     Args:
       fpga_ctrl: The FpgaController object.
     """
-    self._edid = fpga_ctrl.vga_edid
+    self._vga_edid = fpga_ctrl.vga_edid
+
+  def Disable(self):
+    """Disables the EDID response."""
+    self._vga_edid.Disable()
+
+  def Enable(self):
+    """Enables the EDID response."""
+    self._vga_edid.Enable()
 
   def WriteEdid(self, data):
     """Writes the EDID content.
@@ -236,7 +244,7 @@ class VgaEdid(object):
     Args:
       data: The EDID control to write.
     """
-    self._edid.WriteEdid(data)
+    self._vga_edid.WriteEdid(data)
 
   def ReadEdid(self):
     """Reads the EDID content.
@@ -244,4 +252,4 @@ class VgaEdid(object):
     Returns:
       A byte array of EDID data.
     """
-    return self._edid.ReadEdid()
+    return self._vga_edid.ReadEdid()

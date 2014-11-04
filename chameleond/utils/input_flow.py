@@ -524,6 +524,7 @@ class VgaInputFlow(InputFlow):
 
   def Plug(self):
     """Asserts HPD line to high, emulating plug."""
+    self._edid.Enable()
     # For VGA, unblock the RGB source to emulate plug.
     self._mux_io.ClearOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 
@@ -531,6 +532,7 @@ class VgaInputFlow(InputFlow):
     """Deasserts HPD line to low, emulating unplug."""
     # For VGA, block the RGB source to emulate unplug.
     self._mux_io.SetOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
+    self._edid.Disable()
 
   def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
           repeat_count, end_level):
