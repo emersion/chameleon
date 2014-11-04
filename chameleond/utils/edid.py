@@ -124,17 +124,22 @@ class HdmiEdid(object):
     """
     self._rx = main_i2c_bus.GetSlave(rx.HdmiRx.SLAVE_ADDRESSES[0])
     self._fram = main_i2c_bus.GetSlave(FRam.HDMI_SLAVE)
+    self._enabled_before_access = None
 
   def _BeginAccess(self):
     """Performs the sequence before EDID access."""
     # Disable the EDID response during the update.
-    self._rx.DisableEdid()
+    self._enabled_before_access = self._rx.IsEdidEnabled()
+    if self._enabled_before_access:
+      self._rx.DisableEdid()
     self._rx.SetEdidSlave(FRam.HDMI_SLAVE)
     self._rx.EnableEdidAccess()
 
   def _EndAccess(self):
     """Performs the sequence after EDID access."""
     self._rx.DisableEdidAccess()
+    if self._enabled_before_access:
+      self._rx.EnableEdid()
 
   def _ValidateEdid(self, data):
     """Validates the EDID on the HDMI receiver.
@@ -149,6 +154,13 @@ class HdmiEdid(object):
       checksum = ((-sum(map(ord, data[128 * block:128 * (block + 1) - 1])))
                   & 0xff)
       self._rx.UpdateEdidChecksum(block, checksum)
+
+  def Disable(self):
+    """Disables the EDID response."""
+    self._rx.DisableEdid()
+
+  def Enable(self):
+    """Enables the EDID response."""
     self._rx.EnableEdid()
 
   def WriteEdid(self, data):

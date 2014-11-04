@@ -94,8 +94,9 @@ class HdmiRx(i2c.I2cSlave):
   _BIT_SP_OUT_MODE = 1 << 0
 
   _REG_EDID_CONFIG = 0xc0
-  _VALUE_ENABLE_EDID_P0 = 0x06  # DDC monitor; disable P1; enable P0.
-  _VALUE_DISABLE_EDID = 0x03  # No DDC monitor; disable P1; disable P0.
+  _BIT_DDC_MONITOR = 1 << 2
+  _BIT_DISABLE_SHADOW_P1 = 1 << 1
+  _BIT_DISABLE_SHADOW_P0 = 1 << 0
 
   # Registers for checksum
   _REG_P0_B0_SUM = 0xc4  # Port 0, block 0
@@ -193,13 +194,19 @@ class HdmiRx(i2c.I2cSlave):
     """Disables the access of the EDID RAM content."""
     self.ClearMask(self._REG_EDID_SLAVE_ADDR, self._BIT_ENABLE_EDID_ACCESS)
 
+  def IsEdidEnabled(self):
+    """Returns True if the receiver is enabled to respond EDID request."""
+    return bool(self.Get(self._REG_EDID_CONFIG) & self._BIT_DDC_MONITOR)
+
   def EnableEdid(self):
-    """Enables the receiver to monitor DDC and response EDID."""
-    self.Set(self._VALUE_ENABLE_EDID_P0, self._REG_EDID_CONFIG)
+    """Enables the receiver to monitor DDC and respond EDID."""
+    self.Set(self._BIT_DDC_MONITOR | self._BIT_DISABLE_SHADOW_P1,
+             self._REG_EDID_CONFIG)
 
   def DisableEdid(self):
-    """Disables the receiver to monitor DDC and response EDID."""
-    self.Set(self._VALUE_DISABLE_EDID, self._REG_EDID_CONFIG)
+    """Disables the receiver to monitor DDC and respond EDID."""
+    self.Set(self._BIT_DISABLE_SHADOW_P1 | self._BIT_DISABLE_SHADOW_P0,
+             self._REG_EDID_CONFIG)
 
   def UpdateEdidChecksum(self, block_num, checksum):
     """Updates the checksum of the EDID block.
