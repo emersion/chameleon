@@ -72,14 +72,40 @@ class DpEdid(object):
     self._input_id = input_id
     self._mux_io = main_i2c_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
     self._fram = main_i2c_bus.GetSlave(FRam.DP_SLAVE)
+    self._on_main_before_access = None
+
+  def _SwitchRamToMain(self):
+    """Switches the F-RAM to the main I2C bus."""
+    self._mux_io.SetOutputMask(self._EDID_SRAM_MUXES[self._input_id])
+
+  def _SwitchRamToRx(self):
+    """Switches the F-RAM to the I2C bus behind receiver for EDID."""
+    self._mux_io.ClearOutputMask(self._EDID_SRAM_MUXES[self._input_id])
+
+  def _IsRamOnMain(self):
+    """Returns True if the F-RAM is on the main I2C bus; otherwise, False."""
+    return bool(self._mux_io.GetOutput() &
+                self._EDID_SRAM_MUXES[self._input_id])
+
+  def Disable(self):
+    """Disables the EDID response."""
+    self._SwitchRamToMain()
+
+  def Enable(self):
+    """Enables the EDID response."""
+    self._SwitchRamToRx()
 
   def _BeginAccess(self):
     """Performs the sequence before EDID access."""
-    self._mux_io.SetOutputMask(self._EDID_SRAM_MUXES[self._input_id])
+    # Switch F-RAM to the main I2C main before access.
+    self._on_main_before_access = self._IsRamOnMain()
+    if not self._on_main_before_access:
+      self._SwitchRamToMain()
 
   def _EndAccess(self):
     """Performs the sequence after EDID access."""
-    self._mux_io.ClearOutputMask(self._EDID_SRAM_MUXES[self._input_id])
+    if not self._on_main_before_access:
+      self._SwitchRamToRx()
 
   def WriteEdid(self, data):
     """Writes the EDID content.

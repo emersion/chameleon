@@ -300,11 +300,13 @@ class DpInputFlow(InputFlow):
 
   def Plug(self):
     """Asserts HPD line to high, emulating plug."""
+    self._edid.Enable()
     self._fpga.hpd.Plug(self._input_id)
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
     self._fpga.hpd.Unplug(self._input_id)
+    self._edid.Disable()
 
   def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
           repeat_count, end_level):
