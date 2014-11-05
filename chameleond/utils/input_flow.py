@@ -63,8 +63,6 @@ class InputFlow(object):
     self._power_io = self._main_bus.GetSlave(io.PowerIo.SLAVE_ADDRESSES[0])
     self._mux_io = self._main_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
     self._rx = self._main_bus.GetSlave(self._RX_SLAVES[self._input_id])
-    self._audio_capture_manager = audio_utils.AudioCaptureManager(
-        self._fpga.adump)
     self._frame_manager = frame_manager.FrameManager(
         input_id, self._GetEffectiveVideoDumpers())
 
@@ -93,7 +91,6 @@ class InputFlow(object):
     self._fpga.vpass.Select(self._input_id)
     self._fpga.vdump0.Select(self._input_id, self.IsDualPixelMode())
     self._fpga.vdump1.Select(self._input_id, self.IsDualPixelMode())
-    self._fpga.aroute.SetupRouteFromInputToDumper(self._input_id)
     self.WaitVideoOutputStable()
 
   def GetPixelDumpArgs(self):
@@ -150,29 +147,6 @@ class InputFlow(object):
     self.WaitVideoOutputStable()
     self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
                                           timeout)
-  @property
-  def is_capturing_audio(self):
-    """Is input flow capturing audio?"""
-    return self._audio_capture_manager.is_capturing
-
-  def StartCapturingAudio(self):
-    """Starts capturing audio."""
-    self._audio_capture_manager.StartCapturingAudio()
-
-  def StopCapturingAudio(self):
-    """Stops capturing audio.
-
-    Returns:
-      A tuple (data, format).
-      data: The captured audio data.
-      format: The dict representation of AudioDataFormat. Refer to docstring
-        of utils.audio.AudioDataFormat for detail.
-
-    Raises:
-      AudioCaptureManagerError: If captured time or page exceeds the limit.
-      AudioCaptureManagerError: If there is no captured data.
-    """
-    return self._audio_capture_manager.StopCapturingAudio()
 
   def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
                          hash_buffer_limit):
@@ -276,6 +250,51 @@ class InputFlow(object):
     raise NotImplementedError('WriteEdid')
 
 
+class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
+  """An abstraction of an input flow which supports audio."""
+
+  def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
+    """Constructs a InputFlowWithAudio object.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+      main_i2c_bus: The main I2cBus object.
+      fpga_ctrl: The FpgaController object.
+    """
+    super(InputFlowWithAudio, self).__init__(input_id, main_i2c_bus, fpga_ctrl)
+    self._audio_capture_manager = audio_utils.AudioCaptureManager(
+        self._fpga.adump)
+
+  def Select(self):
+    """Selects the input flow to set the proper muxes and FPGA paths."""
+    super(InputFlowWithAudio, self).Select()
+    self._fpga.aroute.SetupRouteFromInputToDumper(self._input_id)
+
+  @property
+  def is_capturing_audio(self):
+    """Is input flow capturing audio?"""
+    return self._audio_capture_manager.is_capturing
+
+  def StartCapturingAudio(self):
+    """Starts capturing audio."""
+    self._audio_capture_manager.StartCapturingAudio()
+
+  def StopCapturingAudio(self):
+    """Stops capturing audio.
+
+    Returns:
+      A tuple (data, format).
+      data: The captured audio data.
+      format: The dict representation of AudioDataFormat. Refer to docstring
+        of utils.audio.AudioDataFormat for detail.
+
+    Raises:
+      AudioCaptureManagerError: If captured time or page exceeds the limit.
+      AudioCaptureManagerError: If there is no captured data.
+    """
+    return self._audio_capture_manager.StopCapturingAudio()
+
+
 class DpInputFlow(InputFlow):
   """An abstraction of the entire flow for DisplayPort."""
 
@@ -356,7 +375,7 @@ class DpInputFlow(InputFlow):
     return True
 
 
-class HdmiInputFlow(InputFlow):
+class HdmiInputFlow(InputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
 
   _CONNECTOR_TYPE = 'HDMI'
