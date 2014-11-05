@@ -582,6 +582,10 @@ class VgaInputFlow(InputFlow):
     """
     pass
 
+  def SetVgaMode(self, mode):
+    """Sets the mode for VGA monitor."""
+    self._rx.SetMode(mode)
+
   def ReadEdid(self):
     """Reads the EDID content."""
     return self._edid.ReadEdid()

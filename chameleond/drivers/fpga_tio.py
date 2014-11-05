@@ -242,6 +242,19 @@ class ChameleondDriver(ChameleondInterface):
     return ids.IsVideoPort(port_id)
 
   @_VideoMethod
+  def SetVgaMode(self, port_id, mode):
+    """Sets the mode for VGA monitor.
+
+    Args:
+      port_id: The ID of the VGA port.
+      mode: A string of the mode name, e.g. 'PC_1920x1080x60'.
+    """
+    if port_id == ids.VGA:
+      self._flows[port_id].SetVgaMode(mode)
+    else:
+      raise DriverError('SetVgaMode only works on VGA port.')
+
+  @_VideoMethod
   def WaitVideoInputStable(self, port_id, timeout=None):
     """Waits the video input stable or timeout.
 

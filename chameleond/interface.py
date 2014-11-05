@@ -137,6 +137,15 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('HasVideoSupport')
 
+  def SetVgaMode(self, port_id, mode):
+    """Sets the mode for VGA monitor.
+
+    Args:
+      port_id: The ID of the VGA port.
+      mode: A string of the mode name, e.g. 'PC_1920x1080x60'.
+    """
+    raise NotImplementedError('SetVgaMode')
+
   def WaitVideoInputStable(self, port_id, timeout=None):
     """Waits the video input stable or timeout.
 
