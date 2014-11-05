@@ -212,7 +212,7 @@ class InputFlow(object):
     pass
 
   def WaitVideoInputStable(self, unused_timeout=None):
-    """Waits the video input stable or timeout."""
+    """Waits the video input stable or timeout. Returns success or not."""
     return True
 
   def WaitVideoOutputStable(self, unused_timeout=None):
@@ -346,7 +346,7 @@ class DpInputFlow(InputFlow):
     self._edid.WriteEdid(data)
 
   def WaitVideoInputStable(self, unused_timeout=None):
-    """Waits the video input stable or timeout."""
+    """Waits the video input stable or timeout. Returns success or not."""
     # TODO(waihong): Implement this method.
     return True
 
@@ -449,7 +449,7 @@ class HdmiInputFlow(InputFlow):
       logging.warn('Skip doing receiver FSM as video input not stable.')
 
   def WaitVideoInputStable(self, timeout=None):
-    """Waits the video input stable or timeout."""
+    """Waits the video input stable or timeout. Returns success or not."""
     if timeout is None:
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
     try:
@@ -494,6 +494,8 @@ class VgaInputFlow(InputFlow):
 
   _CONNECTOR_TYPE = 'VGA'
   _IS_DUAL_PIXEL_MODE = False
+  _DELAY_CHECKING_SYNC_PROBE = 0.1
+  _TIMEOUT_CHECKING_SYNC = 5
 
   def __init__(self, *args):
     super(VgaInputFlow, self).__init__(*args)
@@ -505,19 +507,30 @@ class VgaInputFlow(InputFlow):
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
-    return self._rx.IsSyncDetected()
+    # VGA has no HPD to detect hot-plug. We check the source signal
+    # to make that decision. So plug it and wait a while to see any
+    # signal received. It does not work if DUT is not well-behaved.
+    plugged_before_check = self.IsPlugged()
+    if not plugged_before_check:
+      self.Plug()
+    is_stable = self.WaitVideoInputStable()
+    if not plugged_before_check:
+      self.Unplug()
+    return is_stable
 
   def IsPlugged(self):
     """Returns if the HPD line is plugged."""
-    return True
+    return not bool(self._mux_io.GetOutput() & io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 
   def Plug(self):
     """Asserts HPD line to high, emulating plug."""
-    pass
+    # For VGA, unblock the RGB source to emulate plug.
+    self._mux_io.ClearOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
-    pass
+    # For VGA, block the RGB source to emulate unplug.
+    self._mux_io.SetOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 
   def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
           repeat_count, end_level):
@@ -555,12 +568,19 @@ class VgaInputFlow(InputFlow):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
 
-  # TODO(waihong): Implement the following methods for VGA.
-
-  def WaitVideoInputStable(self, unused_timeout=None):
-    """Waits the video input stable or timeout."""
+  def WaitVideoInputStable(self, timeout=None):
+    """Waits the video input stable or timeout. Returns success or not."""
+    if timeout is None:
+      timeout = self._TIMEOUT_CHECKING_SYNC
+    try:
+      # Check if H-Sync/V-Sync recevied from the source.
+      common.WaitForCondition(self._rx.IsSyncDetected, True,
+          self._DELAY_CHECKING_SYNC_PROBE, timeout)
+    except common.TimeoutError:
+      return False
     return True
 
   def WaitVideoOutputStable(self, unused_timeout=None):
     """Waits the video output stable or timeout."""
+    # TODO(waihong): Implement this method.
     return True
