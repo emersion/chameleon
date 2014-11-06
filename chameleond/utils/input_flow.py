@@ -190,7 +190,7 @@ class InputFlow(object):
     return True
 
   def WaitVideoOutputStable(self, unused_timeout=None):
-    """Waits the video output stable or timeout."""
+    """Waits the video output stable or timeout. Returns success or not."""
     return True
 
   def IsDualPixelMode(self):
@@ -370,7 +370,7 @@ class DpInputFlow(InputFlow):
     return True
 
   def WaitVideoOutputStable(self, unused_timeout=None):
-    """Waits the video output stable or timeout."""
+    """Waits the video output stable or timeout. Returns success or not."""
     # TODO(waihong): Implement this method.
     return True
 
@@ -497,7 +497,7 @@ class HdmiInputFlow(InputFlowWithAudio):
       return False
 
   def WaitVideoOutputStable(self, timeout=None):
-    """Waits the video output stable or timeout."""
+    """Waits the video output stable or timeout. Returns success or not."""
     if timeout is None:
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
     try:
@@ -513,8 +513,9 @@ class VgaInputFlow(InputFlow):
 
   _CONNECTOR_TYPE = 'VGA'
   _IS_DUAL_PIXEL_MODE = False
-  _DELAY_CHECKING_SYNC_PROBE = 0.1
-  _TIMEOUT_CHECKING_SYNC = 5
+  _DELAY_CHECKING_STABLE_PROBE = 0.1
+  _TIMEOUT_CHECKING_STABLE = 5
+  _DELAY_RESOLUTION_PROBE = 0.05
 
   def __init__(self, *args):
     super(VgaInputFlow, self).__init__(*args)
@@ -592,16 +593,30 @@ class VgaInputFlow(InputFlow):
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout. Returns success or not."""
     if timeout is None:
-      timeout = self._TIMEOUT_CHECKING_SYNC
+      timeout = self._TIMEOUT_CHECKING_STABLE
     try:
       # Check if H-Sync/V-Sync recevied from the source.
       common.WaitForCondition(self._rx.IsSyncDetected, True,
-          self._DELAY_CHECKING_SYNC_PROBE, timeout)
+          self._DELAY_CHECKING_STABLE_PROBE, timeout)
     except common.TimeoutError:
       return False
     return True
 
-  def WaitVideoOutputStable(self, unused_timeout=None):
-    """Waits the video output stable or timeout."""
-    # TODO(waihong): Implement this method.
+  def _IsResolutionValid(self):
+    """Returns True if the resolution from FPGA is valid and not floating."""
+    resolution1 = self._frame_manager.ComputeResolution()
+    time.sleep(self._DELAY_RESOLUTION_PROBE)
+    resolution2 = self._frame_manager.ComputeResolution()
+    return resolution1 == resolution2 and 0 not in resolution1
+
+  def WaitVideoOutputStable(self, timeout=None):
+    """Waits the video output stable or timeout. Returns success or not."""
+    if timeout is None:
+      timeout = self._TIMEOUT_CHECKING_STABLE
+    try:
+      # Wait a valid resolution and not floating.
+      common.WaitForCondition(self._IsResolutionValid, True,
+          self._DELAY_CHECKING_STABLE_PROBE, timeout)
+    except common.TimeoutError:
+      return False
     return True
