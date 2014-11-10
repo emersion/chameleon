@@ -21,6 +21,19 @@ class DpRx(i2c.I2cSlave):
   SLAVE_ADDRESSES = (0x58, 0x59)
 
   _AUDIO_RESET_DELAY = 0.001
+  _VIDEO_RESET_DELAY = 0.001
+
+  _REG_INPUT_STATUS = 0x11
+  _BIT_VIDEO_STABLE = 1 << 4
+
+  _REG_FUNC_RESET = 0xEA
+  _REG_PLL_RESET = 0xB3  # This is at bank 1
+  _BIT_RESET_VIDEO = 0x02
+
+  _REG_HACTIVE_H = 0x9C
+  _REG_HACTIVE_L = 0x9B
+  _REG_VACTIVE_H = 0xA2
+  _REG_VACTIVE_L = 0xA1
 
   def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
@@ -31,49 +44,86 @@ class DpRx(i2c.I2cSlave):
       self.SetSinglePixelMode()
 
     # TODO(waihong): Declare constants for the registers and values.
-    self.Set(0x02, 0x05)  # bank 0
+    self._SwitchBank(0)
     self.Set(0x01, 0xe3)  # make interrupt output polarity active low to
                           # match hdmi
     self.Set(0xe0, 0xd2)  # video fifo gain???
     self.Set(0xc5, 0xcc)  # [3:0] CR Wait Time x 100us???
                           # This makes 2560x1600 work
-    self.Set(0x03, 0x05)  # bank 1
+    self._SwitchBank(1)
     self.Set(0xee, 0xa5)  # the driving strength for video
                           # (ITE firmware uses 0xc8)
     self.Set(0x03, 0xb8)  # ?
 
     # Initialize the audio path.
-    self.Set(0x03, 0x05)
+    self._SwitchBank(1)
     self.Set(0xee, 0xa6) # max driving strength for audio
     self.Set(0x04, 0xb3) # reset audio pll
-    self.Set(0x02, 0x05)
+    self._SwitchBank(0)
     self.Set(0x04, 0xea) # reset audio module
     time.sleep(self._AUDIO_RESET_DELAY)
-    self.Set(0x03, 0x05)
+    self._SwitchBank(1)
     self.Set(0x00, 0xb3)
-    self.Set(0x02, 0x05)
+    self._SwitchBank(0)
     self.Set(0x00, 0xea)
 
   def SetDualPixelMode(self):
     """Uses dual pixel mode which occupes 2 video paths in FPGA."""
-    self.Set(0x02, 0x05)  # bank 0
+    self._SwitchBank(0)
     self.Set(0x6c, 0xed)  # power up dual pixel mode path
     self.Set(0x06, 0xef)  # tune dual pixel dp timing
-    self.Set(0x03, 0x05)  # bank 1
+    self._SwitchBank(1)
     self.Set(0x11, 0xa2)  # bit 0 reset FIFO
     self.Set(0x10, 0xa2)  # bit 4 enables dual pixel mode
+    self._SwitchBank(0)
 
   def SetSinglePixelMode(self):
     """Uses single pixel mode which occupes 1 video path in FPGA."""
-    self.Set(0x02, 0x05)  # bank 0
+    self._SwitchBank(0)
     self.Set(0xec, 0xed)  # power down double pixel mode path
     self.Set(0x07, 0xef)  # tune single pixel dp timing
-    self.Set(0x03, 0x05)  # bank 1
+    self._SwitchBank(1)
     self.Set(0x00, 0xa2)  # bit 4 disables dual pixel mode
+    self._SwitchBank(0)
 
   def IsCablePowered(self):
     """Returns if the cable is powered or not."""
     return bool(self.Get(0xc8) & (1 << 3))
+
+  def IsVideoInputStable(self):
+    """Returns whether the video input is stable."""
+    input_status = self.Get(self._REG_INPUT_STATUS)
+    return bool(input_status & self._BIT_VIDEO_STABLE)
+
+  def _SwitchBank(self, bank):
+    """Switch register bank."""
+    assert bank == 0 or bank == 1
+    self.Set(0x02 + bank, 0x05)
+
+  def ResetVideoLogic(self):
+    """Resets the video logic."""
+    logging.info('DpRx: reset video...')
+    self._SwitchBank(1)
+    self.SetMask(self._REG_PLL_RESET, self._BIT_RESET_VIDEO)
+    self._SwitchBank(0)
+    self.SetMask(self._REG_FUNC_RESET, self._BIT_RESET_VIDEO)
+
+    time.sleep(self._VIDEO_RESET_DELAY)
+
+    self._SwitchBank(1)
+    self.ClearMask(self._REG_PLL_RESET, self._BIT_RESET_VIDEO)
+    self._SwitchBank(0)
+    self.ClearMask(self._REG_FUNC_RESET, self._BIT_RESET_VIDEO)
+
+  def GetResolution(self):
+    """Gets the resolution reported by receiver."""
+    hactive_h = self.Get(self._REG_HACTIVE_H)
+    hactive_l = self.Get(self._REG_HACTIVE_L)
+    vactive_h = self.Get(self._REG_VACTIVE_H)
+    vactive_l = self.Get(self._REG_VACTIVE_L)
+    width = hactive_h << 8 | hactive_l
+    height = vactive_h << 8 | vactive_l
+    return (width, height)
 
 
 class HdmiRx(i2c.I2cSlave):

@@ -372,6 +372,11 @@ class DpInputFlow(InputFlow):
   _CONNECTOR_TYPE = 'DP'
   _IS_DUAL_PIXEL_MODE = False
 
+  _DELAY_VIDEO_MODE_PROBE = 1.0
+  _TIMEOUT_VIDEO_STABLE_PROBE = 5
+
+  _HPD_PULSE_WIDTH = 0.1
+
   _AUX_BYPASS_MUXES = {
     ids.DP1: io.MuxIo.MASK_DP1_AUX_BP_L,
     ids.DP2: io.MuxIo.MASK_DP2_AUX_BP_L
@@ -431,19 +436,77 @@ class DpInputFlow(InputFlow):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
 
-  def WaitVideoInputStable(self, unused_timeout=None):
-    """Waits the video input stable or timeout. Returns success or not."""
-    # TODO(waihong): Implement this method.
+  def WaitVideoInputStable(self, timeout=None):
+    """Waits the video input stable or timeout."""
+    if timeout is None:
+      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+
+    try:
+      common.WaitForCondition(self._rx.IsVideoInputStable, True,
+          self._DELAY_VIDEO_MODE_PROBE, timeout)
+      return True
+    except common.TimeoutError:
+      return False
+
+  def _IsFrameLocked(self):
+    """Returns whether the FPGA frame is locked.
+
+    It compares the resolution reported from the receiver with the FPGA.
+
+    Returns:
+      True if the frame is locked; otherwise, False.
+    """
+    resolution_fpga = self._frame_manager.ComputeResolution()
+    resolution_rx = self._rx.GetResolution()
+    if resolution_fpga == resolution_rx:
+      logging.info('same resolution: %dx%d', *resolution_fpga)
+      return True
+    else:
+      logging.info('diff resolution: fpga:%dx%d != rx:%dx%d',
+                   *(resolution_fpga + resolution_rx))
+      return False
+
+  def WaitVideoOutputStable(self, timeout=None):
+    """Waits the video output stable or timeout."""
+    if timeout is None:
+      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+    try:
+      common.WaitForCondition(self._IsFrameLocked, True,
+          self._DELAY_VIDEO_MODE_PROBE, timeout)
+    except common.TimeoutError:
+      return False
     return True
 
-  def WaitVideoOutputStable(self, unused_timeout=None):
-    """Waits the video output stable or timeout.
+  def GetResolution(self):
+    """Gets the resolution of the video flow."""
+    if self.WaitVideoOutputStable():
+      # Resolution from RX is more reliable than that from FPGA
+      return self._rx.GetResolution()
+    raise InputFlowError('Failed to get resolution. Rx:%r, FPGA:%r',
+        self._rx.GetResolution(), self._frame_manager.ComputeResolution())
 
-    Raises:
-      InputFlowError if timeout.
+  def Do_FSM(self):
+    """Does the Finite-State-Machine to ensure the input flow ready.
+
+    The receiver requires to do the FSM in order to clear its state, in case
+    of some events happended, like mode change, power reattach, etc.
+
+    It should be called before doing any post-receiver-action, like capturing
+    frames.
     """
-    # TODO(waihong): Implement this method.
-    pass
+    if not self._rx.IsVideoInputStable() or not self._IsFrameLocked():
+      self._rx.ResetVideoLogic()
+      if not self.WaitVideoInputStable() or not self.WaitVideoOutputStable():
+        logging.info('Send DP HPD pulse to reset source...')
+        self._fpga.hpd.Unplug(self._input_id)
+        time.sleep(self._HPD_PULSE_WIDTH)
+        self._fpga.hpd.Plug(self._input_id)
+        if self.WaitVideoInputStable() and self.WaitVideoOutputStable():
+          logging.info('DP FSM done')
+        else:
+          logging.error('*** DP FSM failed')
+    else:
+      logging.info('Skip resetting DP rx.')
 
   def SetContentProtection(self, enable):
     """Sets the content protection state.
