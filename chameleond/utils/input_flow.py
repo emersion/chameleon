@@ -528,6 +528,7 @@ class VgaInputFlow(InputFlow):
   def __init__(self, *args):
     super(VgaInputFlow, self).__init__(*args)
     self._edid = edid.VgaEdid(self._fpga)
+    self._auto_vga_mode = True
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
@@ -596,7 +597,11 @@ class VgaInputFlow(InputFlow):
 
   def SetVgaMode(self, mode):
     """Sets the mode for VGA monitor."""
-    self._rx.SetMode(mode)
+    if mode.lower() == 'auto':
+      self._auto_vga_mode = True
+    else:
+      self._auto_vga_mode = False
+      self._rx.SetMode(mode)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -605,6 +610,23 @@ class VgaInputFlow(InputFlow):
   def WriteEdid(self, data):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
+
+  def Do_FSM(self):
+    """Does the Finite-State-Machine to ensure the input flow ready.
+
+    The receiver requires to do the FSM in order to clear its state, in case
+    of some events happended, like mode change, power reattach, etc.
+
+    It should be called before doing any post-receiver-action, like capturing
+    frames.
+    """
+    if self._auto_vga_mode:
+      # Detect the VGA mode and set it properly.
+      if self.WaitVideoInputStable():
+        self._rx.SetMode(self._rx.DetectMode())
+        self.WaitVideoOutputStable()
+      else:
+        logging.warn('Skip doing receiver FSM as video input not stable.')
 
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout. Returns success or not."""

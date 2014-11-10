@@ -225,7 +225,8 @@ class ChameleondDriver(ChameleondInterface):
 
     Args:
       port_id: The ID of the VGA port.
-      mode: A string of the mode name, e.g. 'PC_1920x1080x60'.
+      mode: A string of the mode name, e.g. 'PC_1920x1080x60'. Use 'auto'
+            to detect the VGA mode automatically.
     """
     if port_id == ids.VGA:
       self._flows[port_id].SetVgaMode(mode)

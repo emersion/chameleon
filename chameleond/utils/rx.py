@@ -272,8 +272,15 @@ class VgaRx(i2c.I2cSlave):
 
   _REG_SYNC_DETECT = 0x14
   _BIT_HSYNC_DETECTED = 1 << 7
+  _BIT_TV_MODE = 1 << 6
   _BIT_VSYNC_DETECTED = 1 << 4
   _BITS_SYNC_MASK = _BIT_HSYNC_DETECTED | _BIT_VSYNC_DETECTED
+
+  _REG_HSYNC_COUNTER_REFRESH = 0x8f
+  _BITS_HSYNC_COUNTER_REFRESH = 0x68
+
+  _REG_HSYNC_COUNTER_H = 0xac
+  _REG_HSYNC_COUNTER_L = 0xab
 
   _VGA_MODES = {
     'PC_576px50': [0x35, 0xf0, 0x68, 0x80, 0x20, 0x10, 0xf0, 0x80,
@@ -385,8 +392,54 @@ class VgaRx(i2c.I2cSlave):
     self.Set(0x08, 0x99)
     self.Set(0x0f, 0x86)  # Tweak: max driving strength
 
-    # TODO(waihong): Set the mode according to the current EDID.
-    self.SetMode('PC_1920x1080x60')
+  def _IsTvMode(self):
+    """Returns True if the current mode is a TV mode."""
+    return bool(self.Get(self._REG_SYNC_DETECT) & self._BIT_TV_MODE)
+
+  def DetectMode(self):
+    """Returns the current VGA mode."""
+    self.Set(self._BITS_HSYNC_COUNTER_REFRESH, self._REG_HSYNC_COUNTER_REFRESH)
+    hsync_counter = (((self.Get(self._REG_HSYNC_COUNTER_H) << 4) & 0xf00) +
+                     self.Get(self._REG_HSYNC_COUNTER_L))
+    if not self._IsTvMode():
+      # For simplification, this detection logic only works on 60Hz reflesh
+      # rate.
+      if hsync_counter >= 0x1a0 and hsync_counter < 0x240:
+        # Original driver is returning mode PC_640x480x60. But it does not
+        # work on the resolution 720x480. Changing to PC_480px60 works better.
+        mode = 'PC_480px60'
+      elif hsync_counter >= 0x240 and hsync_counter < 0x2d0:
+        mode = 'PC_800x600x60'
+      elif hsync_counter >= 0x2d0 and hsync_counter < 0x310:
+        mode = 'PC_720px60'
+      elif hsync_counter >= 0x310 and hsync_counter < 0x31d:
+        mode = 'PC_1360x768x60'
+      elif hsync_counter >= 0x31e and hsync_counter < 0x331:
+        mode = 'PC_1024x768x60'
+      elif hsync_counter >= 0x332 and hsync_counter < 0x352:
+        mode = 'PC_1280x800x60'
+      elif hsync_counter >= 0x3a0 and hsync_counter < 0x3a7:
+        mode = 'PC_1440x900x60'
+      elif hsync_counter >= 0x3c0 and hsync_counter < 0x400:
+        mode = 'PC_1280x960x60'
+      elif hsync_counter >= 0x420 and hsync_counter < 0x437:
+        mode = 'PC_1280x1024x60'
+      elif hsync_counter >= 0x440 and hsync_counter < 0x459:
+        mode = 'PC_1680x1050x60'
+      elif hsync_counter >= 0x459 and hsync_counter < 0x490:
+        mode = 'PC_1920x1080x60'
+      elif hsync_counter >= 0x4d0 and hsync_counter < 0x4d7:
+        mode = 'PC_1920x1200xReduce'
+      elif hsync_counter >= 0x4da and hsync_counter < 0x510:
+        mode = 'PC_1600x1200x60'
+      else:
+        raise RxError('Failed to detect the VGA mode, #hsync: %#x' %
+                      hsync_counter)
+    else:
+      raise RxError('Detected TV mode which is not supported yet.')
+
+    logging.info('Detected VGA mode: %s (#hsync: %#x)', mode, hsync_counter)
+    return mode
 
   def SetMode(self, mode):
     """Sets the VGA mode.
