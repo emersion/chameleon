@@ -45,6 +45,7 @@ class FpgaController(object):
     self.aiis = AudioI2SController()
     self.hdmi_edid = EdidController(EdidController.HDMI_BASE)
     self.vga_edid = EdidController(EdidController.VGA_BASE)
+    self.aux = AuxController()
 
 
 class HpdController(object):
@@ -1011,3 +1012,29 @@ class AudioI2SController(object):
     """Disables I2S data to codec output."""
     self._memory.ClearMask(self._REGS_BASE + self._REG_ENABLE,
                            self._BIT_ENABLE)
+
+class AuxController(object):
+  """A class to control the AUX channel handling."""
+  _REGS_BASE = 0xff215000
+
+  # Sets enable bit to 1 to enable the handling; 0 to disable.
+  _REG_ENABLE = 0x0
+  _BIT_ENABLE = 1
+
+  def __init__(self):
+    """Constructs an AuxController object."""
+    self._memory = mem.MemoryForController
+    # Disable the handling initially.
+    self.Disable()
+
+  def Enable(self):
+    """Enables the AUX channel handling."""
+    self._memory.SetMask(self._REGS_BASE + self._REG_ENABLE,
+                         self._BIT_ENABLE)
+    logging.info('FPGA AUX channel handling enabled')
+
+  def Disable(self):
+    """Disables the AUX channel handling."""
+    self._memory.ClearMask(self._REGS_BASE + self._REG_ENABLE,
+                           self._BIT_ENABLE)
+    logging.info('FPGA AUX channel handling disabled')

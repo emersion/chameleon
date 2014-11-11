@@ -372,6 +372,11 @@ class DpInputFlow(InputFlow):
   _CONNECTOR_TYPE = 'DP'
   _IS_DUAL_PIXEL_MODE = False
 
+  _AUX_BYPASS_MUXES = {
+    ids.DP1: io.MuxIo.MASK_DP1_AUX_BP_L,
+    ids.DP2: io.MuxIo.MASK_DP2_AUX_BP_L
+  }
+
   def __init__(self, *args):
     super(DpInputFlow, self).__init__(*args)
     self._edid = edid.DpEdid(args[0], self._main_bus)
@@ -392,12 +397,16 @@ class DpInputFlow(InputFlow):
     """Asserts HPD line to high, emulating plug."""
     if self.IsEdidEnabled():
       self._edid.Enable()
+    # enable aux bypass
+    self._mux_io.ClearOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
     self._fpga.hpd.Plug(self._input_id)
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
-    self._fpga.hpd.Unplug(self._input_id)
     self._edid.Disable()
+    # disable aux bypass
+    self._mux_io.SetOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
+    self._fpga.hpd.Unplug(self._input_id)
 
   def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
           repeat_count, end_level):
