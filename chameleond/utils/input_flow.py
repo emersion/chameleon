@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Input flow module which abstracts the entire flow for a specific input."""
 
+import itertools
 import logging
 import time
 from abc import ABCMeta
@@ -227,19 +228,30 @@ class InputFlow(object):
     """
     raise NotImplementedError('FireHpdPulse')
 
-  def FireMixedHpdPulses(self, widths):
+  def FireMixedHpdPulses(self, widths_msec):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
 
-    One must specify a list of segment widths in the widths argument where
-    widths[0] is the width of the first low segment, widths[1] is that of the
-    first high segment, widths[2] is that of the second low segment, ... etc.
+    One must specify a list of segment widths in the widths_msec argument where
+    widths_msec[0] is the width of the first low segment, widths_msec[1] is that
+    of the first high segment, widths_msec[2] is that of the second low segment,
+    etc.
     The HPD line stops at low if even number of segment widths are specified;
     otherwise, it stops at high.
 
+    The method is equivalent to a series of calls to Unplug() and Plug()
+    separated by specified pulse widths.
+
     Args:
-      widths: list of pulse segment widths in usec.
+      widths_msec: list of pulse segment widths in milli-second.
     """
-    raise NotImplementedError('FireMixedHpdPulses')
+    # Append a plug/unplug after the last pulse
+    sleep_times = [w / 1000.0 for w in widths_msec] + [0.0]
+    ops = [self.Unplug, self.Plug] * ((len(sleep_times) + 1) / 2)
+    pulses = itertools.izip(ops, sleep_times)
+
+    for op, sleep_time in pulses:
+      op()
+      time.sleep(sleep_time)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -342,20 +354,6 @@ class DpInputFlow(InputFlow):
     self._fpga.hpd.FireHpdPulse(self._input_id, deassert_interval_usec,
             assert_interval_usec, repeat_count, end_level)
 
-  def FireMixedHpdPulses(self, widths):
-    """Fires one or more HPD pulses, starting at low, of mixed widths.
-
-    One must specify a list of segment widths in the widths argument where
-    widths[0] is the width of the first low segment, widths[1] is that of the
-    first high segment, widths[2] is that of the second low segment, ... etc.
-    The HPD line stops at low if even number of segment widths are specified;
-    otherwise, it stops at high.
-
-    Args:
-      widths: list of pulse segment widths in usec.
-    """
-    self._fpga.hpd.FireMixedHpdPulses(self._input_id, widths)
-
   def ReadEdid(self):
     """Reads the EDID content."""
     return self._edid.ReadEdid()
@@ -425,20 +423,6 @@ class HdmiInputFlow(InputFlowWithAudio):
     """
     self._fpga.hpd.FireHpdPulse(self._input_id, deassert_interval_usec,
             assert_interval_usec, repeat_count, end_level)
-
-  def FireMixedHpdPulses(self, widths):
-    """Fires one or more HPD pulses, starting at low, of mixed widths.
-
-    One must specify a list of segment widths in the widths argument where
-    widths[0] is the width of the first low segment, widths[1] is that of the
-    first high segment, widths[2] is that of the second low segment, ... etc.
-    The HPD line stops at low if even number of segment widths are specified;
-    otherwise, it stops at high.
-
-    Args:
-      widths: list of pulse segment widths in usec.
-    """
-    self._fpga.hpd.FireMixedHpdPulses(self._input_id, widths)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -568,17 +552,21 @@ class VgaInputFlow(InputFlow):
     """
     pass
 
-  def FireMixedHpdPulses(self, widths):
+  def FireMixedHpdPulses(self, widths_msec):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
 
-    One must specify a list of segment widths in the widths argument where
-    widths[0] is the width of the first low segment, widths[1] is that of the
-    first high segment, widths[2] is that of the second low segment, ... etc.
+    One must specify a list of segment widths in the widths_msec argument where
+    widths_msec[0] is the width of the first low segment, widths_msec[1] is that
+    of the first high segment, widths_msec[2] is that of the second low segment,
+    etc.
     The HPD line stops at low if even number of segment widths are specified;
     otherwise, it stops at high.
 
+    The method is equivalent to a series of calls to Unplug() and Plug()
+    separated by specified pulse widths.
+
     Args:
-      widths: list of pulse segment widths in usec.
+      widths_msec: list of pulse segment widths in milli-second.
     """
     pass
 

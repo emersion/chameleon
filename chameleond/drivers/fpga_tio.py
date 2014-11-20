@@ -388,20 +388,24 @@ class ChameleondDriver(ChameleondInterface):
         assert_interval_usec, repeat_count, end_level)
 
   @_VideoMethod
-  def FireMixedHpdPulses(self, port_id, widths):
+  def FireMixedHpdPulses(self, port_id, widths_msec):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
 
-    One must specify a list of segment widths in the widths argument where
-    widths[0] is the width of the first low segment, widths[1] is that of the
-    first high segment, widths[2] is that of the second low segment, ... etc.
+    One must specify a list of segment widths in the widths_msec argument where
+    widths_msec[0] is the width of the first low segment, widths_msec[1] is that
+    of the first high segment, widths_msec[2] is that of the second low segment,
+    etc.
     The HPD line stops at low if even number of segment widths are specified;
     otherwise, it stops at high.
 
+    The method is equivalent to a series of calls to Unplug() and Plug()
+    separated by specified pulse widths.
+
     Args:
       port_id: The ID of the video input port.
-      widths: list of pulse segment widths in usec.
+      widths_msec: list of pulse segment widths in milli-second.
     """
-    return self._flows[port_id].FireMixedHpdPulses(widths)
+    return self._flows[port_id].FireMixedHpdPulses(widths_msec)
 
   def _SelectInput(self, port_id):
     """Selects the input on Chameleon.
