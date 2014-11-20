@@ -12,7 +12,7 @@ BINDIR := ./bin
 SRCDIR := ./src
 DISTDIR := ./dist
 
-TARGETS = directories binaries chameleond
+TARGETS = directories chameleond
 
 .PHONY: all
 all: $(TARGETS)
@@ -27,7 +27,7 @@ BINARIES = $(BINDIR)/hpd_control $(BINDIR)/pixeldump
 binaries: $(BINARIES)
 
 .PHONY: chameleond
-chameleond:
+chameleond: binaries
 	@python setup.py sdist
 
 $(BINDIR)/%.o: $(SRCDIR)/%.c
