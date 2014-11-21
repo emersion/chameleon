@@ -455,15 +455,20 @@ class HdmiInputFlow(InputFlowWithAudio):
     It should be called before doing any post-receiver-action, like capturing
     frames.
     """
+    is_reset_needed = self._rx.IsResetNeeded()
+    if is_reset_needed:
+      self._rx.Reset()
+
     if self.WaitVideoInputStable():
-      if self._rx.IsResetNeeded():
-        self._rx.Reset()
+      if is_reset_needed:
         self.WaitVideoOutputStable()
         # TODO(waihong): Remove this hack only for Nyan-Big.
         # http://crbug.com/402152
         time.sleep(self._DELAY_WAITING_GOOD_PIXELS)
     else:
-      logging.warn('Skip doing receiver FSM as video input not stable.')
+      message = 'Video input not stable.'
+      logging.error(message)
+      raise InputFlowError(message)
 
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout. Returns success or not."""
