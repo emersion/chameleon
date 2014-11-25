@@ -146,8 +146,14 @@ class InputFlow(object):
       common.TimeoutError on timeout.
     """
     self.WaitVideoOutputStable()
-    self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
-                                          timeout)
+    try:
+      self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
+                                            timeout)
+    except common.TimeoutError:
+      message = ('Frames failed to reach %d. RX dump: %r' %
+                 (frame_limit, self._rx.Get(0, 256)))
+      logging.error(message)
+      raise InputFlowError(message)
 
   def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
                          hash_buffer_limit):
