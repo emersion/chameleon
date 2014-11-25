@@ -32,5 +32,7 @@ def WaitForCondition(func, value, delay, timeout):
     time.sleep(delay)
     end_time = time.time()
   else:
-    raise TimeoutError('Timeout on waiting for condition %s == %s' %
-                       (func.__name__, str(value)))
+    message = ('Timeout on waiting for condition %s == %s' %
+               (func.__name__, str(value)))
+    logging.warn(message)
+    raise TimeoutError(message)

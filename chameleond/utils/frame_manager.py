@@ -158,9 +158,10 @@ class FrameManager(object):
       timeout: Time in second of timeout.
     """
     self._last_frame.value = 0
-    common.WaitForCondition(
-        lambda: self._HasFramesDumpedAtLeast(frame_count),
-        True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
+    # Give the lambda method a better name, for debugging.
+    func = lambda: self._HasFramesDumpedAtLeast(frame_count)
+    func.__name__ = 'HasFramesDumpedAtLeast%d' % frame_count
+    common.WaitForCondition(func, True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
 
   def _CreateSavedHashes(self, frame_count):
     """Creates the saved hashes, a sharable object of multiple processes."""
