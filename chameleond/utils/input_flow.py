@@ -197,8 +197,12 @@ class InputFlow(object):
     return True
 
   def WaitVideoOutputStable(self, unused_timeout=None):
-    """Waits the video output stable or timeout. Returns success or not."""
-    return True
+    """Waits the video output stable or timeout.
+
+    Raises:
+      InputFlowError if timeout.
+    """
+    pass
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
@@ -374,9 +378,13 @@ class DpInputFlow(InputFlow):
     return True
 
   def WaitVideoOutputStable(self, unused_timeout=None):
-    """Waits the video output stable or timeout. Returns success or not."""
+    """Waits the video output stable or timeout.
+
+    Raises:
+      InputFlowError if timeout.
+    """
     # TODO(waihong): Implement this method.
-    return True
+    pass
 
 
 class HdmiInputFlow(InputFlowWithAudio):
@@ -487,15 +495,21 @@ class HdmiInputFlow(InputFlowWithAudio):
       return False
 
   def WaitVideoOutputStable(self, timeout=None):
-    """Waits the video output stable or timeout. Returns success or not."""
+    """Waits the video output stable or timeout.
+
+    Raises:
+      InputFlowError if timeout.
+    """
     if timeout is None:
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
     try:
       common.WaitForCondition(self._IsFrameLocked, True,
           self._DELAY_VIDEO_MODE_PROBE, timeout)
     except common.TimeoutError:
-      return False
-    return True
+      message = ('Timeout waiting video output stable. RX dump: %r' %
+                 self._rx.Get(0, 256))
+      logging.error(message)
+      raise InputFlowError(message)
 
 
 class VgaInputFlow(InputFlow):
@@ -608,7 +622,11 @@ class VgaInputFlow(InputFlow):
     return resolution1 == resolution2 and 0 not in resolution1
 
   def WaitVideoOutputStable(self, timeout=None):
-    """Waits the video output stable or timeout. Returns success or not."""
+    """Waits the video output stable or timeout.
+
+    Raises:
+      InputFlowError if timeout.
+    """
     if timeout is None:
       timeout = self._TIMEOUT_CHECKING_STABLE
     try:
@@ -616,5 +634,7 @@ class VgaInputFlow(InputFlow):
       common.WaitForCondition(self._IsResolutionValid, True,
           self._DELAY_CHECKING_STABLE_PROBE, timeout)
     except common.TimeoutError:
-      return False
-    return True
+      message = ('Timeout waiting video output stable. RX dump: %r' %
+                 self._rx.Get(0, 256))
+      logging.error(message)
+      raise InputFlowError(message)
