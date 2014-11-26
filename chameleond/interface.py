@@ -16,26 +16,6 @@ class ChameleondInterface(object):
     """Resets Chameleon board."""
     raise NotImplementedError('Reset')
 
-  def IsHealthy(self):
-    """Returns true if the Chameleon is healthy or any repair is needed.
-
-    Returns:
-      True if the Chameleon is healthy; otherwise, False, need to repair.
-    """
-    raise NotImplementedError('IsHealthy')
-
-  def Repair(self):
-    """Repairs the Chameleon.
-
-    It can be an asynchronous call, e.g. do the repair after return. An
-    approximate time of the repair is returned. The caller should wait that
-    time before the next action.
-
-    Returns:
-      An approximate repair time in second.
-    """
-    raise NotImplementedError('Repair')
-
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
 

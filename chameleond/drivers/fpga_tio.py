@@ -115,28 +115,6 @@ class ChameleondDriver(ChameleondInterface):
     # TODO(waihong): Add other reset routines.
     self._ApplyDefaultEdid()
 
-  def IsHealthy(self):
-    """Returns true if the Chameleon is healthy or any repair is needed.
-
-    Returns:
-      True if the Chameleon is healthy; otherwise, False, need to repair.
-    """
-    # TODO(waihong): Add the check of health when needed.
-    return True
-
-  def Repair(self):
-    """Repairs the Chameleon.
-
-    It can be an asynchronous call, e.g. do the repair after return. An
-    approximate time of the repair is returned. The caller should wait that
-    time before the next action.
-
-    Returns:
-      An approximate repair time in second.
-    """
-    # TODO(waihong): Add the repair routine when needed.
-    return 0
-
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
 
