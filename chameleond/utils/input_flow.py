@@ -92,7 +92,6 @@ class InputFlow(object):
     self._fpga.vpass.Select(self._input_id)
     self._fpga.vdump0.Select(self._input_id, self.IsDualPixelMode())
     self._fpga.vdump1.Select(self._input_id, self.IsDualPixelMode())
-    self.WaitVideoOutputStable()
 
   def GetPixelDumpArgs(self):
     """Gets the arguments of pixeldump tool which selects the proper buffers."""
