@@ -489,11 +489,11 @@ class ChameleondDriver(ChameleondInterface):
     # Check the alignment for a cropped-screen capture.
     if None not in (x, y):
       if is_dual_pixel_mode:
-        if any((x % 16, y % 8, width % 16, height % 8)):
-          raise DriverError('Argument not aligned')
+        if x % 16 or width % 16:
+          raise DriverError('Arguments x and width not aligned to 16-byte.')
       else:
-        if any((x % 8, y % 8, width % 8, height % 8)):
-          raise DriverError('Argument not aligned')
+        if x % 8 or width % 8:
+          raise DriverError('Arguments x and width not aligned to 8-byte.')
 
     self._captured_params = {
       'port_id': port_id,
