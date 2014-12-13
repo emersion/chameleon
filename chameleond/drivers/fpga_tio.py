@@ -635,18 +635,21 @@ class ChameleondDriver(ChameleondInterface):
       screen = f.read()
     return xmlrpclib.Binary(screen)
 
-  def GetCapturedChecksums(self, start_index, stop_index):
+  def GetCapturedChecksums(self, start_index=0, stop_index=None):
     """Gets the list of checksums of the captured frames.
 
     Args:
-      start_index: The index of the start frame.
-      stop_index: The index of the stop frame (excluded).
+      start_index: The index of the start frame. Default is 0.
+      stop_index: The index of the stop frame (excluded). Default is the
+                  value of GetCapturedFrameCount.
 
     Returns:
       The list of checksums of frames.
     """
     port_id = self._captured_params['port_id']
     total_frame = self.GetCapturedFrameCount()
+    if stop_index is None:
+      stop_index = total_frame
     if not 0 <= start_index < total_frame:
       raise DriverError('The start index is out-of-range: %d not in [0, %d)' %
                         (start_index, total_frame))

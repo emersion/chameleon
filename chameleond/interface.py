@@ -363,12 +363,13 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('ReadCapturedFrame')
 
-  def GetCapturedChecksums(self, start_index, stop_index):
+  def GetCapturedChecksums(self, start_index=0, stop_index=None):
     """Gets the list of checksums of the captured frames.
 
     Args:
-      start_index: The index of the start frame.
-      stop_index: The index of the stop frame (excluded).
+      start_index: The index of the start frame. Default is 0.
+      stop_index: The index of the stop frame (excluded). Default is the
+                  value of GetCapturedFrameCount.
 
     Returns:
       The list of checksums of frames.
