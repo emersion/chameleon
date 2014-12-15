@@ -607,11 +607,17 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A byte-array of the pixels, wrapped in a xmlrpclib.Binary object.
     """
+    port_id = self._captured_params['port_id']
     total_frame = self.GetCapturedFrameCount()
-    if not 0 <= frame_index < total_frame:
-      raise DriverError('The frame index is out-of-range: %d not in [0, %d)' %
-                        (frame_index, total_frame))
     width, height = self.GetCapturedResolution()
+    max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
+    # The captured frames are store in a circular buffer. Only the latest
+    # max_frame_limit frames are valid.
+    first_valid_index = max(0, total_frame - max_frame_limit)
+    if not first_valid_index <= frame_index < total_frame:
+      raise DriverError('The frame index is out-of-range: %d not in [%d, %d)' %
+                        (frame_index, first_valid_index, total_frame))
+
     # Specify the proper arguemnt for dual-buffer capture.
     if self._captured_params['is_dual_pixel']:
       width = width / 2
@@ -620,7 +626,7 @@ class ChameleondDriver(ChameleondInterface):
     PAGE_SIZE = 4096
     frame_size = width * height * self._PIXEL_LEN
     frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
-    offset = frame_size * frame_index
+    offset = frame_size * (frame_index % max_frame_limit)
     offset_args = []
     for arg in self._captured_params['pixeldump_args']:
       if isinstance(arg, (int, long)):
