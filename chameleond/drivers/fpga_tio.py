@@ -111,7 +111,7 @@ class ChameleondDriver(ChameleondInterface):
 
   def Reset(self):
     """Resets Chameleon board."""
-    logging.info('Execute the reset process.')
+    logging.info('Execute the reset process')
     # TODO(waihong): Add other reset routines.
     self._ApplyDefaultEdid()
 
@@ -229,6 +229,7 @@ class ChameleondDriver(ChameleondInterface):
             to detect the VGA mode automatically.
     """
     if port_id == ids.VGA:
+      logging.info('Set VGA port #%d to mode: %s', port_id, mode)
       self._flows[port_id].SetVgaMode(mode)
     else:
       raise DriverError('SetVgaMode only works on VGA port.')
@@ -299,7 +300,7 @@ class ChameleondDriver(ChameleondInterface):
 
   def _ApplyDefaultEdid(self):
     """Applies the default EDID to all video inputs."""
-    logging.info('Apply the default EDID to all inputs.')
+    logging.info('Apply the default EDID to all video inputs')
     for flow in self._flows.itervalues():
       if flow and isinstance(flow, input_flow.InputFlow):
         flow.WriteEdid(self._all_edids[0])
@@ -315,6 +316,7 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
       edid_id: The ID of the EDID.
     """
+    logging.info('Apply EDID #%d to port #%d', edid_id, port_id)
     self._flows[port_id].WriteEdid(self._all_edids[edid_id])
 
   def IsPlugged(self, port_id):
@@ -334,6 +336,7 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       port_id: The ID of the input/output port.
     """
+    logging.info('Plug port #%d', port_id)
     return self._flows[port_id].Plug()
 
   def Unplug(self, port_id):
@@ -342,6 +345,7 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       port_id: The ID of the input/output port.
     """
+    logging.info('Unplug port #%d', port_id)
     return self._flows[port_id].Unplug()
 
   @_VideoMethod
@@ -363,6 +367,8 @@ class ChameleondDriver(ChameleondInterface):
       # Fall back to use the same value as deassertion if not given.
       assert_interval_usec = deassert_interval_usec
 
+    logging.info('Fire HPD pulse on port #%d, ending with %s',
+                 port_id, 'high' if end_level else 'low')
     return self._flows[port_id].FireHpdPulse(deassert_interval_usec,
         assert_interval_usec, repeat_count, end_level)
 
@@ -384,6 +390,8 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
       widths_msec: list of pulse segment widths in milli-second.
     """
+    logging.info('Fire mixed HPD pulse on port #%d, ending with %s',
+                 port_id, 'high' if len(widths_msec) % 2 else 'low')
     return self._flows[port_id].FireMixedHpdPulses(widths_msec)
 
   def _SelectInput(self, port_id):
@@ -529,6 +537,7 @@ class ChameleondDriver(ChameleondInterface):
     self._PrepareCapturingVideo(port_id, x, y, width, height)
 
     max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
+    logging.info('Start capturing video from port #%d', port_id)
     self._flows[port_id].StartDumpingFrames(
         max_frame_limit, x, y, width, height, self._MAX_CAPTURED_FRAME_COUNT)
 
@@ -540,6 +549,7 @@ class ChameleondDriver(ChameleondInterface):
     """
     port_id = self._captured_params['port_id']
     self._flows[port_id].StopDumpingFrames()
+    logging.info('Stopped capturing video from port #%d', port_id)
     if self.GetCapturedFrameCount() >= self._MAX_CAPTURED_FRAME_COUNT:
       raise DriverError('Exceeded the limit of capture, frame_count >= %d' %
                         self._MAX_CAPTURED_FRAME_COUNT)
@@ -568,6 +578,7 @@ class ChameleondDriver(ChameleondInterface):
       height: The height of the area of crop.
     """
     x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
+    logging.info('Capture video from port #%d', port_id)
     max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
     if total_frame > max_frame_limit:
       raise DriverError('Exceed the max frame limit %d > %d',
@@ -697,7 +708,9 @@ class ChameleondDriver(ChameleondInterface):
       A (width, height) tuple.
     """
     self._SelectInput(port_id)
-    return self._flows[port_id].GetResolution()
+    resolution = self._flows[port_id].GetResolution()
+    logging.info('Detected resolution on port #%d: %dx%d', port_id, *resolution)
+    return resolution
 
   @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id):
