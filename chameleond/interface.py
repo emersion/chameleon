@@ -166,7 +166,8 @@ class ChameleondInterface(object):
       port_id: The ID of the video input port.
 
     Returns:
-      A byte array of EDID data, wrapped in a xmlrpclib.Binary object.
+      A byte array of EDID data, wrapped in a xmlrpclib.Binary object,
+      or None if the EDID is disabled.
     """
     raise NotImplementedError('ReadEdid')
 

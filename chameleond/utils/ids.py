@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """IDs shared with Chameleond drivers."""
 
+# IDs of ports
 DP1 = 1
 DP2 = 2
 HDMI = 3
@@ -24,3 +25,7 @@ IsInputPort = lambda port_id: port_id in INPUT_PORTS
 IsOutputPort = lambda port_id: port_id in OUTPUT_PORTS
 IsAudioPort = lambda port_id: port_id in AUDIO_PORTS
 IsVideoPort = lambda port_id: port_id in VIDEO_PORTS
+
+# IDs of EDIDs
+EDID_ID_DEFAULT = 0
+EDID_ID_DISABLE = -1

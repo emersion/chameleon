@@ -66,6 +66,8 @@ class InputFlow(object):
     self._rx = self._main_bus.GetSlave(self._RX_SLAVES[self._input_id])
     self._frame_manager = frame_manager.FrameManager(
         input_id, self._GetEffectiveVideoDumpers())
+    self._edid = None  # be overwitten by a subclass.
+    self._edid_enabled = True
 
   def _GetEffectiveVideoDumpers(self):
     """Gets effective video dumpers on the flow."""
@@ -223,6 +225,30 @@ class InputFlow(object):
     """Deasserts HPD line to low, emulating unplug."""
     raise NotImplementedError('Unplug')
 
+  def SetEdidState(self, enable):
+    """Sets the enable/disable state of EDID.
+
+    Args:
+      enable: True to enable EDID due to an user request; False to
+              disable it.
+    """
+    old_state = self._edid_enabled and self.IsPlugged()
+    self._edid_enabled = enable
+    new_state = self._edid_enabled and self.IsPlugged()
+    if old_state != new_state:
+      if new_state:
+        self._edid.Enable()
+      else:
+        self._edid.Disable()
+
+  def IsEdidEnabled(self):
+    """Checks if the EDID is enabled or disabled.
+
+    Returns:
+      True if the EDID is enabled; False if disabled.
+    """
+    return self._edid_enabled
+
   def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
           repeat_count, end_level):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
@@ -340,7 +366,8 @@ class DpInputFlow(InputFlow):
 
   def Plug(self):
     """Asserts HPD line to high, emulating plug."""
-    self._edid.Enable()
+    if self.IsEdidEnabled():
+      self._edid.Enable()
     self._fpga.hpd.Plug(self._input_id)
 
   def Unplug(self):
@@ -414,7 +441,8 @@ class HdmiInputFlow(InputFlowWithAudio):
 
   def Plug(self):
     """Asserts HPD line to high, emulating plug."""
-    self._edid.Enable()
+    if self.IsEdidEnabled():
+      self._edid.Enable()
     self._fpga.hpd.Plug(self._input_id)
 
   def Unplug(self):
@@ -553,7 +581,8 @@ class VgaInputFlow(InputFlow):
 
   def Plug(self):
     """Asserts HPD line to high, emulating plug."""
-    self._edid.Enable()
+    if self.IsEdidEnabled():
+      self._edid.Enable()
     # For VGA, unblock the RGB source to emulate plug.
     self._mux_io.ClearOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 

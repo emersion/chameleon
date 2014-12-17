@@ -281,7 +281,7 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       edid_id: The ID of the EDID, which was created by CreateEdid().
     """
-    if edid_id > 0:
+    if edid_id > ids.EDID_ID_DEFAULT:
       self._all_edids[edid_id] = None
     else:
       raise DriverError('Not a valid edid_id.')
@@ -294,16 +294,21 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
 
     Returns:
-      A byte array of EDID data, wrapped in a xmlrpclib.Binary object.
+      A byte array of EDID data, wrapped in a xmlrpclib.Binary object,
+      or None if the EDID is disabled.
     """
-    return xmlrpclib.Binary(self._flows[port_id].ReadEdid())
+    if self._flows[port_id].IsEdidEnabled():
+      return xmlrpclib.Binary(self._flows[port_id].ReadEdid())
+    else:
+      logging.debug('Read EDID on port #%d which is disabled.', port_id)
+      return None
 
   def _ApplyDefaultEdid(self):
     """Applies the default EDID to all video inputs."""
     logging.info('Apply the default EDID to all video inputs')
-    for flow in self._flows.itervalues():
-      if flow and isinstance(flow, input_flow.InputFlow):
-        flow.WriteEdid(self._all_edids[0])
+    for port_id in self.GetSupportedInputs():
+      if self.HasVideoSupport(port_id):
+        self.ApplyEdid(port_id, ids.EDID_ID_DEFAULT)
 
   @_VideoMethod
   def ApplyEdid(self, port_id, edid_id):
@@ -316,8 +321,15 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
       edid_id: The ID of the EDID.
     """
-    logging.info('Apply EDID #%d to port #%d', edid_id, port_id)
-    self._flows[port_id].WriteEdid(self._all_edids[edid_id])
+    if edid_id == ids.EDID_ID_DISABLE:
+      logging.info('Disable EDID on port #%d', port_id)
+      self._flows[port_id].SetEdidState(False)
+    elif edid_id >= ids.EDID_ID_DEFAULT:
+      logging.info('Apply EDID #%d to port #%d', edid_id, port_id)
+      self._flows[port_id].WriteEdid(self._all_edids[edid_id])
+      self._flows[port_id].SetEdidState(True)
+    else:
+      raise DriverError('Not a valid edid_id.')
 
   def IsPlugged(self, port_id):
     """Returns true if the port is emulated as plugged.
