@@ -302,8 +302,13 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('StartCapturingVideo')
 
-  def StopCapturingVideo(self):
+  def StopCapturingVideo(self, stop_index=None):
     """Stops video capturing which was started previously.
+
+    Args:
+      stop_index: Wait the captured frame count reaches this index. If not
+                  given, stop immediately. Note that the captured frame of
+                  stop_index should not be read.
 
     Raises:
       DriverError if the capture period is longer than the capture limitation.

@@ -553,13 +553,26 @@ class ChameleondDriver(ChameleondInterface):
     self._flows[port_id].StartDumpingFrames(
         max_frame_limit, x, y, width, height, self._MAX_CAPTURED_FRAME_COUNT)
 
-  def StopCapturingVideo(self):
+  def StopCapturingVideo(self, stop_index=None):
     """Stops video capturing which was started previously.
+
+    Args:
+      stop_index: Wait for the captured frame count to reach this index. If
+                  not given, stop immediately. Note that the captured frame of
+                  stop_index should not be read.
 
     Raises:
       DriverError if the capture period is longer than the capture limitation.
     """
     port_id = self._captured_params['port_id']
+    if stop_index:
+      if stop_index >= self._MAX_CAPTURED_FRAME_COUNT:
+        raise DriverError('Exceeded the limit of capture, stop_index >= %d' %
+                          self._MAX_CAPTURED_FRAME_COUNT)
+      logging.info('Waiting the captured frame count reaches %d...', stop_index)
+      while self.GetCapturedFrameCount() < stop_index:
+        pass
+
     self._flows[port_id].StopDumpingFrames()
     logging.info('Stopped capturing video from port #%d', port_id)
     if self.GetCapturedFrameCount() >= self._MAX_CAPTURED_FRAME_COUNT:
