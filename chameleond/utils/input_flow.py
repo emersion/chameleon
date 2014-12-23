@@ -296,6 +296,30 @@ class InputFlow(object):
     """Writes the EDID content."""
     raise NotImplementedError('WriteEdid')
 
+  def SetContentProtection(self, enable):
+    """Sets the content protection state.
+
+    Args:
+      enable: True to enable; False to disable.
+    """
+    raise NotImplementedError('SetContentProtection')
+
+  def IsContentProtectionEnabled(self):
+    """Returns True if the content protection is enabled.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    raise NotImplementedError('IsContentProtectionEnabled')
+
+  def IsVideoInputEncrypted(self):
+    """Returns True if the video input is encrypted.
+
+    Returns:
+      True if the video input is encrypted; otherwise, False.
+    """
+    raise NotImplementedError('IsVideoInputEncrypted')
+
 
 class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
   """An abstraction of an input flow which supports audio."""
@@ -411,6 +435,30 @@ class DpInputFlow(InputFlow):
     """
     # TODO(waihong): Implement this method.
     pass
+
+  def SetContentProtection(self, enable):
+    """Sets the content protection state.
+
+    Args:
+      enable: True to enable; False to disable.
+    """
+    raise NotImplementedError('SetContentProtection')
+
+  def IsContentProtectionEnabled(self):
+    """Returns True if the content protection is enabled.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    raise NotImplementedError('IsContentProtectionEnabled')
+
+  def IsVideoInputEncrypted(self):
+    """Returns True if the video input is encrypted.
+
+    Returns:
+      True if the video input is encrypted; otherwise, False.
+    """
+    raise NotImplementedError('IsVideoInputEncrypted')
 
 
 class HdmiInputFlow(InputFlowWithAudio):
@@ -542,6 +590,30 @@ class HdmiInputFlow(InputFlowWithAudio):
                  self._rx.Get(0, 256))
       logging.error(message)
       raise InputFlowError(message)
+
+  def SetContentProtection(self, enable):
+    """Sets the content protection state.
+
+    Args:
+      enable: True to enable; False to disable.
+    """
+    self._rx.SetContentProtection(enable)
+
+  def IsContentProtectionEnabled(self):
+    """Returns True if the content protection is enabled.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    return self._rx.IsContentProtectionEnabled()
+
+  def IsVideoInputEncrypted(self):
+    """Returns True if the video input is encrypted.
+
+    Returns:
+      True if the video input is encrypted; otherwise, False.
+    """
+    return self._rx.IsVideoInputEncrypted()
 
 
 class VgaInputFlow(InputFlow):
@@ -693,3 +765,29 @@ class VgaInputFlow(InputFlow):
                  self._rx.Get(0, 256))
       logging.error(message)
       raise InputFlowError(message)
+
+  def SetContentProtection(self, enable):
+    """Sets the content protection state.
+
+    Args:
+      enable: True to enable; False to disable.
+    """
+    raise InputFlowError('VGA not support content protection')
+
+  def IsContentProtectionEnabled(self):
+    """Returns True if the content protection is enabled.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    # VGA not support content protection.
+    return False
+
+  def IsVideoInputEncrypted(self):
+    """Returns True if the video input is encrypted.
+
+    Returns:
+      True if the video input is encrypted; otherwise, False.
+    """
+    # VGA not support content protection.
+    return False

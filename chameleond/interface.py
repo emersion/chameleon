@@ -245,6 +245,37 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('FireMixedHpdPulses')
 
+  def SetContentProtection(self, port_id, enable):
+    """Sets the content protection state on the port.
+
+    Args:
+      port_id: The ID of the video input port.
+      enable: True to enable; False to disable.
+    """
+    raise NotImplementedError('SetContentProtection')
+
+  def IsContentProtectionEnabled(self, port_id):
+    """Returns True if the content protection is enabled on the port.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    raise NotImplementedError('IsContentProtectionEnabled')
+
+  def IsVideoInputEncrypted(self, port_id):
+    """Returns True if the video input on the port is encrypted.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      True if the video input is encrypted; otherwise, False.
+    """
+    raise NotImplementedError('IsVideoInputEncrypted')
+
   def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
 

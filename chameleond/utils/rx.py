@@ -91,12 +91,18 @@ class HdmiRx(i2c.I2cSlave):
   _REG_P0_RESET = 0x11
   _BIT_P0_SWRST = 1 << 0
 
+  _REG_P0_HDCP_CONTROL = 0x2d
+  _BIT_P0_HDCP_ENABLE = 1 << 2
+
   _REG_EDID_SLAVE_ADDR = 0x87
   _BIT_ENABLE_EDID_ACCESS = 1
 
   _REG_IO_MAP = 0x8c
   _BIT_VDIO3_ENABLE = 1 << 3
   _BIT_SP_OUT_MODE = 1 << 0
+
+  _REG_HDCP_STATUS = 0x93
+  _BIT_P0_HDCP_ON = 1 << 0
 
   _REG_EDID_CONFIG = 0xc0
   _BIT_DDC_MONITOR = 1 << 2
@@ -263,6 +269,34 @@ class HdmiRx(i2c.I2cSlave):
     width = (hactive_h & 0x3f) << 8 | hactive_l
     height = (vactive_h & 0xf0) << 4 | vactive_l
     return (width, height)
+
+  def SetContentProtection(self, enable):
+    """Sets the content protection state on the receiver.
+
+    Args:
+      enable: True to enable; False to disable.
+    """
+    if enable:
+      self.SetMask(self._REG_P0_HDCP_CONTROL, self._BIT_P0_HDCP_ENABLE)
+    else:
+      self.ClearMask(self._REG_P0_HDCP_CONTROL, self._BIT_P0_HDCP_ENABLE)
+
+  def IsContentProtectionEnabled(self):
+    """Returns True if the content protection is enabled on the receiver.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    return bool(self.Get(self._REG_P0_HDCP_CONTROL) & self._BIT_P0_HDCP_ENABLE)
+
+  def IsVideoInputEncrypted(self):
+    """Returns True if the video input is encrypted.
+
+    Returns:
+      True if the video input is content-protected; otherwise, False.
+    """
+    return self.IsContentProtectionEnabled() and bool(
+        self.Get(self._REG_HDCP_STATUS) & self._BIT_P0_HDCP_ON)
 
 
 class VgaRx(i2c.I2cSlave):

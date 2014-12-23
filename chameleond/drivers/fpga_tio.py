@@ -406,6 +406,41 @@ class ChameleondDriver(ChameleondInterface):
                  port_id, 'high' if len(widths_msec) % 2 else 'low')
     return self._flows[port_id].FireMixedHpdPulses(widths_msec)
 
+  @_VideoMethod
+  def SetContentProtection(self, port_id, enable):
+    """Sets the content protection state on the port.
+
+    Args:
+      port_id: The ID of the video input port.
+      enable: True to enable; False to disable.
+    """
+    logging.info('Set content protection on port #%d: %r', port_id, enable)
+    self._flows[port_id].SetContentProtection(enable)
+
+  @_VideoMethod
+  def IsContentProtectionEnabled(self, port_id):
+    """Returns True if the content protection is enabled on the port.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      True if the content protection is enabled; otherwise, False.
+    """
+    return self._flows[port_id].IsContentProtectionEnabled()
+
+  @_VideoMethod
+  def IsVideoInputEncrypted(self, port_id):
+    """Returns True if the video input on the port is encrypted.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      True if the video input is encrypted; otherwise, False.
+    """
+    return self._flows[port_id].IsVideoInputEncrypted()
+
   def _SelectInput(self, port_id):
     """Selects the input on Chameleon.
 
