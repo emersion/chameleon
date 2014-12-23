@@ -105,8 +105,6 @@ class HdmiRx(i2c.I2cSlave):
   _BIT_P0_HDCP_ON = 1 << 0
 
   _REG_EDID_CONFIG = 0xc0
-  _BIT_DDC_MONITOR = 1 << 2
-  _BIT_DISABLE_SHADOW_P1 = 1 << 1
   _BIT_DISABLE_SHADOW_P0 = 1 << 0
 
   # Registers for checksum
@@ -207,17 +205,15 @@ class HdmiRx(i2c.I2cSlave):
 
   def IsEdidEnabled(self):
     """Returns True if the receiver is enabled to respond EDID request."""
-    return bool(self.Get(self._REG_EDID_CONFIG) & self._BIT_DDC_MONITOR)
+    return not self.Get(self._REG_EDID_CONFIG) & self._BIT_DISABLE_SHADOW_P0
 
   def EnableEdid(self):
     """Enables the receiver to monitor DDC and respond EDID."""
-    self.Set(self._BIT_DDC_MONITOR | self._BIT_DISABLE_SHADOW_P1,
-             self._REG_EDID_CONFIG)
+    self.ClearMask(self._REG_EDID_CONFIG, self._BIT_DISABLE_SHADOW_P0)
 
   def DisableEdid(self):
     """Disables the receiver to monitor DDC and respond EDID."""
-    self.Set(self._BIT_DISABLE_SHADOW_P1 | self._BIT_DISABLE_SHADOW_P0,
-             self._REG_EDID_CONFIG)
+    self.SetMask(self._REG_EDID_CONFIG, self._BIT_DISABLE_SHADOW_P0)
 
   def UpdateEdidChecksum(self, block_num, checksum):
     """Updates the checksum of the EDID block.
