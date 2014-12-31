@@ -114,6 +114,10 @@ class HdmiRx(i2c.I2cSlave):
   _REG_VIDEO_MODE = 0x99
   _BIT_VIDEO_STABLE = 1 << 3
 
+  _REG_PIXEL_CLOCK_DIV = 0x9A
+  _REG_CLK_CONFIG = 0x54
+  _MASK_RCLK_SELECT = 0x03
+
   _REG_HACTIVE_H = 0x9f
   _REG_HACTIVE_L = 0x9e
   _REG_VACTIVE_H = 0xa4
@@ -136,12 +140,23 @@ class HdmiRx(i2c.I2cSlave):
 
     self.SetColorSpaceConvertion()
 
+    # OCLK_MHz = (MHL14|MHL13|MHL12) * 10 / 10^6 = 43.3 (hardware dependent)
+    # RCLK_MHz = OCLK_MHz / (1 << (REG054[1:0] + 1))
+    # PCLK_MHz = RCLK_MHz * 255 / pclk_div
+    #     where pclk_div is from REG09A and depends on input signal
+    # Here we pre-calculate _pclk_base = RCLK_MHz * 255 for PCLK_MHz calculation
+    # in GetPixelClock().
+    rclk_select = self.Get(self._REG_CLK_CONFIG) & self._MASK_RCLK_SELECT
+    rclk = 43.3 / (1 << (rclk_select + 1))
+    self._pclk_base = rclk * 255
+
   def SetDualPixelMode(self):
     """Uses dual pixel mode which occupes 2 video paths in FPGA."""
     self.Set(0x02, 0x05)  # bank 0
     self.Set(0x0f, 0x0d)  # enable PHFCLK
-    self.Set(0x01, 0x8b)  # enable dual pixel mode
+    self.Set(0x03, 0x8b)  # enable dual pixel mode
     self.Set(0x08, 0x8c)  # enable QA IO
+    self.Set(0x01, 0x8b)  # dual pixel fifo normal operation
     self.Set(0xb1, 0x50)  # tune hdmi dual pixel timing
 
   def SetSinglePixelMode(self):
@@ -231,6 +246,11 @@ class HdmiRx(i2c.I2cSlave):
     """Returns whether the video input is stable."""
     video_mode = self.Get(self._REG_VIDEO_MODE)
     return bool(video_mode & self._BIT_VIDEO_STABLE)
+
+  def GetPixelClock(self):
+    """Returns the pixel clock of the input signal in MHz."""
+    pclk_div = self.Get(self._REG_PIXEL_CLOCK_DIV)
+    return self._pclk_base / pclk_div
 
   def IsResetNeeded(self):
     """Returns if the RX needs reset by checking the interrupt values."""

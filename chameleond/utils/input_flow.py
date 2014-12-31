@@ -474,19 +474,25 @@ class HdmiInputFlow(InputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
 
   _CONNECTOR_TYPE = 'HDMI'
-  _IS_DUAL_PIXEL_MODE = True
+
+  # The firmware for the 6803 reference board sets the rx in dual pixel mode
+  # when the pixel clock is greater than 160. Here, we use 130 instead of 160
+  # as the FPGA works more reliably when the pixel clock is under this value.
+  _PIXEL_MODE_PCLK_THRESHOLD = 130 # MHz
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
   _DELAY_WAITING_GOOD_PIXELS = 3
 
   def __init__(self, *args):
+    self._is_dual_pixel_mode = True
+
     super(HdmiInputFlow, self).__init__(*args)
     self._edid = edid.HdmiEdid(self._main_bus)
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
-    return self._IS_DUAL_PIXEL_MODE
+    return self._is_dual_pixel_mode
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -530,6 +536,29 @@ class HdmiInputFlow(InputFlowWithAudio):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
 
+  def _SetPixelMode(self):
+    """Sets the pixel mode based on the pixel clock of the input signal.
+
+    Returns
+      True if pixel mode is changed; False if nothing is changed.
+    """
+    pclk = self._rx.GetPixelClock()
+    logging.info('PCLK = %s', pclk)
+    dual_pixel_mode = pclk > self._PIXEL_MODE_PCLK_THRESHOLD
+    if self._is_dual_pixel_mode != dual_pixel_mode:
+      self._is_dual_pixel_mode = dual_pixel_mode
+      if dual_pixel_mode:
+        self._rx.SetDualPixelMode()
+        logging.info('Changed to dual pixel mode')
+      else:
+        self._rx.SetSinglePixelMode()
+        logging.info('Changed to single pixel mode')
+      self._frame_manager = frame_manager.FrameManager(
+          self._input_id, self._GetEffectiveVideoDumpers())
+      self.Select()
+      return True
+    return False
+
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
@@ -544,7 +573,8 @@ class HdmiInputFlow(InputFlowWithAudio):
       self._rx.Reset()
 
     if self.WaitVideoInputStable():
-      if is_reset_needed:
+      pixel_mode_changed = self._SetPixelMode()
+      if is_reset_needed or pixel_mode_changed:
         self.WaitVideoOutputStable()
         # TODO(waihong): Remove this hack only for Nyan-Big.
         # http://crbug.com/402152
