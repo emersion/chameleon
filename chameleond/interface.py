@@ -245,12 +245,12 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('FireMixedHpdPulses')
 
-  def SetContentProtection(self, port_id, enable):
+  def SetContentProtection(self, port_id, enabled):
     """Sets the content protection state on the port.
 
     Args:
       port_id: The ID of the video input port.
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
     raise NotImplementedError('SetContentProtection')
 

@@ -225,15 +225,15 @@ class InputFlow(object):
     """Deasserts HPD line to low, emulating unplug."""
     raise NotImplementedError('Unplug')
 
-  def SetEdidState(self, enable):
-    """Sets the enable/disable state of EDID.
+  def SetEdidState(self, enabled):
+    """Sets the enabled/disabled state of EDID.
 
     Args:
-      enable: True to enable EDID due to an user request; False to
-              disable it.
+      enabled: True to enable EDID due to an user request; False to
+               disable it.
     """
     old_state = self._edid_enabled and self.IsPlugged()
-    self._edid_enabled = enable
+    self._edid_enabled = enabled
     new_state = self._edid_enabled and self.IsPlugged()
     if old_state != new_state:
       if new_state:
@@ -297,11 +297,11 @@ class InputFlow(object):
     """Writes the EDID content."""
     raise NotImplementedError('WriteEdid')
 
-  def SetContentProtection(self, enable):
+  def SetContentProtection(self, enabled):
     """Sets the content protection state.
 
     Args:
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
     raise NotImplementedError('SetContentProtection')
 
@@ -513,11 +513,11 @@ class DpInputFlow(InputFlow):
     else:
       logging.info('Skip resetting DP rx.')
 
-  def SetContentProtection(self, enable):
+  def SetContentProtection(self, enabled):
     """Sets the content protection state.
 
     Args:
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
     raise NotImplementedError('SetContentProtection')
 
@@ -701,13 +701,13 @@ class HdmiInputFlow(InputFlowWithAudio):
       logging.error(message)
       raise InputFlowError(message)
 
-  def SetContentProtection(self, enable):
+  def SetContentProtection(self, enabled):
     """Sets the content protection state.
 
     Args:
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
-    self._rx.SetContentProtection(enable)
+    self._rx.SetContentProtection(enabled)
 
   def IsContentProtectionEnabled(self):
     """Returns True if the content protection is enabled.
@@ -879,11 +879,11 @@ class VgaInputFlow(InputFlow):
       logging.error(message)
       raise InputFlowError(message)
 
-  def SetContentProtection(self, enable):
+  def SetContentProtection(self, enabled):
     """Sets the content protection state.
 
     Args:
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
     raise InputFlowError('VGA not support content protection')
 

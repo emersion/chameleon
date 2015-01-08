@@ -346,13 +346,13 @@ class HdmiRx(i2c.I2cSlave):
     height = (vactive_h & 0xf0) << 4 | vactive_l
     return (width, height)
 
-  def SetContentProtection(self, enable):
+  def SetContentProtection(self, enabled):
     """Sets the content protection state on the receiver.
 
     Args:
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
-    if enable:
+    if enabled:
       self.SetMask(self._REG_P0_HDCP_CONTROL, self._BIT_P0_HDCP_ENABLE)
     else:
       self.ClearMask(self._REG_P0_HDCP_CONTROL, self._BIT_P0_HDCP_ENABLE)

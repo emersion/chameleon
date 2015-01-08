@@ -774,7 +774,7 @@ class AudioRouteController(object):
     self._memory.Write(
         self._REGS_BASE + self._REG_INPUT_SELECT, new_value)
 
-  def _EnableGenerator(self, enable):
+  def _EnableGenerator(self, enabled):
     """Enables generator.
 
     The audio codec needs us feed its I2S clock 48K when recording/playing
@@ -782,9 +782,9 @@ class AudioRouteController(object):
     is not controlled by divisor or volume control.
 
     Args:
-      enable: True to enable.
+      enabled: True to enable.
     """
-    if enable:
+    if enabled:
       self._memory.SetMask(
           self._REGS_BASE + self._REG_GENERATOR_ENABLE,
           self._BIT_GENERATOR_ENABLE)

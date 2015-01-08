@@ -408,15 +408,15 @@ class ChameleondDriver(ChameleondInterface):
     return self._flows[port_id].FireMixedHpdPulses(widths_msec)
 
   @_VideoMethod
-  def SetContentProtection(self, port_id, enable):
+  def SetContentProtection(self, port_id, enabled):
     """Sets the content protection state on the port.
 
     Args:
       port_id: The ID of the video input port.
-      enable: True to enable; False to disable.
+      enabled: True to enable; False to disable.
     """
-    logging.info('Set content protection on port #%d: %r', port_id, enable)
-    self._flows[port_id].SetContentProtection(enable)
+    logging.info('Set content protection on port #%d: %r', port_id, enabled)
+    self._flows[port_id].SetContentProtection(enabled)
 
   @_VideoMethod
   def IsContentProtectionEnabled(self, port_id):
