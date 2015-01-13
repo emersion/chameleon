@@ -413,8 +413,8 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetCapturedChecksums')
 
-  def ComputePixelChecksum(self, port_id, x=None, y=None, width=None,
-        height=None):
+  def ComputePixelChecksum(
+      self, port_id, x=None, y=None, width=None, height=None):
     """Computes the checksum of pixels in the selected area.
 
     If not given the area, default to compute the whole screen.

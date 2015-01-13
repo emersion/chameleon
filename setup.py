@@ -6,15 +6,15 @@
 from distutils.core import setup
 
 setup(
-  name = 'chameleond',
-  version = '0.0.2',
-  packages = ['chameleond', 'chameleond.drivers', 'chameleond.utils'],
-  package_data = {'chameleond': ['data/*.bin']},
-  url = 'http://www.chromium.org',
-  maintainer = 'chromium os',
-  maintainer_email = 'chromium-os-dev@chromium.org',
-  license = 'Chromium',
-  description = 'Server to communicate and control Chameleon board.',
-  long_description = 'Server to communicate and control Chameleon board.',
-  scripts = ['utils/run_chameleond']
+    name='chameleond',
+    version='0.0.2',
+    packages=['chameleond', 'chameleond.drivers', 'chameleond.utils'],
+    package_data={'chameleond': ['data/*.bin']},
+    url='http://www.chromium.org',
+    maintainer='chromium os',
+    maintainer_email='chromium-os-dev@chromium.org',
+    license='Chromium',
+    description='Server to communicate and control Chameleon board.',
+    long_description='Server to communicate and control Chameleon board.',
+    scripts=['utils/run_chameleond']
 )

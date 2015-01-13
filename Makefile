@@ -73,7 +73,7 @@ clean:
 PYLINTRC = $(CROS_WORKON_SRCROOT)/chromite/pylintrc
 PYLINT_OPTIONS = \
 	--rcfile=$(PYLINTRC) \
-	--disable=R0921,R0922,R0923,W9100
+	--disable=R0921,R0922,R0923,R9100
 
 LINT_FILES = $(shell find -name '*.py' -type f | sort)
 LINT_BLACKLIST =

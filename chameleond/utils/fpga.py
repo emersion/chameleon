@@ -53,9 +53,9 @@ class HpdController(object):
 
   _HPD_BASE = 0xff21a000
   _HPD_OFFSETS = {
-    ids.DP1: 0x4,
-    ids.DP2: 0x8,
-    ids.HDMI: 0xc
+      ids.DP1: 0x4,
+      ids.DP2: 0x8,
+      ids.HDMI: 0xc
   }
   _BIT_UNPLUG = 0
   _BIT_PLUG = 1
@@ -94,8 +94,9 @@ class HpdController(object):
     self._memory.Write(self._HPD_BASE + self._HPD_OFFSETS[input_id],
                        self._BIT_UNPLUG)
 
-  def FireHpdPulse(self, input_id, deassert_interval_usec, assert_interval_usec,
-          repeat_count, end_level):
+  def FireHpdPulse(
+      self, input_id, deassert_interval_usec, assert_interval_usec,
+      repeat_count, end_level):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
@@ -108,9 +109,9 @@ class HpdController(object):
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
     system_tools.SystemTools.Call(
-            'hpd_control', 'repeat_pulse',
-            self._HPD_OFFSETS[input_id], int(deassert_interval_usec),
-            int(assert_interval_usec), repeat_count, end_level)
+        'hpd_control', 'repeat_pulse',
+        self._HPD_OFFSETS[input_id], int(deassert_interval_usec),
+        int(assert_interval_usec), repeat_count, end_level)
 
   def FireMixedHpdPulses(self, input_id, widths):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
@@ -126,9 +127,9 @@ class HpdController(object):
       widths: list of pulse segment widths in usec.
     """
     system_tools.SystemTools.Call(
-            'hpd_control', 'pulse',
-            self._HPD_OFFSETS[input_id],
-            *tuple(widths))
+        'hpd_control', 'pulse',
+        self._HPD_OFFSETS[input_id],
+        *tuple(widths))
 
 class VideoPasser(object):
   """A class to abstract the behavior of video pass-through.
@@ -144,10 +145,10 @@ class VideoPasser(object):
   _BIT_CLK_B = 1 << 1
 
   _VALUES_CTRL = {
-    ids.DP1: _BIT_CLK_A | _BIT_DATA_A,
-    ids.DP2: _BIT_CLK_B | _BIT_DATA_B,
-    ids.HDMI: _BIT_CLK_B | _BIT_DATA_A,
-    ids.VGA: _BIT_CLK_A | _BIT_DATA_A
+      ids.DP1: _BIT_CLK_A | _BIT_DATA_A,
+      ids.DP2: _BIT_CLK_B | _BIT_DATA_B,
+      ids.HDMI: _BIT_CLK_B | _BIT_DATA_A,
+      ids.VGA: _BIT_CLK_A | _BIT_DATA_A
   }
 
   def __init__(self):
@@ -206,16 +207,16 @@ class VideoDumper(object):
   #  (3) DUAL PIXEL EVEN PIXELS DATA | A   | B   | A    |     |
   #  (4) DUAL PIXEL ODD PIXELS DATA  | B   | A   | B    |     |
   PRIMARY_FLOW_INDEXES = {
-    ids.DP1: 0,
-    ids.DP2: 1,
-    ids.HDMI: 1,
-    ids.VGA: 0,
+      ids.DP1: 0,
+      ids.DP2: 1,
+      ids.HDMI: 1,
+      ids.VGA: 0,
   }
   EVEN_PIXELS_FLOW_INDEXES = {
-    ids.DP1: 0,
-    ids.DP2: 1,
-    ids.HDMI: 0,
-    ids.VGA: 0,
+      ids.DP1: 0,
+      ids.DP2: 1,
+      ids.HDMI: 0,
+      ids.VGA: 0,
   }
 
   _DUMP_BASE_ADDRESS = 0xc0000000
@@ -315,7 +316,7 @@ class VideoDumper(object):
                        self._DUMP_TEMP_START_ADDRESSES[self._index])
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
                        self._DUMP_TEMP_START_ADDRESSES[self._index] +
-                         self._DUMP_TEMP_BUFFER_SIZE)
+                       self._DUMP_TEMP_BUFFER_SIZE)
 
   def SetDumpAddressForCapture(self):
     """Sets the dump memory address space for capture."""
@@ -323,7 +324,7 @@ class VideoDumper(object):
                        self._DUMP_START_ADDRESSES[self._index])
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_END_ADDR,
                        self._DUMP_START_ADDRESSES[self._index] +
-                         self._DUMP_BUFFER_SIZE)
+                       self._DUMP_BUFFER_SIZE)
 
   def Select(self, input_id, dual_pixel_mode):
     """Selects the given input for dumping.
@@ -375,7 +376,8 @@ class VideoDumper(object):
     Returns:
       A list of hash16 values.
     """
-    hash_addr = lambda x: (self._REGS_BASE[self._index] +
+    hash_addr = lambda x: (
+        self._REGS_BASE[self._index] +
         self._REG_HASH_BUF_BASE + (x * 4) % self._REG_HASH_BUF_SIZE)
 
     if dual_pixel_mode:
@@ -915,7 +917,7 @@ class AudioStreamController(object):
     underflow = (self._memory.Read(self._REGS_BASE +
                                    self._REG_STREAM_UNDERFLOW) &
                  self._BIT_STREAM_UNDERFLOW)
-    return (stream_run and not underflow)
+    return stream_run and not underflow
 
   def _Stop(self):
     """Stops streaming."""

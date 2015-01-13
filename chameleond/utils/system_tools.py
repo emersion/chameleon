@@ -11,14 +11,14 @@ class _SystemTools(object):
   """A class to wrap the required tools for Chameleond execution."""
 
   _TOOL_PATHS = {
-    'chameleond': '/etc/init.d/chameleond',
-    'i2cdump': '/usr/local/sbin/i2cdump',
-    'i2cget': '/usr/local/sbin/i2cget',
-    'i2cset': '/usr/local/sbin/i2cset',
-    'hpd_control': '/usr/bin/hpd_control',
-    'memtool': '/usr/bin/memtool',
-    'reboot': '/sbin/reboot',
-    'pixeldump': '/usr/bin/pixeldump',
+      'chameleond': '/etc/init.d/chameleond',
+      'i2cdump': '/usr/local/sbin/i2cdump',
+      'i2cget': '/usr/local/sbin/i2cget',
+      'i2cset': '/usr/local/sbin/i2cset',
+      'hpd_control': '/usr/bin/hpd_control',
+      'memtool': '/usr/bin/memtool',
+      'reboot': '/sbin/reboot',
+      'pixeldump': '/usr/bin/pixeldump',
   }
 
   def __init__(self):

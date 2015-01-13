@@ -119,10 +119,10 @@ class PowerIo(IoExpander):
   MASK_LED_I2C = 1 << 15
 
   _MASKS_RX_RST_L = {
-    ids.DP1: MASK_DP1_RST_L,
-    ids.DP2: MASK_DP2_RST_L,
-    ids.HDMI: MASK_HDMI_RST_L,
-    ids.VGA: MASK_VGA_RST_L
+      ids.DP1: MASK_DP1_RST_L,
+      ids.DP2: MASK_DP2_RST_L,
+      ids.HDMI: MASK_HDMI_RST_L,
+      ids.VGA: MASK_VGA_RST_L
   }
 
   _RX_RESET_PULSE_SECS = 0.001

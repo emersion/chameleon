@@ -36,18 +36,18 @@ class InputFlow(object):
   _CONNECTOR_TYPE = 'Unknown'  # A subclass should override it.
 
   _RX_SLAVES = {
-    ids.DP1: rx.DpRx.SLAVE_ADDRESSES[0],
-    ids.DP2: rx.DpRx.SLAVE_ADDRESSES[1],
-    ids.HDMI: rx.HdmiRx.SLAVE_ADDRESSES[0],
-    ids.VGA: rx.VgaRx.SLAVE_ADDRESSES[0]
+      ids.DP1: rx.DpRx.SLAVE_ADDRESSES[0],
+      ids.DP2: rx.DpRx.SLAVE_ADDRESSES[1],
+      ids.HDMI: rx.HdmiRx.SLAVE_ADDRESSES[0],
+      ids.VGA: rx.VgaRx.SLAVE_ADDRESSES[0]
   }
   _MUX_CONFIGS = {
-    # Use a dual-pixel-mode setting for IO as no support for two flows
-    # simultaneously so far.
-    ids.DP1: io.MuxIo.CONFIG_DP1_DUAL,
-    ids.DP2: io.MuxIo.CONFIG_DP2_DUAL,
-    ids.HDMI: io.MuxIo.CONFIG_HDMI_DUAL,
-    ids.VGA: io.MuxIo.CONFIG_VGA
+      # Use a dual-pixel-mode setting for IO as no support for two flows
+      # simultaneously so far.
+      ids.DP1: io.MuxIo.CONFIG_DP1_DUAL,
+      ids.DP2: io.MuxIo.CONFIG_DP2_DUAL,
+      ids.HDMI: io.MuxIo.CONFIG_HDMI_DUAL,
+      ids.VGA: io.MuxIo.CONFIG_VGA
   }
 
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
@@ -249,8 +249,9 @@ class InputFlow(object):
     """
     return self._edid_enabled
 
-  def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
-          repeat_count, end_level):
+  def FireHpdPulse(
+      self, deassert_interval_usec, assert_interval_usec, repeat_count,
+      end_level):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
@@ -378,8 +379,8 @@ class DpInputFlow(InputFlow):
   _HPD_PULSE_WIDTH = 0.1
 
   _AUX_BYPASS_MUXES = {
-    ids.DP1: io.MuxIo.MASK_DP1_AUX_BP_L,
-    ids.DP2: io.MuxIo.MASK_DP2_AUX_BP_L
+      ids.DP1: io.MuxIo.MASK_DP1_AUX_BP_L,
+      ids.DP2: io.MuxIo.MASK_DP2_AUX_BP_L
   }
 
   def __init__(self, *args):
@@ -413,8 +414,9 @@ class DpInputFlow(InputFlow):
     self._mux_io.SetOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
     self._fpga.hpd.Unplug(self._input_id)
 
-  def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
-          repeat_count, end_level):
+  def FireHpdPulse(
+      self, deassert_interval_usec, assert_interval_usec, repeat_count,
+      end_level):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
@@ -425,8 +427,9 @@ class DpInputFlow(InputFlow):
       repeat_count: The count of HPD pulses to fire.
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
-    self._fpga.hpd.FireHpdPulse(self._input_id, deassert_interval_usec,
-            assert_interval_usec, repeat_count, end_level)
+    self._fpga.hpd.FireHpdPulse(
+        self._input_id, deassert_interval_usec, assert_interval_usec,
+        repeat_count, end_level)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -442,8 +445,9 @@ class DpInputFlow(InputFlow):
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
 
     try:
-      common.WaitForCondition(self._rx.IsVideoInputStable, True,
-          self._DELAY_VIDEO_MODE_PROBE, timeout)
+      common.WaitForCondition(
+          self._rx.IsVideoInputStable, True, self._DELAY_VIDEO_MODE_PROBE,
+          timeout)
       return True
     except common.TimeoutError:
       return False
@@ -471,8 +475,8 @@ class DpInputFlow(InputFlow):
     if timeout is None:
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
     try:
-      common.WaitForCondition(self._IsFrameLocked, True,
-          self._DELAY_VIDEO_MODE_PROBE, timeout)
+      common.WaitForCondition(
+          self._IsFrameLocked, True, self._DELAY_VIDEO_MODE_PROBE, timeout)
     except common.TimeoutError:
       return False
     return True
@@ -482,7 +486,8 @@ class DpInputFlow(InputFlow):
     if self.WaitVideoOutputStable():
       # Resolution from RX is more reliable than that from FPGA
       return self._rx.GetResolution()
-    raise InputFlowError('Failed to get resolution. Rx:%r, FPGA:%r',
+    raise InputFlowError(
+        'Failed to get resolution. Rx:%r, FPGA:%r',
         self._rx.GetResolution(), self._frame_manager.ComputeResolution())
 
   def Do_FSM(self):
@@ -576,8 +581,9 @@ class HdmiInputFlow(InputFlowWithAudio):
     self._fpga.hpd.Unplug(self._input_id)
     self._edid.Disable()
 
-  def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
-          repeat_count, end_level):
+  def FireHpdPulse(
+      self, deassert_interval_usec, assert_interval_usec, repeat_count,
+      end_level):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
@@ -588,8 +594,9 @@ class HdmiInputFlow(InputFlowWithAudio):
       repeat_count: The count of HPD pulses to fire.
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
-    self._fpga.hpd.FireHpdPulse(self._input_id, deassert_interval_usec,
-            assert_interval_usec, repeat_count, end_level)
+    self._fpga.hpd.FireHpdPulse(
+        self._input_id, deassert_interval_usec, assert_interval_usec,
+        repeat_count, end_level)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -602,7 +609,7 @@ class HdmiInputFlow(InputFlowWithAudio):
   def _SetPixelMode(self):
     """Sets the pixel mode based on the pixel clock of the input signal.
 
-    Returns
+    Returns:
       True if pixel mode is changed; False if nothing is changed.
     """
     pclk = self._rx.GetPixelClock()
@@ -652,8 +659,9 @@ class HdmiInputFlow(InputFlowWithAudio):
     if timeout is None:
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
     try:
-      common.WaitForCondition(self._rx.IsVideoInputStable, True,
-          self._DELAY_VIDEO_MODE_PROBE, timeout)
+      common.WaitForCondition(
+          self._rx.IsVideoInputStable, True, self._DELAY_VIDEO_MODE_PROBE,
+          timeout)
     except common.TimeoutError:
       return False
     return True
@@ -685,8 +693,8 @@ class HdmiInputFlow(InputFlowWithAudio):
     if timeout is None:
       timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
     try:
-      common.WaitForCondition(self._IsFrameLocked, True,
-          self._DELAY_VIDEO_MODE_PROBE, timeout)
+      common.WaitForCondition(
+          self._IsFrameLocked, True, self._DELAY_VIDEO_MODE_PROBE, timeout)
     except common.TimeoutError:
       message = ('Timeout waiting video output stable. RX dump: %r' %
                  self._rx.Get(0, 256))
@@ -766,8 +774,9 @@ class VgaInputFlow(InputFlow):
     self._mux_io.SetOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
     self._edid.Disable()
 
-  def FireHpdPulse(self, deassert_interval_usec, assert_interval_usec,
-          repeat_count, end_level):
+  def FireHpdPulse(
+      self, deassert_interval_usec, assert_interval_usec, repeat_count,
+      end_level):
     """Fires one or more HPD pulse (low -> high -> low -> ...).
 
     Args:
@@ -837,8 +846,9 @@ class VgaInputFlow(InputFlow):
       timeout = self._TIMEOUT_CHECKING_STABLE
     try:
       # Check if H-Sync/V-Sync recevied from the source.
-      common.WaitForCondition(self._rx.IsSyncDetected, True,
-          self._DELAY_CHECKING_STABLE_PROBE, timeout)
+      common.WaitForCondition(
+          self._rx.IsSyncDetected, True, self._DELAY_CHECKING_STABLE_PROBE,
+          timeout)
     except common.TimeoutError:
       return False
     return True
@@ -860,8 +870,9 @@ class VgaInputFlow(InputFlow):
       timeout = self._TIMEOUT_CHECKING_STABLE
     try:
       # Wait a valid resolution and not floating.
-      common.WaitForCondition(self._IsResolutionValid, True,
-          self._DELAY_CHECKING_STABLE_PROBE, timeout)
+      common.WaitForCondition(
+          self._IsResolutionValid, True, self._DELAY_CHECKING_STABLE_PROBE,
+          timeout)
     except common.TimeoutError:
       message = ('Timeout waiting video output stable. RX dump: %r' %
                  self._rx.Get(0, 256))

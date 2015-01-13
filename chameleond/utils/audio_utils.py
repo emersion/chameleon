@@ -191,7 +191,7 @@ class AudioStreamManager(object):
     if len(data) > self._stream.MAX_STREAM_BUFFER_SIZE:
       raise AudioStreamManagerError(
           'audio data is larger than %r bytes' %
-              self._stream.MAX_STREAM_BUFFER_SIZE)
+          self._stream.MAX_STREAM_BUFFER_SIZE)
     logging.info('Fill 0x%x bytes data to memory 0x%x',
                  len(data), self._stream.mapped_start_address)
     self._memory.Fill(self._stream.mapped_start_address, data)

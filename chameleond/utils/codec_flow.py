@@ -51,7 +51,7 @@ class CodecFlow(object):
     self._port_id = port_id
     self._fpga = fpga_ctrl
     self._audio_codec = codec_i2c_bus.GetSlave(
-       codec.AudioCodec.SLAVE_ADDRESSES[0])
+        codec.AudioCodec.SLAVE_ADDRESSES[0])
 
   def Initialize(self):
     """Initializes codec."""
@@ -180,7 +180,7 @@ class OutputCodecFlow(CodecFlow):
       source_id: The ID of the input connector. Check the value in ids.py.
     """
     logging.info('Start OutputFlow #%d to echo input source #%d.',
-                  self._port_id, source_id)
+                 self._port_id, source_id)
     self._fpga.aroute.SetupRouteFromInputToI2S(source_id)
     self._fpga.aiis.Enable()
 

@@ -58,8 +58,8 @@ class DpEdid(object):
   """
   _EDID_SIZE = 256
   _EDID_SRAM_MUXES = {
-    ids.DP1: io.MuxIo.MASK_DP1_EDID_SRAM_MUX,
-    ids.DP2: io.MuxIo.MASK_DP2_EDID_SRAM_MUX
+      ids.DP1: io.MuxIo.MASK_DP1_EDID_SRAM_MUX,
+      ids.DP2: io.MuxIo.MASK_DP2_EDID_SRAM_MUX
   }
 
   def __init__(self, input_id, main_i2c_bus):

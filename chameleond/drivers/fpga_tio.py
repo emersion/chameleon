@@ -90,13 +90,14 @@ class ChameleondDriver(ChameleondInterface):
     audio_bus = i2c.I2cBus(self._I2C_BUS_AUDIO)
     fpga_ctrl = fpga.FpgaController()
     self._flows = {
-      ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
-      ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
-      ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
-      ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
-      ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_bus, fpga_ctrl),
-      ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_bus, fpga_ctrl),
-      ids.LINEOUT: codec_flow.OutputCodecFlow(ids.LINEOUT, audio_bus, fpga_ctrl)
+        ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
+        ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
+        ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
+        ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
+        ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_bus, fpga_ctrl),
+        ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_bus, fpga_ctrl),
+        ids.LINEOUT: codec_flow.OutputCodecFlow(
+            ids.LINEOUT, audio_bus, fpga_ctrl)
     }
 
     for flow in self._flows.itervalues():
@@ -381,8 +382,8 @@ class ChameleondDriver(ChameleondInterface):
 
     logging.info('Fire HPD pulse on port #%d, ending with %s',
                  port_id, 'high' if end_level else 'low')
-    return self._flows[port_id].FireHpdPulse(deassert_interval_usec,
-        assert_interval_usec, repeat_count, end_level)
+    return self._flows[port_id].FireHpdPulse(
+        deassert_interval_usec, assert_interval_usec, repeat_count, end_level)
 
   @_VideoMethod
   def FireMixedHpdPulses(self, port_id, widths_msec):
@@ -551,10 +552,10 @@ class ChameleondDriver(ChameleondInterface):
           raise DriverError('Arguments x and width not aligned to 8-byte.')
 
     self._captured_params = {
-      'port_id': port_id,
-      'resolution': (width, height),
-      'is_dual_pixel': is_dual_pixel_mode,
-      'pixeldump_args': self._flows[port_id].GetPixelDumpArgs(),
+        'port_id': port_id,
+        'resolution': (width, height),
+        'is_dual_pixel': is_dual_pixel_mode,
+        'pixeldump_args': self._flows[port_id].GetPixelDumpArgs(),
     }
 
   @_VideoMethod
@@ -736,8 +737,8 @@ class ChameleondDriver(ChameleondInterface):
     return self._flows[port_id].GetFrameHashes(start_index, stop_index)
 
   @_VideoMethod
-  def ComputePixelChecksum(self, port_id, x=None, y=None, width=None,
-        height=None):
+  def ComputePixelChecksum(
+      self, port_id, x=None, y=None, width=None, height=None):
     """Computes the checksum of pixels in the selected area.
 
     If not given the area, default to compute the whole screen.
@@ -804,7 +805,7 @@ class ChameleondDriver(ChameleondInterface):
         other port. The API includes CaptureVideo, StartCapturingVideo,
         DetectResolution, StartCapturingAudio, StartPlayingEcho.
     """
-    if (self._selected_input != port_id):
+    if self._selected_input != port_id:
       raise DriverError(
           'The input is selected to %r not %r', self._selected_input, port_id)
     data, data_format = self._flows[port_id].StopCapturingAudio()
@@ -868,7 +869,7 @@ class ChameleondDriver(ChameleondInterface):
         This happens if user has used API related to output operation on other
         port. The API includes StartPlayingAudio, StartPlayingEcho.
     """
-    if (self._selected_output != port_id):
+    if self._selected_output != port_id:
       raise DriverError(
           'The output is selected to %r not %r', self._selected_output, port_id)
     logging.info('Stop playing audio from port #%d', port_id)
