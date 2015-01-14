@@ -114,7 +114,11 @@ class ChameleondDriver(ChameleondInterface):
     """Resets Chameleon board."""
     logging.info('Execute the reset process')
     # TODO(waihong): Add other reset routines.
-    self._ApplyDefaultEdid()
+    logging.info('Apply the default EDID and enable DDC on all video inputs')
+    for port_id in self.GetSupportedInputs():
+      if self.HasVideoSupport(port_id):
+        self.ApplyEdid(port_id, ids.EDID_ID_DEFAULT)
+        self.SetDdcState(port_id, enabled=True)
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
@@ -288,6 +292,30 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('Not a valid edid_id.')
 
   @_VideoMethod
+  def SetDdcState(self, port_id, enabled):
+    """Sets the enabled/disabled state of DDC bus on the given video input.
+
+    Args:
+      port_id: The ID of the video input port.
+      enabled: True to enable DDC bus due to an user request; False to
+               disable it.
+    """
+    logging.info('Set DDC bus on port #%d to enabled %r', port_id, enabled)
+    self._flows[port_id].SetDdcState(enabled)
+
+  @_VideoMethod
+  def IsDdcEnabled(self, port_id):
+    """Checks if the DDC bus is enabled or disabled on the given video input.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      True if the DDC bus is enabled; False if disabled.
+    """
+    return self._flows[port_id].IsDdcEnabled()
+
+  @_VideoMethod
   def ReadEdid(self, port_id):
     """Reads the EDID content of the selected video input on Chameleon.
 
@@ -303,13 +331,6 @@ class ChameleondDriver(ChameleondInterface):
     else:
       logging.debug('Read EDID on port #%d which is disabled.', port_id)
       return None
-
-  def _ApplyDefaultEdid(self):
-    """Applies the default EDID to all video inputs."""
-    logging.info('Apply the default EDID to all video inputs')
-    for port_id in self.GetSupportedInputs():
-      if self.HasVideoSupport(port_id):
-        self.ApplyEdid(port_id, ids.EDID_ID_DEFAULT)
 
   @_VideoMethod
   def ApplyEdid(self, port_id, edid_id):

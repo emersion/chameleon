@@ -68,6 +68,7 @@ class InputFlow(object):
         input_id, self._GetEffectiveVideoDumpers())
     self._edid = None  # be overwitten by a subclass.
     self._edid_enabled = True
+    self._ddc_enabled = True
 
   def _GetEffectiveVideoDumpers(self):
     """Gets effective video dumpers on the flow."""
@@ -232,14 +233,11 @@ class InputFlow(object):
       enabled: True to enable EDID due to an user request; False to
                disable it.
     """
-    old_state = self._edid_enabled and self.IsPlugged()
+    if enabled and self.IsPlugged():
+      self._edid.Enable()
+    else:
+      self._edid.Disable()
     self._edid_enabled = enabled
-    new_state = self._edid_enabled and self.IsPlugged()
-    if old_state != new_state:
-      if new_state:
-        self._edid.Enable()
-      else:
-        self._edid.Disable()
 
   def IsEdidEnabled(self):
     """Checks if the EDID is enabled or disabled.
@@ -288,6 +286,35 @@ class InputFlow(object):
     for op, sleep_time in pulses:
       op()
       time.sleep(sleep_time)
+
+  def _EnableDdc(self):
+    """Enables the DDC bus."""
+    raise NotImplementedError('EnableDdc')
+
+  def _DisableDdc(self):
+    """Disables the DDC bus."""
+    raise NotImplementedError('DisableDdc')
+
+  def SetDdcState(self, enabled):
+    """Sets the enabled/disabled state of DDC bus.
+
+    Args:
+      enabled: True to enable DDC bus due to an user request; False to
+              disable it.
+    """
+    if enabled and self.IsPlugged():
+      self._EnableDdc()
+    else:
+      self._DisableDdc()
+    self._ddc_enabled = enabled
+
+  def IsDdcEnabled(self):
+    """Checks if the DDC bus is enabled or disabled.
+
+    Returns:
+      True if the DDC bus is enabled; False if disabled.
+    """
+    return self._ddc_enabled
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -403,15 +430,14 @@ class DpInputFlow(InputFlow):
     """Asserts HPD line to high, emulating plug."""
     if self.IsEdidEnabled():
       self._edid.Enable()
-    # enable aux bypass
-    self._mux_io.ClearOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
+    if self.IsDdcEnabled():
+      self._EnableDdc()
     self._fpga.hpd.Plug(self._input_id)
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
     self._edid.Disable()
-    # disable aux bypass
-    self._mux_io.SetOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
+    self._DisableDdc()
     self._fpga.hpd.Unplug(self._input_id)
 
   def FireHpdPulse(
@@ -430,6 +456,16 @@ class DpInputFlow(InputFlow):
     self._fpga.hpd.FireHpdPulse(
         self._input_id, deassert_interval_usec, assert_interval_usec,
         repeat_count, end_level)
+
+  def _EnableDdc(self):
+    """Enable the DDC bus."""
+    # Enable AUX bypass
+    self._mux_io.ClearOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
+
+  def _DisableDdc(self):
+    """Disable the DDC bus."""
+    # Disable AUX bypass
+    self._mux_io.SetOutputMask(self._AUX_BYPASS_MUXES[self._input_id])
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -574,12 +610,15 @@ class HdmiInputFlow(InputFlowWithAudio):
     """Asserts HPD line to high, emulating plug."""
     if self.IsEdidEnabled():
       self._edid.Enable()
+    if self.IsDdcEnabled():
+      self._EnableDdc()
     self._fpga.hpd.Plug(self._input_id)
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
-    self._fpga.hpd.Unplug(self._input_id)
     self._edid.Disable()
+    self._DisableDdc()
+    self._fpga.hpd.Unplug(self._input_id)
 
   def FireHpdPulse(
       self, deassert_interval_usec, assert_interval_usec, repeat_count,
@@ -597,6 +636,14 @@ class HdmiInputFlow(InputFlowWithAudio):
     self._fpga.hpd.FireHpdPulse(
         self._input_id, deassert_interval_usec, assert_interval_usec,
         repeat_count, end_level)
+
+  def _EnableDdc(self):
+    """Enable the DDC bus."""
+    self._mux_io.ClearOutputMask(io.MuxIo.MASK_HDMI_DDC_BP_L)
+
+  def _DisableDdc(self):
+    """Disable the DDC bus."""
+    self._mux_io.SetOutputMask(io.MuxIo.MASK_HDMI_DDC_BP_L)
 
   def ReadEdid(self):
     """Reads the EDID content."""
@@ -765,14 +812,17 @@ class VgaInputFlow(InputFlow):
     """Asserts HPD line to high, emulating plug."""
     if self.IsEdidEnabled():
       self._edid.Enable()
+    if self.IsDdcEnabled():
+      self._EnableDdc()
     # For VGA, unblock the RGB source to emulate plug.
     self._mux_io.ClearOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 
   def Unplug(self):
     """Deasserts HPD line to low, emulating unplug."""
+    self._edid.Disable()
+    self._DisableDdc()
     # For VGA, block the RGB source to emulate unplug.
     self._mux_io.SetOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
-    self._edid.Disable()
 
   def FireHpdPulse(
       self, deassert_interval_usec, assert_interval_usec, repeat_count,
@@ -814,6 +864,18 @@ class VgaInputFlow(InputFlow):
     else:
       self._auto_vga_mode = False
       self._rx.SetMode(mode)
+
+  def _EnableDdc(self):
+    """Enable the DDC bus."""
+    # Chameleon board does not support disabling the DDC bus on VGA.
+    # Simply enable the EDID.
+    self._edid.Enable()
+
+  def _DisableDdc(self):
+    """Disable the DDC bus."""
+    # Chameleon board does not support disabling the DDC bus on VGA.
+    # Simply disable the EDID.
+    self._edid.Disable()
 
   def ReadEdid(self):
     """Reads the EDID content."""

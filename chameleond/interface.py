@@ -159,6 +159,27 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DestroyEdid')
 
+  def SetDdcState(self, port_id, enabled):
+    """Sets the enabled/disabled state of DDC bus on the given video input.
+
+    Args:
+      port_id: The ID of the video input port.
+      enabled: True to enable DDC bus due to a user request; False to
+               disable it.
+    """
+    raise NotImplementedError('SetDdcState')
+
+  def IsDdcEnabled(self, port_id):
+    """Checks if the DDC bus is enabled or disabled on the given video input.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      True if the DDC bus is enabled; False if disabled.
+    """
+    raise NotImplementedError('IsDdcEnabled')
+
   def ReadEdid(self, port_id):
     """Reads the EDID content of the selected video input on Chameleon.
 
