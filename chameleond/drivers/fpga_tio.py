@@ -107,7 +107,7 @@ class ChameleondDriver(ChameleondInterface):
     self.Reset()
 
     # Set all ports unplugged on initialization.
-    for port_id in self.ProbePorts():
+    for port_id in self.GetSupportedPorts():
       self.Unplug(port_id)
 
   def Reset(self):
