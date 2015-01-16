@@ -152,9 +152,9 @@ class InputFlow(object):
       self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
                                             timeout)
     except common.TimeoutError:
-      message = ('Frames failed to reach %d. RX dump: %r' %
-                 (frame_limit, self._rx.Get(0, 256)))
+      message = 'Frames failed to reach %d' % frame_limit
       logging.error(message)
+      logging.error('RX dump: %r', self._rx.Get(0, 256))
       raise InputFlowError(message)
 
   def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
@@ -743,9 +743,9 @@ class HdmiInputFlow(InputFlowWithAudio):
       common.WaitForCondition(
           self._IsFrameLocked, True, self._DELAY_VIDEO_MODE_PROBE, timeout)
     except common.TimeoutError:
-      message = ('Timeout waiting video output stable. RX dump: %r' %
-                 self._rx.Get(0, 256))
+      message = 'Timeout waiting video output stable'
       logging.error(message)
+      logging.error('RX dump: %r', self._rx.Get(0, 256))
       raise InputFlowError(message)
 
   def SetContentProtection(self, enabled):
@@ -936,9 +936,9 @@ class VgaInputFlow(InputFlow):
           self._IsResolutionValid, True, self._DELAY_CHECKING_STABLE_PROBE,
           timeout)
     except common.TimeoutError:
-      message = ('Timeout waiting video output stable. RX dump: %r' %
-                 self._rx.Get(0, 256))
+      message = 'Timeout waiting video output stable'
       logging.error(message)
+      logging.error('RX dump: %r', self._rx.Get(0, 256))
       raise InputFlowError(message)
 
   def SetContentProtection(self, enabled):
