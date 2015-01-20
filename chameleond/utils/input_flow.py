@@ -363,11 +363,8 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
     super(InputFlowWithAudio, self).__init__(input_id, main_i2c_bus, fpga_ctrl)
     self._audio_capture_manager = audio_utils.AudioCaptureManager(
         self._fpga.adump)
-
-  def Select(self):
-    """Selects the input flow to set the proper muxes and FPGA paths."""
-    super(InputFlowWithAudio, self).Select()
-    self._fpga.aroute.SetupRouteFromInputToDumper(self._input_id)
+    self._audio_route_manager = audio_utils.AudioRouteManager(
+        self._fpga.aroute)
 
   @property
   def is_capturing_audio(self):
@@ -376,6 +373,7 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
 
   def StartCapturingAudio(self):
     """Starts capturing audio."""
+    self._audio_route_manager.SetupRouteFromInputToDumper(self._input_id)
     self._audio_capture_manager.StartCapturingAudio()
 
   def StopCapturingAudio(self):
@@ -391,7 +389,13 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    return self._audio_capture_manager.StopCapturingAudio()
+    return_value = self._audio_capture_manager.StopCapturingAudio()
+    self.ResetRoute()
+    return return_value
+
+  def ResetRoute(self):
+    """Resets the audio route."""
+    self._audio_route_manager.ResetRouteToDumper()
 
 
 class DpInputFlow(InputFlow):

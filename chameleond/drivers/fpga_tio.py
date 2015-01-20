@@ -119,6 +119,9 @@ class ChameleondDriver(ChameleondInterface):
       if self.HasVideoSupport(port_id):
         self.ApplyEdid(port_id, ids.EDID_ID_DEFAULT)
         self.SetDdcState(port_id, enabled=True)
+    for port_id in self.GetSupportedPorts():
+      if self.HasAudioSupport(port_id):
+        self._flows[port_id].ResetRoute()
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
@@ -798,6 +801,9 @@ class ChameleondDriver(ChameleondInterface):
   def StartCapturingAudio(self, port_id):
     """Starts capturing audio.
 
+    Refer to the docstring of StartPlayingEcho about the restriction of
+    capturing and echoing at the same time.
+
     Args:
       port_id: The ID of the audio input port.
     """
@@ -861,6 +867,28 @@ class ChameleondDriver(ChameleondInterface):
     """Echoes audio data received from input_id and plays to port_id.
 
     Echoes audio data received from input_id and plays to port_id.
+
+    Chameleon does not support echoing from HDMI and capturing from LineIn/Mic
+    at the same time. The echoing/capturing needs to be stop first before
+    another action starts.
+
+    For example, user can call
+
+    StartPlayingEcho(3, 7) --> StopPlayingAudio(3) --> StartCapturingAudio(6)
+
+    or
+
+    StartCapturingAudio(6) --> StopCapturingAudio(6) --> StartPlayingEcho(3, 7)
+
+    but user can not call
+
+    StartPlayingEcho(3, 7) --> StartCapturingAudio(6)
+
+    or
+
+    StartCapturingAudio(6) --> StartPlayingEcho(3, 7)
+
+    Exception is raised when conflicting actions are performed.
 
     Args:
       port_id: The ID of the output connector. Check the value in ids.py.

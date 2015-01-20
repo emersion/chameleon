@@ -10,6 +10,8 @@ import tempfile
 import time
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.utils import fpga
+from chameleond.utils import ids
 from chameleond.utils import mem
 from chameleond.utils import system_tools
 
@@ -213,3 +215,166 @@ def AppendZeroToFitPageSize(data, page_size):
     return data
   append_size = page_size - offset
   return data + struct.pack('<b', 0) * append_size
+
+
+class AudioRouteManagerError(Exception):
+  """Exception raised when any error occurs in AudioRouteManager."""
+  pass
+
+
+class AudioRouteManager(object):
+  """A class to manage audio route.
+
+  This class provides SetupRouteFrom[]To[] for audio flows to setup
+  audio route. Route reset API are also provided. Invalid route as
+  described below will raise exception when requested.
+
+  The audio codec needs us feed its I2S clock when recording/playing
+  audio. There are two possible clock sources:
+  1. Generator generates a fixed 48K clock once it is turned on and it
+     is not controlled by divisor or volume control.
+  2. The clock from RX along with the audio signal received from RX.
+
+  Due to the fact that codec only accepts one clock,
+  we can not connect two different clocks for playback and recording.
+
+  The following combination is invalid:
+
+  RX_I2S -> I2S
+  CODEC -> DUMPER
+                                                    ----------       play to
+  Source: RX_I2S        --->  Destination: I2S --> |          | ---> LINEOUT
+                                                   |  CODEC   |
+  Destination: DUMPER   <---  Source: CODEC    <-- |          | <--- record from
+                                                    ----------       LINEIN/MIC
+
+  In the above combination, codec will only be connected to the RX clock. But
+  if there is no audio signal from RX, the RX clock will be gone too. This will
+  cause malfunction to the path of recording.
+
+  Properties:
+    _aroute: An AudioRouteController object in FpgaController.
+  """
+  def __init__(self, audio_route):
+    """Inits an AudioRouteManager.
+
+    Args:
+      audio_route: An AudioRouteController object.
+    """
+    self._aroute = audio_route
+
+  def SetupRouteFromInputToDumper(self, input_id):
+    """Sets up audio route given an input_id for audio dumper.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+    """
+    source = self._GetAudioSourceFromInputId(input_id)
+    self._SetupRouteFromSourceToDestination(
+        source, fpga.AudioDestination.DUMPER)
+
+  def SetupRouteFromInputToI2S(self, input_id):
+    """Sets up audio source given an input_id for I2S controller.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+    """
+    source = self._GetAudioSourceFromInputId(input_id)
+    self._SetupRouteFromSourceToDestination(source, fpga.AudioDestination.I2S)
+
+  def SetupRouteFromMemoryToI2S(self):
+    """Sets up memory as audio source and I2S as destination."""
+    self._SetupRouteFromSourceToDestination(
+        fpga.AudioSource.MEMORY, fpga.AudioDestination.I2S)
+
+  def ResetRouteToI2S(self):
+    """Resets the route to I2S by selecting generator as source."""
+    self._SetupRouteFromSourceToDestination(
+        fpga.AudioSource.GENERATOR, fpga.AudioDestination.I2S)
+
+  def ResetRouteToDumper(self):
+    """Resets the route to DUMPER by selecting generator as source."""
+    self._SetupRouteFromSourceToDestination(
+        fpga.AudioSource.GENERATOR, fpga.AudioDestination.DUMPER)
+
+  def _SetupRouteFromSourceToDestination(self, source, destination):
+    """Sets up route from source to destination.
+
+    _CheckInvalidCombination will check if the combination is invalid.
+
+    Args:
+      source: An audio source in fpga.AudioSource.
+      destination: An audio destination in fpga.AudioDestination.
+    """
+    # Gets the other source to check if the combination is invalid.
+    if destination == fpga.AudioDestination.I2S:
+      source_i2s = source
+      source_dumper = self._aroute.GetCurrentSource(
+          fpga.AudioDestination.DUMPER)
+    else:
+      source_i2s = self._aroute.GetCurrentSource(fpga.AudioDestination.I2S)
+      source_dumper = source
+
+    self._CheckInvalidCombination(source_i2s, source_dumper)
+
+    # Turns on generator if any one of source requires generator clock.
+    # Turns off generator if none of the source requires generator clock.
+    self._aroute.SetGeneratorEnabled(
+        self._RequiresGeneratorClock(source_i2s) or
+        self._RequiresGeneratorClock(source_dumper))
+
+    self._aroute.SetupRoute(source, destination)
+
+  def _CheckInvalidCombination(self, source_i2s, source_dumper):
+    """Checks if the route combination is invalid.
+
+    As stated in the docstrings of AudioRouteManager, this combination
+    is invalid:
+
+    RX_I2S -> I2S
+    CODEC -> DUMPER
+
+    Args:
+      source_i2s: An audio source in fpga.AudioSource.
+      source_dumper: An audio source in fpga.AudioSource.
+
+    Raises:
+      AudioRouteManagerError if the route is invalid.
+    """
+    if (source_i2s == fpga.AudioSource.RX_I2S and
+        source_dumper == fpga.AudioSource.CODEC):
+      raise AudioRouteManagerError(
+          '%r -> %r, %r -> %r is invalid.' % (
+              source_i2s, fpga.AudioDestination.I2S,
+              source_dumper, fpga.AudioDestination.DUMPER))
+
+  def _GetAudioSourceFromInputId(self, input_id):
+    """Gets audio source given an input_id.
+
+    Args:
+      input_id: The ID of the input connector. Check the value in ids.py.
+
+    Returns:
+      An audio source in fpga.AudioSource.
+
+    Raises:
+      AudioRouteManagerError if input_id is not supported.
+    """
+    if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
+      return fpga.AudioSource.RX_I2S
+    if input_id in [ids.MIC, ids.LINEIN]:
+      return fpga.AudioSource.CODEC
+    raise AudioRouteManagerError(
+        'input_id %s is not supported in AudioRouteController' % input_id)
+
+  def _RequiresGeneratorClock(self, source):
+    """Checks if a source requires generator clock.
+
+    Args:
+      source: An audio source in fpga.AudioSource.
+
+    Returns:
+      True if generator clock is required for source.
+    """
+    return source != fpga.AudioSource.RX_I2S
+

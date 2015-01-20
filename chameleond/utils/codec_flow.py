@@ -52,6 +52,8 @@ class CodecFlow(object):
     self._fpga = fpga_ctrl
     self._audio_codec = codec_i2c_bus.GetSlave(
         codec.AudioCodec.SLAVE_ADDRESSES[0])
+    self._audio_route_manager = audio_utils.AudioRouteManager(
+        self._fpga.aroute)
 
   def Initialize(self):
     """Initializes codec."""
@@ -65,6 +67,10 @@ class CodecFlow(object):
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
     raise NotImplementedError('GetConnectorType')
+
+  def ResetRoute(self):
+    """Resets the audio route."""
+    raise NotImplementedError('ResetRoute')
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -113,7 +119,6 @@ class InputCodecFlow(CodecFlow):
   def Select(self):
     """Selects the codec flow to set the proper codec path and FPGA paths."""
     logging.info('Select InputCodecFlow for input id #%d.', self._port_id)
-    self._fpga.aroute.SetupRouteFromInputToDumper(self._port_id)
     self._audio_codec.SelectInput(self._CODEC_INPUTS[self._port_id])
 
   def GetConnectorType(self):
@@ -131,6 +136,7 @@ class InputCodecFlow(CodecFlow):
 
   def StartCapturingAudio(self):
     """Starts capturing audio."""
+    self._audio_route_manager.SetupRouteFromInputToDumper(self._port_id)
     self._audio_capture_manager.StartCapturingAudio()
 
   def StopCapturingAudio(self):
@@ -146,7 +152,13 @@ class InputCodecFlow(CodecFlow):
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    return self._audio_capture_manager.StopCapturingAudio()
+    return_value = self._audio_capture_manager.StopCapturingAudio()
+    self.ResetRoute()
+    return return_value
+
+  def ResetRoute(self):
+    """Resets the audio route."""
+    self._audio_route_manager.ResetRouteToDumper()
 
 
 class OutputCodecFlow(CodecFlow):
@@ -181,7 +193,7 @@ class OutputCodecFlow(CodecFlow):
     """
     logging.info('Start OutputFlow #%d to echo input source #%d.',
                  self._port_id, source_id)
-    self._fpga.aroute.SetupRouteFromInputToI2S(source_id)
+    self._audio_route_manager.SetupRouteFromInputToI2S(source_id)
     self._fpga.aiis.Enable()
 
   def StartPlayingAudioData(self, audio_data):
@@ -197,7 +209,7 @@ class OutputCodecFlow(CodecFlow):
         format: The dict representation of AudioDataFormat. Refer to docstring
           of utils.audio.AudioDataFormat for detail.
     """
-    self._fpga.aroute.SetupRouteFromMemoryToI2S()
+    self._audio_route_manager.SetupRouteFromMemoryToI2S()
     self._fpga.aiis.Enable()
     self._audio_stream_manager.StartPlayingAudio(audio_data)
 
@@ -214,3 +226,8 @@ class OutputCodecFlow(CodecFlow):
     """Stops playing audio for both echo and streaming."""
     self._fpga.aiis.Disable()
     self._audio_stream_manager.StopPlayingAudio()
+    self.ResetRoute()
+
+  def ResetRoute(self):
+    """Resets the audio route."""
+    self._audio_route_manager.ResetRouteToI2S()

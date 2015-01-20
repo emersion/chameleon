@@ -683,8 +683,11 @@ class AudioRouteController(object):
   """A class to control audio source controller.
 
   As shown in audio routing graph, this controller controls two destinations in
-  AudioDestination. They can be independently selected from four sources in
-  AudioSource.
+  AudioDestination. They can be selected from four sources in AudioSource, but
+  the combination is subjected to clock selection, as described in
+  audio_utils.AudioRouteManager.
+  This AudioRouteController is only responsible for low level control. Refer
+  to audio_utils.AudioRouteManager for the routing usage and constraints.
   """
   _REGS_BASE = 0xff213000
 
@@ -711,50 +714,33 @@ class AudioRouteController(object):
     """Constructs an AudioRouteController object."""
     self._memory = mem.MemoryForController
 
-  def SetupRouteFromInputToDumper(self, input_id):
-    """Sets up audio source given input_id for audio dumper.
+  def GetCurrentSource(self, destination):
+    """Gets current source for the specified destination
 
     Args:
-      input_id: The ID of the input connector. Check the value in ids.py.
-    """
-    self._SetupRouteFromInput(input_id, AudioDestination.DUMPER)
-
-  def SetupRouteFromInputToI2S(self, input_id):
-    """Sets up audio source given input_id for I2S controller.
-
-    Args:
-      input_id: The ID of the input connector. Check the value in ids.py.
-    """
-    # Check docstring of _EnableGenerator for the reason to enable generator.
-    self._EnableGenerator(True)
-    self._SetupRouteFromInput(input_id, AudioDestination.I2S)
-
-  def _SetupRouteFromInput(self, input_id, destination):
-    """Sets up audio route given an input_id and a destination.
-
-    Args:
-      input_id: The ID of the input connector. Check the value in ids.py.
       destination: A destination in AudioDestination.
 
+    Returns:
+      An audio source in AudioSource.
+
     Raises:
-      AudioRouteControllerError if input_id is not supported.
+      AudioRouteControllerError if source read from memory is invalid.
     """
-    if input_id in [ids.DP1, ids.DP2, ids.HDMI]:
-      self._SetupRoute(AudioSource.RX_I2S, destination)
-      return
-    if input_id in [ids.MIC, ids.LINEIN]:
-      self._SetupRoute(AudioSource.CODEC, destination)
-      return
-    raise AudioRouteControllerError(
-        'input_id %s is not supported in AudioRouteController' % input_id)
+    reg_value = self._memory.Read(
+        self._REGS_BASE + self._REG_INPUT_SELECT)
+    source_value = ((reg_value & self._MASKS_INPUT_SELECT[destination]) >>
+                    self._SHIFTS_INPUT_SELECT[destination])
+    source = None
+    for k, v in self._VALUES_INPUT_SELECT.iteritems():
+      if source_value == v:
+        source = k
+    if source is None:
+      raise AudioRouteControllerError(
+          'Read invalid source value %r for '
+          'destination %r' % (source_value, destination))
+    return source
 
-  def SetupRouteFromMemoryToI2S(self):
-    """Sets up memory as audio source and I2S as destination."""
-    # Check docstring of _EnableGenerator for the reason to enable generator.
-    self._EnableGenerator(True)
-    self._SetupRoute(AudioSource.MEMORY, AudioDestination.I2S)
-
-  def _SetupRoute(self, source, destination):
+  def SetupRoute(self, source, destination):
     """Sets up audio route given a source and a destination.
 
     Args:
@@ -774,12 +760,8 @@ class AudioRouteController(object):
     self._memory.Write(
         self._REGS_BASE + self._REG_INPUT_SELECT, new_value)
 
-  def _EnableGenerator(self, enabled):
-    """Enables generator.
-
-    The audio codec needs us feed its I2S clock 48K when recording/playing
-    audio. Generator generates a fixed 48K clock once it is turned on and it
-    is not controlled by divisor or volume control.
+  def SetGeneratorEnabled(self, enabled):
+    """Enables or disables generator.
 
     Args:
       enabled: True to enable.
@@ -792,6 +774,7 @@ class AudioRouteController(object):
       self._memory.ClearMask(
           self._REGS_BASE + self._REG_GENERATOR_ENABLE,
           self._BIT_GENERATOR_ENABLE)
+
 
 class AudioStreamControllerError(Exception):
   """Exception raised when any error on AudioStreamController."""
