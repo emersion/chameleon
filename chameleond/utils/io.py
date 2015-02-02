@@ -13,9 +13,15 @@ from chameleond.utils import ids
 
 
 class IoExpander(i2c.I2cSlave):
-  """A class to abstract the behavior of the TCA6416A I/O expander."""
+  """A class to abstract the behavior of the TCA6416A/TCA9995 I/O expander.
 
-  SLAVE_ADDRESSES = (0x20, 0x21)
+  TIO uses TCA6416A while the audio board uses TCA9995. Both I/O expanders
+  share the same usage.
+  """
+
+  # TIO uses TCA6416A on 0x20, 0x21.
+  # The audio board uses TCA9995 on 0x20, 0x21, 0x22.
+  SLAVE_ADDRESSES = (0x20, 0x21, 0x22)
 
   _INPUT_BASE = 0
   _OUTPUT_BASE = 2

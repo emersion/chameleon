@@ -23,8 +23,8 @@ class I2cBusError(Exception):
 class I2cBus(object):
   """A Class to abstract the behavior of I2C bus."""
 
-  # Register base addresses for the I2C bus 0, 1, and 2.
-  _BASE_ADDRESSES = (0xff21b000, 0xff21c000, 0xff218000)
+  # Register base addresses for the I2C bus 0, 1, 2, and 3.
+  _BASE_ADDRESSES = (0xff21b000, 0xff21c000, 0xff218000, 0xff21c800)
 
   def __init__(self, bus):
     """Constructs a I2cBus object.
