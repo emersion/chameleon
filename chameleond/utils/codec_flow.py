@@ -153,6 +153,7 @@ class InputCodecFlow(CodecFlow):
       AudioCaptureManagerError: If there is no captured data.
     """
     return_value = self._audio_capture_manager.StopCapturingAudio()
+    self._audio_codec.SelectInput(codec.CodecInput.NONE)
     self.ResetRoute()
     return return_value
 
