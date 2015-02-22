@@ -63,7 +63,7 @@ class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for FPGA customized platform."""
 
   _I2C_BUS_MAIN = 0
-  _I2C_BUS_AUDIO = 1
+  _I2C_BUS_AUDIO_CODEC = 1
 
   _PIXEL_LEN = 3
 
@@ -87,17 +87,18 @@ class ChameleondDriver(ChameleondInterface):
 
     self._tools = system_tools.SystemTools
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
-    audio_bus = i2c.I2cBus(self._I2C_BUS_AUDIO)
+    audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
     fpga_ctrl = fpga.FpgaController()
     self._flows = {
         ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
         ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
         ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
         ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
-        ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_bus, fpga_ctrl),
-        ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_bus, fpga_ctrl),
+        ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_codec_bus, fpga_ctrl),
+        ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_codec_bus,
+                                              fpga_ctrl),
         ids.LINEOUT: codec_flow.OutputCodecFlow(
-            ids.LINEOUT, audio_bus, fpga_ctrl)
+            ids.LINEOUT, audio_codec_bus, fpga_ctrl)
     }
 
     for flow in self._flows.itervalues():
