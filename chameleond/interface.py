@@ -547,3 +547,49 @@ class ChameleondInterface(object):
       port_id: The ID of the output connector.
     """
     raise NotImplementedError('StopPlayingAudio')
+
+  def AudioBoardConnect(self, bus_number, endpoint):
+    """Connects an endpoint to an audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+      endpoint: An endpoint defined in audio_board.AudioBusEndpoint.
+
+    Raises:
+      DriverError: If the endpoint is a source and there is other source
+                   endpoint occupying audio bus.
+    """
+    raise NotImplementedError('AudioBoardConnect')
+
+  def AudioBoardDisconnect(self, bus_number, endpoint):
+    """Disconnects an endpoint to an audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+      endpoint: An endpoint defined in audio_board.AudioBusEndpoint.
+
+    Raises:
+      DriverError: If the endpoint is not connected to audio bus.
+    """
+    raise NotImplementedError('AudioBoardDisconnect')
+
+  def AudioBoardGetRoutes(self, bus_number):
+    """Gets a list of routes on audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+
+    Returns:
+      A list of tuples (source, sink) that are routed on audio bus
+      where source and sink are endpoints defined in
+      audio_board.AudioBusEndpoint.
+    """
+    raise NotImplementedError('AudioBoardGetRoutes')
+
+  def AudioBoardClearRoutes(self, bus_number):
+    """Clears routes on an audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+    """
+    raise NotImplementedError('AudioBoardClearRoutes')

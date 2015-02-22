@@ -12,6 +12,7 @@ import xmlrpclib
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
+from chameleond.utils import audio_board
 from chameleond.utils import codec_flow
 from chameleond.utils import fpga
 from chameleond.utils import i2c
@@ -59,11 +60,22 @@ def _VideoMethod(func):
   return wrapper
 
 
+def _AudioBoardMethod(func):
+  """Decorator that checks there is an audio board."""
+  @functools.wraps(func)
+  def wrapper(instance, *args, **kwargs):
+    if not instance.HasAudioBoard():
+      raise DriverError('There is no audio board')
+    return func(instance, *args, **kwargs)
+  return wrapper
+
+
 class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for FPGA customized platform."""
 
   _I2C_BUS_MAIN = 0
   _I2C_BUS_AUDIO_CODEC = 1
+  _I2C_BUS_AUDIO_BOARD = 3
 
   _PIXEL_LEN = 3
 
@@ -105,6 +117,16 @@ class ChameleondDriver(ChameleondInterface):
       if flow:
         flow.Initialize()
 
+    # Some Chameleon might not have audio board installed.
+    self._audio_board = None
+    try:
+      audio_board_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_BOARD)
+      self._audio_board = audio_board.AudioBoard(audio_board_bus)
+    except audio_board.AudioBoardException:
+      logging.warning('There is no audio board on this Chameleon')
+    else:
+      logging.info('There is an audio board on this Chameleon')
+
     self.Reset()
 
     # Set all ports unplugged on initialization.
@@ -123,6 +145,9 @@ class ChameleondDriver(ChameleondInterface):
     for port_id in self.GetSupportedPorts():
       if self.HasAudioSupport(port_id):
         self._flows[port_id].ResetRoute()
+
+    if self.HasAudioBoard():
+      self._audio_board.Reset()
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
@@ -798,6 +823,14 @@ class ChameleondDriver(ChameleondInterface):
     logging.info('Detected resolution on port #%d: %dx%d', port_id, *resolution)
     return resolution
 
+  def HasAudioBoard(self):
+    """Returns True if there is an audio board.
+
+    Returns:
+      True if there is an audio board. False otherwise.
+    """
+    return self._audio_board is not None
+
   @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id):
     """Starts capturing audio.
@@ -924,3 +957,74 @@ class ChameleondDriver(ChameleondInterface):
           'The output is selected to %r not %r', self._selected_output, port_id)
     logging.info('Stop playing audio from port #%d', port_id)
     self._flows[port_id].StopPlayingAudio()
+
+  @_AudioBoardMethod
+  def AudioBoardConnect(self, bus_number, endpoint):
+    """Connects an endpoint to an audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+      endpoint: An endpoint defined in audio_board.AudioBusEndpoint.
+
+    Raises:
+      DriverError: If the endpoint is a source and there is other source
+                   endpoint occupying audio bus.
+    """
+    if audio_board.IsSource(endpoint):
+      current_sources, _ = self._audio_board.GetConnections(bus_number)
+      if current_sources and endpoint not in current_sources:
+        raise DriverError(
+            'Sources %s other than %s are currently occupying audio bus.' %
+            (current_sources, endpoint))
+
+    self._audio_board.SetConnection(
+        bus_number, endpoint, True)
+
+  @_AudioBoardMethod
+  def AudioBoardDisconnect(self, bus_number, endpoint):
+    """Disconnects an endpoint to an audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+      endpoint: An endpoint defined in audio_board.AudioBusEndpoint.
+
+    Raises:
+      DriverError: If the endpoint is not connected to audio bus.
+    """
+    if not self._audio_board.IsConnected(bus_number, endpoint):
+      raise DriverError(
+          'Endpoint %s is not connected to audio bus %d.' %
+          (endpoint, bus_number))
+
+    self._audio_board.SetConnection(
+        bus_number, endpoint, False)
+
+  @_AudioBoardMethod
+  def AudioBoardGetRoutes(self, bus_number):
+    """Gets a list of routes on audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+
+    Returns:
+      A list of tuples (source, sink) that are routed on audio bus
+      where source and sink are endpoints defined in
+      audio_board.AudioBusEndpoint.
+    """
+    sources, sinks = self._audio_board.GetConnections(bus_number)
+    routes = []
+    for source in sources:
+      for sink in sinks:
+        logging.info('Route on bus %d: %s ---> %s',
+                     bus_number, source, sink)
+        routes.append((source, sink))
+    return routes
+
+  @_AudioBoardMethod
+  def AudioBoardClearRoutes(self, bus_number):
+    """Clears routes on an audio bus.
+
+    Args:
+      bus_number: 1 or 2 for audio bus 1 or bus 2.
+    """
+    self._audio_board.ResetConnections(bus_number)
