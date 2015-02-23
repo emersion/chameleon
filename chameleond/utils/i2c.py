@@ -76,6 +76,22 @@ class I2cBus(object):
       self._slaves[slave] = self._CreateSlave(slave)
     return self._slaves[slave]
 
+  def AddSlave(self, i2c_slave):
+    """Adds an I2C slave object.
+
+    Args:
+      i2c_slave: An I2cSlave or its subclass object.
+
+    Raises:
+      I2cBusError if there is already a slave object at the slave address of
+      i2c_slave object.
+    """
+    if i2c_slave.slave in self._slaves:
+      raise I2cBusError(
+          'There is already a slave object at slave %#x' % i2c_slave.slave)
+    else:
+      self._slaves[i2c_slave.slave] = i2c_slave
+
 
 class I2cSlave(object):
   """A Class to abstract the behavior of I2C slave."""
@@ -120,6 +136,15 @@ class I2cSlave(object):
       slave: The number of slave address.
     """
     return slave in cls.SLAVE_ADDRESSES
+
+  @property
+  def slave(self):
+    """Returns the slave address.
+
+    Returns:
+      The number of slave address.
+    """
+    return self._slave
 
   def _WaitForReady(self):
     """Waits for the I2C ready by polling the status register.
