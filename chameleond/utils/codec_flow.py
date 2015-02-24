@@ -117,9 +117,13 @@ class InputCodecFlow(CodecFlow):
         self._fpga.adump)
 
   def Select(self):
-    """Selects the codec flow to set the proper codec path and FPGA paths."""
+    """Selects the codec flow.
+
+    This is a dummy method because proper codec path and FPGA paths are set
+    in StartCapturingAudio to achieve consecutive StartCapturingAudio
+    and StopCapturingAudio calls while this flow is only selected once.
+    """
     logging.info('Select InputCodecFlow for input id #%d.', self._port_id)
-    self._audio_codec.SelectInput(self._CODEC_INPUTS[self._port_id])
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
@@ -136,6 +140,7 @@ class InputCodecFlow(CodecFlow):
 
   def StartCapturingAudio(self):
     """Starts capturing audio."""
+    self._audio_codec.SelectInput(self._CODEC_INPUTS[self._port_id])
     self._audio_route_manager.SetupRouteFromInputToDumper(self._port_id)
     self._audio_capture_manager.StartCapturingAudio()
 
