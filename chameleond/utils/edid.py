@@ -12,17 +12,12 @@ from chameleond.utils import io
 from chameleond.utils import rx
 
 
-class FRam(i2c.I2cSlave):
-  """A Class to abstract the behavior of F-RAM."""
+class I2cRam(i2c.I2cSlave):
+  """A Class to abstract the behavior of memory with I2C interface."""
 
-  HDMI_SLAVE = 0x49
-  DP_SLAVE = 0x50
-  SLAVE_ADDRESSES = (HDMI_SLAVE, DP_SLAVE)
+  SLAVE_ADDRESSES = (0x49, 0x50)
 
-  # M24C02 eeprom needs at most 5ms write time.
-  # FM24CL04B fram doesn't need this delay.
-  # TODO(waihong): Zero this delay if all boards use FM24CL04B.
-  _WRITE_DELAY = 0.005
+  _WRITE_DELAY = 'Unknown'  # A subclass should override it.
 
   def Write(self, data):
     """Writes the given data to the F-RAM.
@@ -44,6 +39,22 @@ class FRam(i2c.I2cSlave):
       A string of data of the F-RAM content.
     """
     return self.Get(0, size)
+
+
+class FRam(I2cRam):
+  """A Class to abstract the behavior of F-RAM."""
+  SLAVE_ADDRESSES = (0x50, )
+
+  # FM24CL04B F-RAM doesn't need this delay.
+  _WRITE_DELAY = 0
+
+
+class HdmiEdidRam(I2cRam):
+  """A Class to abstract the behavior of interal RAM on HDMI RX."""
+  SLAVE_ADDRESSES = (0x49, )
+
+  # Collabora tested that it should be 0.01 seconds.
+  _WRITE_DELAY = 0.01
 
 
 class DpEdid(object):
@@ -71,7 +82,7 @@ class DpEdid(object):
     """
     self._input_id = input_id
     self._mux_io = main_i2c_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
-    self._fram = main_i2c_bus.GetSlave(FRam.DP_SLAVE)
+    self._fram = main_i2c_bus.GetSlave(FRam.SLAVE_ADDRESSES[0])
     self._on_main_before_access = None
 
   def _SwitchRamToMain(self):
@@ -149,7 +160,7 @@ class HdmiEdid(object):
       main_i2c_bus: The main I2cBus object.
     """
     self._rx = main_i2c_bus.GetSlave(rx.HdmiRx.SLAVE_ADDRESSES[0])
-    self._fram = main_i2c_bus.GetSlave(FRam.HDMI_SLAVE)
+    self._edidram = main_i2c_bus.GetSlave(HdmiEdidRam.SLAVE_ADDRESSES[0])
     self._enabled_before_access = None
 
   def _BeginAccess(self):
@@ -158,7 +169,7 @@ class HdmiEdid(object):
     self._enabled_before_access = self._rx.IsEdidEnabled()
     if self._enabled_before_access:
       self._rx.DisableEdid()
-    self._rx.SetEdidSlave(FRam.HDMI_SLAVE)
+    self._rx.SetEdidSlave(HdmiEdidRam.SLAVE_ADDRESSES[0])
     self._rx.EnableEdidAccess()
 
   def _EndAccess(self):
@@ -197,7 +208,7 @@ class HdmiEdid(object):
     """
     self._BeginAccess()
     try:
-      self._fram.Write(data)
+      self._edidram.Write(data)
       self._ValidateEdid(data)
     finally:
       self._EndAccess()
@@ -210,7 +221,7 @@ class HdmiEdid(object):
     """
     self._BeginAccess()
     try:
-      edid = self._fram.Read(self._EDID_SIZE)
+      edid = self._edidram.Read(self._EDID_SIZE)
     finally:
       self._EndAccess()
     return edid
