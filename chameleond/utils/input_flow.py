@@ -106,15 +106,6 @@ class InputFlow(object):
     """Returns the human readable string for the connector type."""
     return cls._CONNECTOR_TYPE
 
-  def GetResolution(self):
-    """Gets the resolution of the video flow."""
-    self.WaitVideoOutputStable()
-    width, height = self._frame_manager.ComputeResolution()
-    if width == 0 or height == 0:
-      raise InputFlowError('Something wrong with the resolution: %dx%d' %
-                           (width, height))
-    return (width, height)
-
   def GetMaxFrameLimit(self, width, height):
     """Returns of the maximal number of frames which can be dumped."""
     if self.IsDualPixelMode():
@@ -501,7 +492,7 @@ class DpInputFlow(InputFlow):
       True if the frame is locked; otherwise, False.
     """
     resolution_fpga = self._frame_manager.ComputeResolution()
-    resolution_rx = self._rx.GetResolution()
+    resolution_rx = self._rx.GetFieldResolution()
     if resolution_fpga == resolution_rx:
       logging.info('same resolution: %dx%d', *resolution_fpga)
       return True
@@ -525,10 +516,11 @@ class DpInputFlow(InputFlow):
     """Gets the resolution of the video flow."""
     if self.WaitVideoOutputStable():
       # Resolution from RX is more reliable than that from FPGA
-      return self._rx.GetResolution()
+      # TODO(waihong): Support interlaced mode.
+      return self._rx.GetFieldResolution()
     raise InputFlowError(
         'Failed to get resolution. Rx:%r, FPGA:%r',
-        self._rx.GetResolution(), self._frame_manager.ComputeResolution())
+        self._rx.GetFieldResolution(), self._frame_manager.ComputeResolution())
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
@@ -733,7 +725,7 @@ class HdmiInputFlow(InputFlowWithAudio):
       True if the frame is locked; otherwise, False.
     """
     resolution_fpga = self._frame_manager.ComputeResolution()
-    resolution_rx = self._rx.GetResolution()
+    resolution_rx = self._rx.GetFieldResolution()
     if resolution_fpga == resolution_rx:
       logging.info('same resolution: %dx%d', *resolution_fpga)
       return True
@@ -758,6 +750,13 @@ class HdmiInputFlow(InputFlowWithAudio):
       logging.error(message)
       logging.error('RX dump: %r', self._rx.Get(0, 256))
       raise InputFlowError(message)
+
+  def GetResolution(self):
+    """Gets the resolution of the video flow."""
+    self.WaitVideoOutputStable()
+    field_per_frame = 2 if self._rx.IsInterlaced() else 1
+    resolution = self._rx.GetFieldResolution()
+    return (resolution[0], resolution[1] * field_per_frame)
 
   def SetContentProtection(self, enabled):
     """Sets the content protection state.
@@ -951,6 +950,15 @@ class VgaInputFlow(InputFlow):
       logging.error(message)
       logging.error('RX dump: %r', self._rx.Get(0, 256))
       raise InputFlowError(message)
+
+  def GetResolution(self):
+    """Gets the resolution of the video flow."""
+    self.WaitVideoOutputStable()
+    width, height = self._frame_manager.ComputeResolution()
+    if width == 0 or height == 0:
+      raise InputFlowError('Something wrong with the resolution: %dx%d' %
+                           (width, height))
+    return (width, height)
 
   def SetContentProtection(self, enabled):
     """Sets the content protection state.

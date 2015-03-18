@@ -115,8 +115,8 @@ class DpRx(i2c.I2cSlave):
     self._SwitchBank(0)
     self.ClearMask(self._REG_FUNC_RESET, self._BIT_RESET_VIDEO)
 
-  def GetResolution(self):
-    """Gets the resolution reported by receiver."""
+  def GetFieldResolution(self):
+    """Gets the resolution of a field."""
     hactive_h = self.Get(self._REG_HACTIVE_H)
     hactive_l = self.Get(self._REG_HACTIVE_L)
     vactive_h = self.Get(self._REG_VACTIVE_H)
@@ -163,6 +163,7 @@ class HdmiRx(i2c.I2cSlave):
 
   _REG_VIDEO_MODE = 0x99
   _BIT_VIDEO_STABLE = 1 << 3
+  _BIT_INTERLACED = 1 << 1
 
   _REG_PIXEL_CLOCK_DIV = 0x9A
   _REG_CLK_CONFIG = 0x54
@@ -336,8 +337,13 @@ class HdmiRx(i2c.I2cSlave):
     # Some interrupts are triggered on reset. Clear them.
     self._ClearInterrupt()
 
-  def GetResolution(self):
-    """Gets the resolution reported from receiver."""
+  def IsInterlaced(self):
+    """Returns True if the input video is in interlaced mode."""
+    video_mode = self.Get(self._REG_VIDEO_MODE)
+    return bool(video_mode & self._BIT_INTERLACED)
+
+  def GetFieldResolution(self):
+    """Gets the resolution of a field."""
     hactive_h = self.Get(self._REG_HACTIVE_H)
     hactive_l = self.Get(self._REG_HACTIVE_L)
     vactive_h = self.Get(self._REG_VACTIVE_H)
