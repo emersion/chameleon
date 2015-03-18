@@ -13,7 +13,7 @@ from chameleond.utils import audio_utils
 from chameleond.utils import common
 from chameleond.utils import edid
 from chameleond.utils import fpga
-from chameleond.utils import field_manager
+from chameleond.utils import frame_manager
 from chameleond.utils import ids
 from chameleond.utils import io
 from chameleond.utils import rx
@@ -64,8 +64,8 @@ class InputFlow(object):
     self._power_io = self._main_bus.GetSlave(io.PowerIo.SLAVE_ADDRESSES[0])
     self._mux_io = self._main_bus.GetSlave(io.MuxIo.SLAVE_ADDRESSES[0])
     self._rx = self._main_bus.GetSlave(self._RX_SLAVES[self._input_id])
-    self._field_manager = field_manager.FieldManager(
-        input_id, self._GetEffectiveVideoDumpers())
+    self._frame_manager = frame_manager.FrameManager(
+        input_id, self._rx, self._GetEffectiveVideoDumpers())
     self._edid = None  # be overwitten by a subclass.
     self._edid_enabled = True
     self._ddc_enabled = True
@@ -122,7 +122,7 @@ class InputFlow(object):
     Returns:
       A list of frame hashes.
     """
-    return self._field_manager.GetFieldHashes(start, stop)
+    return self._frame_manager.GetFrameHashes(start, stop)
 
   def DumpFramesToLimit(self, frame_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.
@@ -140,10 +140,10 @@ class InputFlow(object):
     """
     self.WaitVideoOutputStable()
     try:
-      self._field_manager.DumpFieldsToLimit(frame_limit, x, y, width, height,
+      self._frame_manager.DumpFramesToLimit(frame_limit, x, y, width, height,
                                             timeout)
     except common.TimeoutError:
-      message = 'Fields failed to reach %d' % frame_limit
+      message = 'Frames failed to reach %d' % frame_limit
       logging.error(message)
       logging.error('RX dump: %r', self._rx.Get(0, 256))
       raise InputFlowError(message)
@@ -163,16 +163,16 @@ class InputFlow(object):
                          capturing when this limitation is reached.
     """
     self.WaitVideoOutputStable()
-    self._field_manager.StartDumpingFields(
+    self._frame_manager.StartDumpingFrames(
         frame_buffer_limit, x, y, width, height, hash_buffer_limit)
 
   def StopDumpingFrames(self):
     """Stops dumping frames."""
-    self._field_manager.StopDumpingFields()
+    self._frame_manager.StopDumpingFrames()
 
   def GetDumpedFrameCount(self):
     """Gets the number of frames which is dumped."""
-    return self._field_manager.GetFieldCount()
+    return self._frame_manager.GetFrameCount()
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
@@ -491,8 +491,8 @@ class DpInputFlow(InputFlow):
     Returns:
       True if the frame is locked; otherwise, False.
     """
-    resolution_fpga = self._field_manager.ComputeResolution()
-    resolution_rx = self._rx.GetFieldResolution()
+    resolution_fpga = self._frame_manager.ComputeResolution()
+    resolution_rx = self._rx.GetFrameResolution()
     if resolution_fpga == resolution_rx:
       logging.info('same resolution: %dx%d', *resolution_fpga)
       return True
@@ -515,14 +515,12 @@ class DpInputFlow(InputFlow):
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     if self.WaitVideoOutputStable():
-      field_per_frame = 2 if self._rx.IsInterlaced() else 1
-      resolution = self._rx.GetFieldResolution()
-      return (resolution[0], resolution[1] * field_per_frame)
+      return self._rx.GetFrameResolution()
     else:
       raise InputFlowError(
-          'Field resolution not stable. Rx:%r, FPGA:%r',
-          self._rx.GetFieldResolution(),
-          self._field_manager.ComputeResolution())
+          'Frame resolution not stable. Rx:%r, FPGA:%r',
+          self._rx.GetFrameResolution(),
+          self._frame_manager.ComputeResolution())
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
@@ -675,8 +673,8 @@ class HdmiInputFlow(InputFlowWithAudio):
       else:
         self._rx.SetSinglePixelMode()
         logging.info('Changed to single pixel mode')
-      self._field_manager = field_manager.FieldManager(
-          self._input_id, self._GetEffectiveVideoDumpers())
+      self._frame_manager = frame_manager.FrameManager(
+          self._input_id, self._rx, self._GetEffectiveVideoDumpers())
       self.Select()
       return True
     return False
@@ -726,8 +724,8 @@ class HdmiInputFlow(InputFlowWithAudio):
     Returns:
       True if the frame is locked; otherwise, False.
     """
-    resolution_fpga = self._field_manager.ComputeResolution()
-    resolution_rx = self._rx.GetFieldResolution()
+    resolution_fpga = self._frame_manager.ComputeResolution()
+    resolution_rx = self._rx.GetFrameResolution()
     if resolution_fpga == resolution_rx:
       logging.info('same resolution: %dx%d', *resolution_fpga)
       return True
@@ -756,9 +754,7 @@ class HdmiInputFlow(InputFlowWithAudio):
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
-    field_per_frame = 2 if self._rx.IsInterlaced() else 1
-    resolution = self._rx.GetFieldResolution()
-    return (resolution[0], resolution[1] * field_per_frame)
+    return self._rx.GetFrameResolution()
 
   def SetContentProtection(self, enabled):
     """Sets the content protection state.
@@ -929,9 +925,9 @@ class VgaInputFlow(InputFlow):
 
   def _IsResolutionValid(self):
     """Returns True if the resolution from FPGA is valid and not floating."""
-    resolution1 = self._field_manager.ComputeResolution()
+    resolution1 = self._frame_manager.ComputeResolution()
     time.sleep(self._DELAY_RESOLUTION_PROBE)
-    resolution2 = self._field_manager.ComputeResolution()
+    resolution2 = self._frame_manager.ComputeResolution()
     return resolution1 == resolution2 and 0 not in resolution1
 
   def WaitVideoOutputStable(self, timeout=None):
@@ -956,7 +952,7 @@ class VgaInputFlow(InputFlow):
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
-    width, height = self._field_manager.ComputeResolution()
+    width, height = self._frame_manager.ComputeResolution()
     if width == 0 or height == 0:
       raise InputFlowError('Something wrong with the resolution: %dx%d' %
                            (width, height))

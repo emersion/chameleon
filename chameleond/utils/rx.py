@@ -133,6 +133,12 @@ class DpRx(i2c.I2cSlave):
     height = vactive_h << 8 | vactive_l
     return (width, height)
 
+  def GetFrameResolution(self):
+    """Gets the resolution of a frame."""
+    field_per_frame = 2 if self.IsInterlaced() else 1
+    (width, height) = self.GetFieldResolution()
+    return (width, height * field_per_frame)
+
 
 class HdmiRx(i2c.I2cSlave):
   """A class to control ITE IT6803 HDMI Receiver."""
@@ -360,6 +366,12 @@ class HdmiRx(i2c.I2cSlave):
     height = (vactive_h & 0xf0) << 4 | vactive_l
     return (width, height)
 
+  def GetFrameResolution(self):
+    """Gets the resolution of a frame."""
+    field_per_frame = 2 if self.IsInterlaced() else 1
+    (width, height) = self.GetFieldResolution()
+    return (width, height * field_per_frame)
+
   def SetContentProtection(self, enabled):
     """Sets the content protection state on the receiver.
 
@@ -582,3 +594,8 @@ class VgaRx(i2c.I2cSlave):
   def IsSyncDetected(self):
     """Returns True if Hsync or Vsync is detected."""
     return bool(self.Get(self._REG_SYNC_DETECT) & self._BITS_SYNC_MASK)
+
+  def IsInterlaced(self):
+    """Returns True if the input video is in interlaced mode."""
+    # TODO(waihong): Support checking interlaced.
+    return False
