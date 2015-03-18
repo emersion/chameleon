@@ -35,6 +35,9 @@ class DpRx(i2c.I2cSlave):
   _REG_VACTIVE_H = 0xA2
   _REG_VACTIVE_L = 0xA1
 
+  _REG_VIDEO_FLAG = 0xa9
+  _BIT_INTERLACED = 1 << 2
+
   def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize DisplayPort RX chip.')
@@ -114,6 +117,11 @@ class DpRx(i2c.I2cSlave):
     self.ClearMask(self._REG_PLL_RESET, self._BIT_RESET_VIDEO)
     self._SwitchBank(0)
     self.ClearMask(self._REG_FUNC_RESET, self._BIT_RESET_VIDEO)
+
+  def IsInterlaced(self):
+    """Returns True if the input video is in interlaced mode."""
+    video_flag = self.Get(self._REG_VIDEO_FLAG)
+    return bool(video_flag & self._BIT_INTERLACED)
 
   def GetFieldResolution(self):
     """Gets the resolution of a field."""

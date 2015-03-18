@@ -515,12 +515,14 @@ class DpInputFlow(InputFlow):
   def GetResolution(self):
     """Gets the resolution of the video flow."""
     if self.WaitVideoOutputStable():
-      # Resolution from RX is more reliable than that from FPGA
-      # TODO(waihong): Support interlaced mode.
-      return self._rx.GetFieldResolution()
-    raise InputFlowError(
-        'Failed to get resolution. Rx:%r, FPGA:%r',
-        self._rx.GetFieldResolution(), self._frame_manager.ComputeResolution())
+      field_per_frame = 2 if self._rx.IsInterlaced() else 1
+      resolution = self._rx.GetFieldResolution()
+      return (resolution[0], resolution[1] * field_per_frame)
+    else:
+      raise InputFlowError(
+          'Field resolution not stable. Rx:%r, FPGA:%r',
+          self._rx.GetFieldResolution(),
+          self._frame_manager.ComputeResolution())
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
