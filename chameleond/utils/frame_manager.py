@@ -41,6 +41,13 @@ class FrameManager(object):
     (width, height) = self._field_manager.ComputeResolution()
     return (width, height * field_per_frame)
 
+  def GetMaxFrameLimit(self, width, height):
+    """Returns of the maximal number of frames which can be dumped."""
+    field_per_frame = 2 if self._rx.IsInterlaced() else 1
+    height = height / field_per_frame
+    field_limit = self._field_manager.GetMaxFieldLimit(width, height)
+    return field_limit / field_per_frame
+
   def GetFrameHashes(self, start, stop):
     """Returns the saved list of the frame hashes.
 

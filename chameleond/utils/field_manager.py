@@ -8,6 +8,7 @@ from multiprocessing import Process, Value, Array
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import common
+from chameleond.utils import fpga
 
 
 class FieldManagerError(Exception):
@@ -55,6 +56,12 @@ class FieldManager(object):
       return (resolutions[0][0] + resolutions[1][0], resolutions[0][1])
     else:
       return (self._vdumps[0].GetWidth(), self._vdumps[0].GetHeight())
+
+  def GetMaxFieldLimit(self, width, height):
+    """Returns of the maximal number of fields which can be dumped."""
+    if self._is_dual:
+      width = width / 2
+    return fpga.VideoDumper.GetMaxFieldLimit(width, height)
 
   def _StopFieldDump(self):
     """Stops field dump."""

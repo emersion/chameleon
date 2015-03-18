@@ -575,6 +575,10 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A number of the frame limit.
     """
+    # This result is related to the video flow status, e.g.
+    # single/dual pixel mode, progressive/interlaced mode.
+    # Need to select the input flow first.
+    self._SelectInput(port_id)
     return self._flows[port_id].GetMaxFrameLimit(width, height)
 
   def _PrepareCapturingVideo(self, port_id, x, y, width, height):
@@ -606,6 +610,7 @@ class ChameleondDriver(ChameleondInterface):
         'resolution': (width, height),
         'is_dual_pixel': is_dual_pixel_mode,
         'pixeldump_args': self._flows[port_id].GetPixelDumpArgs(),
+        'max_frame_limit': self._flows[port_id].GetMaxFrameLimit(width, height)
     }
 
   @_VideoMethod
@@ -633,8 +638,7 @@ class ChameleondDriver(ChameleondInterface):
     """
     x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
     self._PrepareCapturingVideo(port_id, x, y, width, height)
-
-    max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
+    max_frame_limit = self._captured_params['max_frame_limit']
     logging.info('Start capturing video from port #%d', port_id)
     self._flows[port_id].StartDumpingFrames(
         max_frame_limit, x, y, width, height, self._MAX_CAPTURED_FRAME_COUNT)
@@ -690,12 +694,12 @@ class ChameleondDriver(ChameleondInterface):
     """
     x, y, width, height = self._AutoFillArea(port_id, x, y, width, height)
     logging.info('Capture video from port #%d', port_id)
-    max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
+    self._PrepareCapturingVideo(port_id, x, y, width, height)
+    max_frame_limit = self._captured_params['max_frame_limit']
     if total_frame > max_frame_limit:
       raise DriverError('Exceed the max frame limit %d > %d',
                         total_frame, max_frame_limit)
 
-    self._PrepareCapturingVideo(port_id, x, y, width, height)
     # TODO(waihong): Make the timeout value based on the FPS rate.
     self._flows[port_id].DumpFramesToLimit(
         total_frame, x, y, width, height, self._TIMEOUT_FRAME_DUMP_PROBE)
@@ -732,7 +736,7 @@ class ChameleondDriver(ChameleondInterface):
     port_id = self._captured_params['port_id']
     total_frame = self.GetCapturedFrameCount()
     width, height = self.GetCapturedResolution()
-    max_frame_limit = self.GetMaxFrameLimit(port_id, width, height)
+    max_frame_limit = self._captured_params['max_frame_limit']
     # The captured frames are store in a circular buffer. Only the latest
     # max_frame_limit frames are valid.
     first_valid_index = max(0, total_frame - max_frame_limit)

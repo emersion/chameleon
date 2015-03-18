@@ -108,9 +108,7 @@ class InputFlow(object):
 
   def GetMaxFrameLimit(self, width, height):
     """Returns of the maximal number of frames which can be dumped."""
-    if self.IsDualPixelMode():
-      width = width / 2
-    return fpga.VideoDumper.GetMaxFieldLimit(width, height)
+    return self._frame_manager.GetMaxFrameLimit(width, height)
 
   def GetFrameHashes(self, start, stop):
     """Returns the list of the frame hashes.
