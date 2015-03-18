@@ -4,11 +4,13 @@
 """Field manager module which manages the field dump and monitor logic."""
 
 import logging
+import tempfile
 from multiprocessing import Process, Value, Array
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import common
 from chameleond.utils import fpga
+from chameleond.utils import system_tools
 
 
 class FieldManagerError(Exception):
@@ -44,6 +46,7 @@ class FieldManager(object):
     self._last_field = Value('i', -1)
     self._timeout_in_field = None
     self._process = None
+    self._dimension = (0, 0)
 
   def ComputeResolution(self):
     """Computes the resolution from FPGA."""
@@ -56,6 +59,10 @@ class FieldManager(object):
       return (resolutions[0][0] + resolutions[1][0], resolutions[0][1])
     else:
       return (self._vdumps[0].GetWidth(), self._vdumps[0].GetHeight())
+
+  def GetDumpedDimension(self):
+    """Gets the dimension of the dumped fields."""
+    return self._dimension
 
   def GetMaxFieldLimit(self, width, height):
     """Returns of the maximal number of fields which can be dumped."""
@@ -91,6 +98,20 @@ class FieldManager(object):
       height: The height of the area of crop.
       loop: True to loop-back and continue dump.
     """
+    # Check the alignment for a cropped dimension.
+    if self._is_dual:
+      alignment = 16
+    else:
+      alignment = 8
+    if x is not None and x % alignment:
+      raise FieldManagerError('Arguments x not aligned to %d-byte.' % alignment)
+    if width % alignment:
+      raise FieldManagerError('Arguments width not aligned to %d-byte.' %
+                              alignment)
+
+    # Save the dimension of fields.
+    self._dimension = (width, height)
+
     for vdump in self._vdumps:
       vdump.SetDumpAddressForCapture()
       vdump.SetFieldLimit(field_limit, loop)
@@ -139,6 +160,31 @@ class FieldManager(object):
   def _ComputeFieldCount(self):
     """Returns the current number of field dumped."""
     return min(vdump.GetFieldCount() for vdump in self._vdumps)
+
+  def ReadDumpedField(self, field_index):
+    """Reads the content of the dumped field from the buffer."""
+    (width, height) = self._dimension
+    if self._is_dual:
+      width = width / 2
+
+    # Modify the memory offset to match the field.
+    PAGE_SIZE = 4096
+    PIXEL_LEN = 3
+    field_size = width * height * PIXEL_LEN
+    field_size = ((field_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
+    offset = field_size * field_index
+    offset_args = []
+    for arg in fpga.VideoDumper.GetPixelDumpArgs(self._input_id, self._is_dual):
+      if isinstance(arg, (int, long)):
+        offset_args.append(arg + offset)
+      else:
+        offset_args.append(arg)
+    logging.info('pixeldump args %r', offset_args)
+
+    with tempfile.NamedTemporaryFile() as f:
+      system_tools.SystemTools.Call(
+          'pixeldump', f.name, width, height, PIXEL_LEN, *offset_args)
+      return f.read()
 
   def _HasFieldsDumpedAtLeast(self, field_count):
     """Returns true if FPGA dumps at least the given field count.

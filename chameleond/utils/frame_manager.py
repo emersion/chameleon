@@ -66,10 +66,31 @@ class FrameManager(object):
     else:
       return self._field_manager.GetFieldHashes(start, stop)
 
+  def GetDumpedDimension(self):
+    """Gets the dimension of the dumped frames."""
+    field_per_frame = 2 if self._is_interlaced else 1
+    (width, height) = self._field_manager.GetDumpedDimension()
+    return (width, height * field_per_frame)
+
   def GetFrameCount(self):
     """Returns the saved number of frame dumped."""
     field_per_frame = 2 if self._is_interlaced else 1
     return self._field_manager.GetFieldCount() / field_per_frame
+
+  def ReadDumpedFrame(self, frame_index):
+    """Reads the content of the dumped frame from the buffer."""
+    if self._is_interlaced:
+      # Merge two fields into one frame.
+      (width, _) = self._field_manager.GetDumpedDimension()
+      PIXEL_LEN = 3
+      line_len = width * PIXEL_LEN
+      even_field = self._field_manager.ReadDumpedField(frame_index * 2)
+      odd_field = self._field_manager.ReadDumpedField(frame_index * 2 + 1)
+      return ''.join([''.join([even_field[i:i+line_len],
+                               odd_field[i:i+line_len]])
+                      for i in xrange(0, len(even_field), line_len)])
+    else:
+      return self._field_manager.ReadDumpedField(frame_index)
 
   def DumpFramesToLimit(self, frame_buffer_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.

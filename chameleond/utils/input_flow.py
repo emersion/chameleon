@@ -96,11 +96,6 @@ class InputFlow(object):
     self._fpga.vdump0.Select(self._input_id, self.IsDualPixelMode())
     self._fpga.vdump1.Select(self._input_id, self.IsDualPixelMode())
 
-  def GetPixelDumpArgs(self):
-    """Gets the arguments of pixeldump tool which selects the proper buffers."""
-    return fpga.VideoDumper.GetPixelDumpArgs(self._input_id,
-                                             self.IsDualPixelMode())
-
   @classmethod
   def GetConnectorType(cls):
     """Returns the human readable string for the connector type."""
@@ -168,9 +163,17 @@ class InputFlow(object):
     """Stops dumping frames."""
     self._frame_manager.StopDumpingFrames()
 
+  def GetCapturedResolution(self):
+    """Gets the resolution of the captured frame."""
+    return self._frame_manager.GetDumpedDimension()
+
   def GetDumpedFrameCount(self):
     """Gets the number of frames which is dumped."""
     return self._frame_manager.GetFrameCount()
+
+  def ReadCapturedFrame(self, frame_index):
+    """Reads the content of the captured frame from the buffer."""
+    return self._frame_manager.ReadDumpedFrame(frame_index)
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.

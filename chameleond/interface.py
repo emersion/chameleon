@@ -411,7 +411,7 @@ class ChameleondInterface(object):
     raise NotImplementedError('GetCapturedResolution')
 
   def ReadCapturedFrame(self, frame_index):
-    """Reads the content of the captured frames from the buffer.
+    """Reads the content of the captured frame from the buffer.
 
     Args:
       frame_index: The index of the frame to read.

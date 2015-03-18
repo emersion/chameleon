@@ -6,7 +6,6 @@
 import functools
 import logging
 import os
-import tempfile
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
@@ -18,7 +17,6 @@ from chameleond.utils import fpga
 from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import input_flow
-from chameleond.utils import system_tools
 
 
 class DriverError(Exception):
@@ -77,8 +75,6 @@ class ChameleondDriver(ChameleondInterface):
   _I2C_BUS_AUDIO_CODEC = 1
   _I2C_BUS_AUDIO_BOARD = 3
 
-  _PIXEL_LEN = 3
-
   # Time to wait for video frame dump to start before a timeout error is raised
   _TIMEOUT_FRAME_DUMP_PROBE = 60.0
 
@@ -97,7 +93,6 @@ class ChameleondDriver(ChameleondInterface):
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
 
-    self._tools = system_tools.SystemTools
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
     audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
     fpga_ctrl = fpga.FpgaController()
@@ -594,22 +589,8 @@ class ChameleondDriver(ChameleondInterface):
     self._SelectInput(port_id)
     if not self.IsPlugged(port_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
-
-    is_dual_pixel_mode = self._flows[port_id].IsDualPixelMode()
-    # Check the alignment for a cropped-screen capture.
-    if None not in (x, y):
-      if is_dual_pixel_mode:
-        if x % 16 or width % 16:
-          raise DriverError('Arguments x and width not aligned to 16-byte.')
-      else:
-        if x % 8 or width % 8:
-          raise DriverError('Arguments x and width not aligned to 8-byte.')
-
     self._captured_params = {
         'port_id': port_id,
-        'resolution': (width, height),
-        'is_dual_pixel': is_dual_pixel_mode,
-        'pixeldump_args': self._flows[port_id].GetPixelDumpArgs(),
         'max_frame_limit': self._flows[port_id].GetMaxFrameLimit(width, height)
     }
 
@@ -722,10 +703,11 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    return self._captured_params['resolution']
+    port_id = self._captured_params['port_id']
+    return self._flows[port_id].GetCapturedResolution()
 
   def ReadCapturedFrame(self, frame_index):
-    """Reads the content of the captured frames from the buffer.
+    """Reads the content of the captured frame from the buffer.
 
     Args:
       frame_index: The index of the frame to read.
@@ -735,7 +717,6 @@ class ChameleondDriver(ChameleondInterface):
     """
     port_id = self._captured_params['port_id']
     total_frame = self.GetCapturedFrameCount()
-    width, height = self.GetCapturedResolution()
     max_frame_limit = self._captured_params['max_frame_limit']
     # The captured frames are store in a circular buffer. Only the latest
     # max_frame_limit frames are valid.
@@ -744,27 +725,9 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('The frame index is out-of-range: %d not in [%d, %d)' %
                         (frame_index, first_valid_index, total_frame))
 
-    # Specify the proper arguemnt for dual-buffer capture.
-    if self._captured_params['is_dual_pixel']:
-      width = width / 2
-
-    # Modify the memory offset to match the frame.
-    PAGE_SIZE = 4096
-    frame_size = width * height * self._PIXEL_LEN
-    frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
-    offset = frame_size * (frame_index % max_frame_limit)
-    offset_args = []
-    for arg in self._captured_params['pixeldump_args']:
-      if isinstance(arg, (int, long)):
-        offset_args.append(arg + offset)
-      else:
-        offset_args.append(arg)
-    logging.info('pixeldump args %r', offset_args)
-
-    with tempfile.NamedTemporaryFile() as f:
-      self._tools.Call('pixeldump', f.name, width, height,
-                       self._PIXEL_LEN, *offset_args)
-      screen = f.read()
+    # Use the projected index.
+    frame_index = frame_index % max_frame_limit
+    screen = self._flows[port_id].ReadCapturedFrame(frame_index)
     return xmlrpclib.Binary(screen)
 
   def GetCapturedChecksums(self, start_index=0, stop_index=None):
