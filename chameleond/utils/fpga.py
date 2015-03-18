@@ -177,7 +177,7 @@ class VideoDumper(object):
   _BIT_RUN = 1 << 2
   # Run only when both dumpers' _BIT_RUN_DUAL set.
   _BIT_RUN_DUAL = 1 << 3
-  # Set to generate 64-bit frame hash; otherwise, 32-bit.
+  # Set to generate 64-bit field hash; otherwise, 32-bit.
   _BIT_HASH_64 = 1 << 4
   # Set to enable cropping.
   _BIT_CROP = 1 << 5
@@ -191,11 +191,11 @@ class VideoDumper(object):
   _REG_WIDTH = 0x18
   _REG_HEIGHT = 0x1c
   _REG_FRAME_COUNT = 0x20
-  # Registers to crop frames
+  # Registers to crop fields
   _REG_CROP_XRANGE = 0x24
   _REG_CROP_YRANGE = 0x28
 
-  # Frame hash buffer
+  # Field hash buffer
   _REG_HASH_BUF_BASE = 0x400
   _REG_HASH_BUF_SIZE = 1024
 
@@ -244,7 +244,7 @@ class VideoDumper(object):
     self._index = index
 
   def EnableCrop(self, x, y, width, height):
-    """Enable cropping frames.
+    """Enable cropping fields.
 
     Only dump the pixels and its checksum within the given rectangle.
 
@@ -264,7 +264,7 @@ class VideoDumper(object):
                          self._BIT_CROP)
 
   def DisableCrop(self):
-    """Disable cropping frames."""
+    """Disable cropping fields."""
     self._memory.ClearMask(self._REGS_BASE[self._index] + self._REG_CTRL,
                            self._BIT_CROP)
 
@@ -289,24 +289,24 @@ class VideoDumper(object):
     self._memory.SetMask(self._REGS_BASE[self._index] + self._REG_CTRL, bit_run)
 
   @classmethod
-  def GetMaxFrameLimit(cls, width, height):
-    """Returns of the maximal number of frames which can be dumped."""
+  def GetMaxFieldLimit(cls, width, height):
+    """Returns of the maximal number of fields which can be dumped."""
     BYTE_PER_PIXEL = 3
     PAGE_SIZE = 4096
-    frame_size = width * height * BYTE_PER_PIXEL
-    frame_size = ((frame_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
-    return cls._DUMP_BUFFER_SIZE / frame_size
+    field_size = width * height * BYTE_PER_PIXEL
+    field_size = ((field_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
+    return cls._DUMP_BUFFER_SIZE / field_size
 
-  def SetFrameLimit(self, frame_limit, loop=False):
-    """Sets the limitation of total frames to dump.
+  def SetFieldLimit(self, field_limit, loop=False):
+    """Sets the limitation of total fields to dump.
 
     Args:
-      frame_limit: The number of frames to dump.
-      loop: When the frame_limit is reached, True to reset the dump pointer
+      field_limit: The number of fields to dump.
+      loop: When the field_limit is reached, True to reset the dump pointer
             to the start address; False to do nothing.
     """
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_LIMIT,
-                       frame_limit)
+                       field_limit)
     self._memory.Write(self._REGS_BASE[self._index] + self._REG_LOOP,
                        1 if loop else 0)
 
@@ -335,7 +335,7 @@ class VideoDumper(object):
     """
     self.Stop()
     self.SetDumpAddressForTemp()
-    self.SetFrameLimit(self._DEFAULT_LIMIT, self._DEFAULT_ENABLE_LOOP)
+    self.SetFieldLimit(self._DEFAULT_LIMIT, self._DEFAULT_ENABLE_LOOP)
     # Use the proper CLK.
     if self._index == self.PRIMARY_FLOW_INDEXES[input_id]:
       ctrl_value = self._BIT_CLK_NORMAL
@@ -358,19 +358,19 @@ class VideoDumper(object):
     """Gets the height of the video path."""
     return self._memory.Read(self._REGS_BASE[self._index] + self._REG_HEIGHT)
 
-  def GetFrameCount(self):
-    """Gets the total count of frames captured."""
+  def GetFieldCount(self):
+    """Gets the total count of fields captured."""
     return self._memory.Read(self._REGS_BASE[self._index] +
                              self._REG_FRAME_COUNT)
 
-  def GetFrameHash(self, index, dual_pixel_mode):
-    """Gets the frame hash of the given frame index.
+  def GetFieldHash(self, index, dual_pixel_mode):
+    """Gets the field hash of the given field index.
 
     FPGA overwrites the old hash values when exceeding the hash buffer
     size. The caller should save the old values before that happens.
 
     Args:
-      index: The index of frame. The index can exceed the hash buffer size.
+      index: The index of field. The index can exceed the hash buffer size.
       dual_pixel_mode: True if using the dual pixel mode; otherwise, False.
 
     Returns:

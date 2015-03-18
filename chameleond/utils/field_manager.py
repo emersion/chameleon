@@ -1,7 +1,7 @@
 # Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Frame manager module which manages the frame dump and monitor logic."""
+"""Field manager module which manages the field dump and monitor logic."""
 
 import logging
 from multiprocessing import Process, Value, Array
@@ -10,13 +10,13 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import common
 
 
-class FrameManagerError(Exception):
-  """Exception raised when any error on FrameManager."""
+class FieldManagerError(Exception):
+  """Exception raised when any error on FieldManager."""
   pass
 
 
-class FrameManager(object):
-  """An abstraction of the frame management.
+class FieldManager(object):
+  """An abstraction of the field management.
 
   It acts as an intermediate layer between an InputFlow and VideoDumpers.
   It simplifies the logic of handling dual-pixel-mode and single-pixel-mode.
@@ -24,11 +24,11 @@ class FrameManager(object):
 
   _HASH_SIZE = 4
 
-  # Delay in second to check the frame count, using 120-fps.
+  # Delay in second to check the field count, using 120-fps.
   _DELAY_VIDEO_DUMP_PROBE = 1.0 / 120
 
   def __init__(self, input_id, vdumps):
-    """Constructs a FrameManager object.
+    """Constructs a FieldManager object.
 
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
@@ -40,8 +40,8 @@ class FrameManager(object):
     self._vdumps = vdumps
     self._is_dual = len(vdumps) == 2
     self._saved_hashes = None
-    self._last_frame = Value('i', -1)
-    self._timeout_in_frame = None
+    self._last_field = Value('i', -1)
+    self._timeout_in_field = None
     self._process = None
 
   def ComputeResolution(self):
@@ -56,28 +56,28 @@ class FrameManager(object):
     else:
       return (self._vdumps[0].GetWidth(), self._vdumps[0].GetHeight())
 
-  def _StopFrameDump(self):
-    """Stops frame dump."""
+  def _StopFieldDump(self):
+    """Stops field dump."""
     for vdump in self._vdumps:
       vdump.Stop()
     # We can't just stop the video dumpers as some functions, like detecting
     # resolution, need the video dumpers continue to run. So select them again
-    # to re-initialize the default setting, i.e. single frame non-loop dumping.
+    # to re-initialize the default setting, i.e. single field non-loop dumping.
     # TODO(waihong): Simplify the above logic.
     for vdump in self._vdumps:
       vdump.Select(self._input_id, self._is_dual)
 
-  def _StartFrameDump(self):
-    """Starts frame dump."""
+  def _StartFieldDump(self):
+    """Starts field dump."""
     for vdump in self._vdumps:
       # TODO(waihong): Wipe off the _input_id argument.
       vdump.Start(self._input_id, self._is_dual)
 
-  def _SetupFrameDump(self, frame_limit, x, y, width, height, loop):
-    """Restarts frame dump.
+  def _SetupFieldDump(self, field_limit, x, y, width, height, loop):
+    """Restarts field dump.
 
     Args:
-      frame_limit: The limitation of frame to dump.
+      field_limit: The limitation of field to dump.
       x: The X position of the top-left corner of crop; None for a full-screen.
       y: The Y position of the top-left corner of crop; None for a full-screen.
       width: The width of the area of crop.
@@ -86,7 +86,7 @@ class FrameManager(object):
     """
     for vdump in self._vdumps:
       vdump.SetDumpAddressForCapture()
-      vdump.SetFrameLimit(frame_limit, loop)
+      vdump.SetFieldLimit(field_limit, loop)
       if None in (x, y):
         vdump.DisableCrop()
       else:
@@ -95,13 +95,13 @@ class FrameManager(object):
         else:
           vdump.EnableCrop(x, y, width, height)
 
-  def _ComputeFrameHash(self, index):
-    """Computes the frame hash of the given frame index, from FPGA.
+  def _ComputeFieldHash(self, index):
+    """Computes the field hash of the given field index, from FPGA.
 
     Returns:
-      A list of hash16 values, i.e. a single frame hash.
+      A list of hash16 values, i.e. a single field hash.
     """
-    hashes = [vdump.GetFrameHash(index, self._is_dual)
+    hashes = [vdump.GetFieldHash(index, self._is_dual)
               for vdump in self._vdumps]
     if self._is_dual:
       # [Odd MSB, Even MSB, Odd LSB, Odd LSB]
@@ -109,110 +109,110 @@ class FrameManager(object):
     else:
       return hashes[0]
 
-  def GetFrameHashes(self, start, stop):
-    """Returns the saved list of the frame hashes.
+  def GetFieldHashes(self, start, stop):
+    """Returns the saved list of the field hashes.
 
     Args:
-      start: The index of the start frame.
-      stop: The index of the stop frame (excluded).
+      start: The index of the start field.
+      stop: The index of the stop field (excluded).
 
     Returns:
-      A list of frame hashes.
+      A list of field hashes.
     """
-    # Convert to a list, in which each element is a frame hash.
+    # Convert to a list, in which each element is a field hash.
     return [self._saved_hashes[i : i + self._HASH_SIZE]
             for i in xrange(start * self._HASH_SIZE,
                             stop * self._HASH_SIZE,
                             self._HASH_SIZE)]
 
-  def GetFrameCount(self):
-    """Returns the saved number of frame dumped."""
-    return self._last_frame.value
+  def GetFieldCount(self):
+    """Returns the saved number of field dumped."""
+    return self._last_field.value
 
-  def _ComputeFrameCount(self):
-    """Returns the current number of frame dumped."""
-    return min(vdump.GetFrameCount() for vdump in self._vdumps)
+  def _ComputeFieldCount(self):
+    """Returns the current number of field dumped."""
+    return min(vdump.GetFieldCount() for vdump in self._vdumps)
 
-  def _HasFramesDumpedAtLeast(self, frame_count):
-    """Returns true if FPGA dumps at least the given frame count.
+  def _HasFieldsDumpedAtLeast(self, field_count):
+    """Returns true if FPGA dumps at least the given field count.
 
-    The function assumes that the frame count starts at zero.
+    The function assumes that the field count starts at zero.
     """
-    current_frame = self._ComputeFrameCount()
-    if current_frame > self._last_frame.value:
-      for i in xrange(self._last_frame.value, current_frame):
-        hash64 = self._ComputeFrameHash(i)
+    current_field = self._ComputeFieldCount()
+    if current_field > self._last_field.value:
+      for i in xrange(self._last_field.value, current_field):
+        hash64 = self._ComputeFieldHash(i)
         for j in xrange(self._HASH_SIZE):
           self._saved_hashes[i * self._HASH_SIZE + j] = hash64[j]
         logging.info(
-            'Saved frame hash #%d: %r', i,
+            'Saved field hash #%d: %r', i,
             self._saved_hashes[i * self._HASH_SIZE : (i + 1) * self._HASH_SIZE])
-      self._last_frame.value = current_frame
-    return current_frame >= frame_count
+      self._last_field.value = current_field
+    return current_field >= field_count
 
-  def _WaitForFrameCount(self, frame_count, timeout):
-    """Waits until the given frame_count reached or timeout.
+  def _WaitForFieldCount(self, field_count, timeout):
+    """Waits until the given field_count reached or timeout.
 
     Args:
-      frame_count: A number of frames to wait.
+      field_count: A number of fields to wait.
       timeout: Time in second of timeout.
     """
-    self._last_frame.value = 0
+    self._last_field.value = 0
     # Give the lambda method a better name, for debugging.
-    func = lambda: self._HasFramesDumpedAtLeast(frame_count)
-    func.__name__ = 'HasFramesDumpedAtLeast%d' % frame_count
+    func = lambda: self._HasFieldsDumpedAtLeast(field_count)
+    func.__name__ = 'HasFieldsDumpedAtLeast%d' % field_count
     common.WaitForCondition(func, True, self._DELAY_VIDEO_DUMP_PROBE, timeout)
 
-  def _CreateSavedHashes(self, frame_count):
+  def _CreateSavedHashes(self, field_count):
     """Creates the saved hashes, a sharable object of multiple processes."""
     # Store the hashes in a flat array, limitation of the shared variable.
     if self._saved_hashes:
       del self._saved_hashes
-    array_size = frame_count * self._HASH_SIZE
+    array_size = field_count * self._HASH_SIZE
     self._saved_hashes = Array('H', array_size)
 
-  def _StartMonitoringFrames(self, hash_buffer_limit):
-    """Starts a process to monitor frames."""
-    self._StopMonitoringFrames()
+  def _StartMonitoringFields(self, hash_buffer_limit):
+    """Starts a process to monitor fields."""
+    self._StopMonitoringFields()
     self._CreateSavedHashes(hash_buffer_limit)
     # Keep 5 seconds margin for timeout.
     timeout_in_second = hash_buffer_limit / 60 + 5
-    self._timeout_in_frame = hash_buffer_limit
-    self._process = Process(target=self._WaitForFrameCount,
+    self._timeout_in_field = hash_buffer_limit
+    self._process = Process(target=self._WaitForFieldCount,
                             args=(hash_buffer_limit,
                                   timeout_in_second))
     self._process.start()
 
-  def _StopMonitoringFrames(self):
-    """Stops the previous process which monitors frames."""
+  def _StopMonitoringFields(self):
+    """Stops the previous process which monitors fields."""
     if self._process and self._process.is_alive():
       self._process.terminate()
       self._process.join()
 
-  def DumpFramesToLimit(self, frame_buffer_limit, x, y, width, height, timeout):
-    """Dumps frames and waits for the given limit being reached or timeout.
+  def DumpFieldsToLimit(self, field_buffer_limit, x, y, width, height, timeout):
+    """Dumps fields and waits for the given limit being reached or timeout.
 
     Args:
-      frame_buffer_limit: The limitation of frame to dump.
+      field_buffer_limit: The limitation of field to dump.
       x: The X position of the top-left corner of crop; None for a full-screen.
       y: The Y position of the top-left corner of crop; None for a full-screen.
       width: The width of the area of crop.
       height: The height of the area of crop.
       timeout: Time in second of timeout.
     """
-    self._StopFrameDump()
-    self._SetupFrameDump(frame_buffer_limit, x, y, width, height, loop=False)
-    self._StartFrameDump()
-    self._CreateSavedHashes(frame_buffer_limit)
-    self._WaitForFrameCount(frame_buffer_limit, timeout)
+    self._StopFieldDump()
+    self._SetupFieldDump(field_buffer_limit, x, y, width, height, loop=False)
+    self._StartFieldDump()
+    self._CreateSavedHashes(field_buffer_limit)
+    self._WaitForFieldCount(field_buffer_limit, timeout)
 
-  def StartDumpingFrames(self, frame_buffer_limit, x, y, width, height,
+  def StartDumpingFields(self, field_buffer_limit, x, y, width, height,
                          hash_buffer_limit):
-    """Starts dumping frames continuously.
+    """Starts dumping fields continuously.
 
     Args:
-      frame_buffer_limit: The size of the buffer which stores the frame.
-                          Frames will be dumped to the beginning when full.
+      field_buffer_limit: The size of the buffer which stores the field.
+                          Fields will be dumped to the beginning when full.
       x: The X position of the top-left corner of crop; None for a full-screen.
       y: The Y position of the top-left corner of crop; None for a full-screen.
       width: The width of the area of crop.
@@ -220,14 +220,14 @@ class FrameManager(object):
       hash_buffer_limit: The maximum number of hashes to monitor. Stop
                          capturing when this limitation is reached.
     """
-    self._StopFrameDump()
-    self._SetupFrameDump(frame_buffer_limit, x, y, width, height, loop=True)
-    self._StartFrameDump()
-    self._StartMonitoringFrames(hash_buffer_limit)
+    self._StopFieldDump()
+    self._SetupFieldDump(field_buffer_limit, x, y, width, height, loop=True)
+    self._StartFieldDump()
+    self._StartMonitoringFields(hash_buffer_limit)
 
-  def StopDumpingFrames(self):
-    """Stops dumping frames."""
-    if self._last_frame.value == -1:
-      raise FrameManagerError('Not started capuring video yet.')
-    self._StopFrameDump()
-    self._StopMonitoringFrames()
+  def StopDumpingFields(self):
+    """Stops dumping fields."""
+    if self._last_field.value == -1:
+      raise FieldManagerError('Not started capuring video yet.')
+    self._StopFieldDump()
+    self._StopMonitoringFields()
