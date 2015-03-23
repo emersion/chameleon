@@ -5,6 +5,7 @@
 
 import os
 import subprocess
+import threading
 
 
 class _SystemTools(object):
@@ -68,10 +69,8 @@ class _SystemTools(object):
       name: The name of the tool.
       *args: The arguments of the tool.
     """
-    sleep_command = 'sleep %f' % time
-    tool_command = [self._TOOL_PATHS[name]] + map(str, args)
-    command = '; '.join([sleep_command, ' '.join(tool_command)])
-    subprocess.Popen(command, shell=True)
+    threading.Timer(time, lambda: self.Call(name, *args)).start()
+
 
 # Singleton
 SystemTools = _SystemTools()

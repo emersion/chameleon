@@ -16,6 +16,7 @@ from chameleond.utils import fpga
 from chameleond.utils import frame_manager
 from chameleond.utils import ids
 from chameleond.utils import io
+from chameleond.utils import system_tools
 from chameleond.utils import rx
 
 
@@ -542,7 +543,11 @@ class DpInputFlow(InputFlow):
         if self.WaitVideoInputStable() and self.WaitVideoOutputStable():
           logging.info('DP FSM done')
         else:
-          logging.error('*** DP FSM failed')
+          # Fatal error. Only rebooting Chameleon fixes this issue.
+          # TODO: Investigate the root cause.
+          logging.error('DP FSM failed. Rebooting...')
+          system_tools.SystemTools.DelayedCall(1, 'reboot')
+          raise InputFlowError('DP FSM failed. Reboot Chameleon.')
     else:
       logging.info('Skip resetting DP rx.')
 
