@@ -103,21 +103,6 @@ class DpRx(i2c.I2cSlave):
     assert bank == 0 or bank == 1
     self.Set(0x02 + bank, 0x05)
 
-  def ResetVideoLogic(self):
-    """Resets the video logic."""
-    logging.info('DpRx: reset video...')
-    self._SwitchBank(1)
-    self.SetMask(self._REG_PLL_RESET, self._BIT_RESET_VIDEO)
-    self._SwitchBank(0)
-    self.SetMask(self._REG_FUNC_RESET, self._BIT_RESET_VIDEO)
-
-    time.sleep(self._VIDEO_RESET_DELAY)
-
-    self._SwitchBank(1)
-    self.ClearMask(self._REG_PLL_RESET, self._BIT_RESET_VIDEO)
-    self._SwitchBank(0)
-    self.ClearMask(self._REG_FUNC_RESET, self._BIT_RESET_VIDEO)
-
   def IsInterlaced(self):
     """Returns True if the input video is in interlaced mode."""
     video_flag = self.Get(self._REG_VIDEO_FLAG)

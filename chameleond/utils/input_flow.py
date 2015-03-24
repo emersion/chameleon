@@ -16,7 +16,6 @@ from chameleond.utils import fpga
 from chameleond.utils import frame_manager
 from chameleond.utils import ids
 from chameleond.utils import io
-from chameleond.utils import system_tools
 from chameleond.utils import rx
 
 
@@ -35,6 +34,8 @@ class InputFlow(object):
   __metaclass__ = ABCMeta
 
   _CONNECTOR_TYPE = 'Unknown'  # A subclass should override it.
+
+  __PULSE_RETRY_COUNT = 3
 
   _RX_SLAVES = {
       ids.DP1: rx.DpRx.SLAVE_ADDRESSES[0],
@@ -277,7 +278,18 @@ class InputFlow(object):
     pulses = itertools.izip(ops, sleep_times)
 
     for op, sleep_time in pulses:
-      op()
+      count = 0
+      while count < self.__PULSE_RETRY_COUNT:
+        try:
+          op()
+          break
+        except Exception as e:
+          count += 1
+          logging.info('%s error %d', op.__name__, count)
+          logging.exception(e)
+      else:
+        raise
+
       time.sleep(sleep_time)
 
   def _EnableDdc(self):
@@ -534,7 +546,8 @@ class DpInputFlow(InputFlow):
     frames.
     """
     if not self._rx.IsVideoInputStable() or not self._IsFrameLocked():
-      self._rx.ResetVideoLogic()
+      self.Initialize()  # reset rx
+      self.Select()  # to make sure mux is properly set for this InputFlow
       if not self.WaitVideoInputStable() or not self.WaitVideoOutputStable():
         logging.info('Send DP HPD pulse to reset source...')
         self._fpga.hpd.Unplug(self._input_id)
@@ -543,11 +556,8 @@ class DpInputFlow(InputFlow):
         if self.WaitVideoInputStable() and self.WaitVideoOutputStable():
           logging.info('DP FSM done')
         else:
-          # Fatal error. Only rebooting Chameleon fixes this issue.
-          # TODO: Investigate the root cause.
-          logging.error('DP FSM failed. Rebooting...')
-          system_tools.SystemTools.DelayedCall(1, 'reboot')
-          raise InputFlowError('DP FSM failed. Reboot Chameleon.')
+          logging.error('DP FSM failed')
+          raise InputFlowError('DP FSM failed')
     else:
       logging.info('Skip resetting DP rx.')
 
