@@ -407,7 +407,6 @@ class DpInputFlow(InputFlow):
   """An abstraction of the entire flow for DisplayPort."""
 
   _CONNECTOR_TYPE = 'DP'
-  _IS_DUAL_PIXEL_MODE = False
 
   _DELAY_VIDEO_MODE_PROBE = 1.0
   _TIMEOUT_VIDEO_STABLE_PROBE = 5
@@ -419,13 +418,20 @@ class DpInputFlow(InputFlow):
       ids.DP2: io.MuxIo.MASK_DP2_AUX_BP_L
   }
 
+  # Two thresholds defining a hysteresis zone to avoid rapid mode changes due
+  # to pixel clock noise.
+  _PIXEL_MODE_PCLK_THRESHOLD_HIGH = 200  # MHz
+  _PIXEL_MODE_PCLK_THRESHOLD_LOW = 180  # MHz
+
   def __init__(self, *args):
+    self._is_dual_pixel_mode = False
+
     super(DpInputFlow, self).__init__(*args)
     self._edid = edid.DpEdid(args[0], self._main_bus)
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
-    return self._IS_DUAL_PIXEL_MODE
+    return self._is_dual_pixel_mode
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
@@ -536,6 +542,40 @@ class DpInputFlow(InputFlow):
           self._rx.GetFrameResolution(),
           self._frame_manager.ComputeResolution())
 
+  def _SetPixelMode(self):
+    """Sets the pixel mode based on the pixel clock of the input signal.
+
+    Returns:
+      True if pixel mode is changed; False if nothing is changed.
+    """
+    pclk = self._rx.GetPixelClock()
+    logging.info('PCLK = %s', pclk)
+    if (self._PIXEL_MODE_PCLK_THRESHOLD_LOW <= pclk <=
+        self._PIXEL_MODE_PCLK_THRESHOLD_HIGH):
+      # Hysteresis: do not change mode if pclk is in this buffer zone.
+      return False
+    dual_pixel_mode = pclk >= self._PIXEL_MODE_PCLK_THRESHOLD_HIGH
+
+    # Guard the pixel mode by frame width. Pclk is not reliable; may get
+    # an unreasonably high pclk for low resolution.
+    # FIXME: remove the hack when we know what's going on with high pclk
+    if dual_pixel_mode and self._rx.GetFrameResolution()[0] < 1920:
+      dual_pixel_mode = False
+
+    if self._is_dual_pixel_mode != dual_pixel_mode:
+      self._is_dual_pixel_mode = dual_pixel_mode
+      if dual_pixel_mode:
+        self._rx.SetDualPixelMode()
+        logging.info('Changed to dual pixel mode')
+      else:
+        self._rx.SetSinglePixelMode()
+        logging.info('Changed to single pixel mode')
+      self._frame_manager = frame_manager.FrameManager(
+          self._input_id, self._rx, self._GetEffectiveVideoDumpers())
+      self.Select()
+      return True
+    return False
+
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
@@ -547,18 +587,27 @@ class DpInputFlow(InputFlow):
     """
     if not self._rx.IsVideoInputStable() or not self._IsFrameLocked():
       self.Initialize()  # reset rx
-      self.Select()  # to make sure mux is properly set for this InputFlow
-      if not self.WaitVideoInputStable() or not self.WaitVideoOutputStable():
+      video_input_stable = self.WaitVideoInputStable()
+
+      if not video_input_stable:
         logging.info('Send DP HPD pulse to reset source...')
         self._fpga.hpd.Unplug(self._input_id)
         time.sleep(self._HPD_PULSE_WIDTH)
         self._fpga.hpd.Plug(self._input_id)
-        if self.WaitVideoInputStable() and self.WaitVideoOutputStable():
+        video_input_stable = self.WaitVideoInputStable()
+
+      if video_input_stable:
+        self._SetPixelMode()
+        self.Select()  # to make sure mux is properly set for this InputFlow
+        if self.WaitVideoOutputStable():
           logging.info('DP FSM done')
-        else:
-          logging.error('DP FSM failed')
-          raise InputFlowError('DP FSM failed')
+          return
+
+      logging.error('DP FSM failed')
+      raise InputFlowError('DP FSM failed')
     else:
+      if self._SetPixelMode():
+        self.WaitVideoOutputStable()
       logging.info('Skip resetting DP rx.')
 
   def SetContentProtection(self, enabled):
