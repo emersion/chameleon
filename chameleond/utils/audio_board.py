@@ -11,14 +11,69 @@ from chameleond.utils import i2c
 from chameleond.utils import io
 
 
+class _AudioBoardIOController(object):
+  """Controls I/O expanders on audio board.
+
+  There are three I/O expanders on i2c bus 3,
+  address 0x20, 0x21, 0x22. Each I/O expander has 16 bits.
+  Some of the bits are set as output to control compoments on audio board.
+  Some of the bits are set as input to read status.
+  Other bits are left untouched.
+  This class provides the interface to control output or read input on certain
+  bit of certian I/O expander.
+  """
+  def __init__(self, i2c_bus):
+    """Constructs an _AudioBoardIOController.
+
+    Args:
+      i2c_bus: The I2cBus object.
+    """
+    self._io_expanders = [
+        io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[0]),
+        io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[1]),
+        io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[2])]
+
+    for io_expander in self._io_expanders:
+      i2c_bus.AddSlave(io_expander)
+
+    self._ResetDirections()
+    logging.info('_AudioBoardIOController initialized')
+
+  def _ResetDirections(self):
+    """Resets all ports to be input."""
+    for expander in self._io_expanders:
+      expander.SetDirection(0xffff)
+
+  def SetBit(self, index, offset, value):
+    """Sets a bit as output and sets its value to 1 or 0.
+
+    Args:
+      index: The index number of I/O expander.
+      offset: The bit offset 0x0 to 0xf.
+      value: 1 or 0.
+    """
+    logging.info('Set I/O expander #%d, bit offset 0x%x to %d',
+                 index, offset, value)
+    self._io_expanders[index].SetBit(offset, value)
+
+  def ReadBit(self, index, offset):
+    """Sets a bit as input and reads its value.
+
+    Args:
+      index: The index number of I/O expander.
+      offset: The bit offset 0x0 to 0xf.
+
+    Returns:
+      1 or 0.
+    """
+    return self._io_expanders[index].ReadBit(offset)
+
+
 class _AudioBoardSwitchController(object):
-  """Controls switches using I/O expanders.
+  """Controls switches on audio board.
 
   There are 18 switches for audio board controlling.
-  The switches are controlled by three I/O expanders on i2c bus 3,
-  address 0x20, 0x21, 0x22. Each I/O expander has 16 bits.
-  Some of the bits are set as output to control the switches.
-  Other bits are left untouched.
+  The switches are controlled through _AudioBoardIOController,
   This class provides the interface to toggle switches on/off.
   Here is the table of bit location of each switch:
 
@@ -74,34 +129,21 @@ class _AudioBoardSwitchController(object):
       19: (2, 1),
       25: (2, 5)}
 
-  def __init__(self, i2c_bus):
+  def __init__(self, io_controller):
     """Constructs an _AudioBoardSwitchController.
 
     Args:
-      i2c_bus: The I2cBus object.
+      io_controller: An _AudioBoardIOController object.
     """
-    self._io_expanders = [
-        io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[0]),
-        io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[1]),
-        io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[2])]
-
-    for io_expander in self._io_expanders:
-      i2c_bus.AddSlave(io_expander)
-
-    self._SetDirectionForSwitches()
+    self._io_controller = io_controller
+    self._ResetSwitches()
 
     logging.info('_AudioBoardSwitchController initialized')
 
-  def _SetDirectionForSwitches(self):
-    """Sets used bits as output."""
-    masks = collections.defaultdict(int)
-    for index, offset in self._SWITCH_EXPANDER_BIT_MAP.itervalues():
-      masks[index] |= (1 << offset)
-    for index, value in masks.iteritems():
-      # value contains the offsets that should be set as output.
-      # Inverts it because 0 means output in SetDirection.
-      # Ands it with 0xffff to obtain a 2-byte mask.
-      self._io_expanders[index].SetDirection(~value & 0xffff)
+  def _ResetSwitches(self):
+    """Turns off all switches."""
+    for number in self._SWITCH_EXPANDER_BIT_MAP.iterkeys():
+      self.EnableSwitch(number, False)
 
   def EnableSwitch(self, number, enabled):
     """Enables/disables a switch.
@@ -112,11 +154,7 @@ class _AudioBoardSwitchController(object):
     """
     logging.info('Set switch %d to %s', number, enabled)
     index, offset = self._SWITCH_EXPANDER_BIT_MAP[number]
-    mask = 1 << offset
-    if enabled:
-      self._io_expanders[index].SetOutputMask(mask)
-    else:
-      self._io_expanders[index].ClearOutputMask(mask)
+    self._io_controller.SetBit(index, offset, 1 if enabled else 0)
 
 
 class AudioBusEndpointException(Exception):
@@ -360,7 +398,8 @@ class AudioBoard(object):
       AudioBoardException: If audio board can not be initialized.
     """
     try:
-      self._switch_controller = _AudioBoardSwitchController(i2c_bus)
+      io_controller = _AudioBoardIOController(i2c_bus)
+      self._switch_controller = _AudioBoardSwitchController(io_controller)
       self._audio_buses = {
           1: _AudioBus(self._switch_controller, 1),
           2: _AudioBus(self._switch_controller, 2)}
