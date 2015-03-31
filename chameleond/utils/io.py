@@ -50,6 +50,35 @@ class IoExpander(i2c.I2cSlave):
     data = struct.pack('H', value)
     self.Set(data, reg_base)
 
+  def _GetDirection(self):
+    """Gets the direction (input or output) for the ports.
+
+    Returns:
+      A 2-byte value of the direction mask (1: input, 0: output).
+    """
+    return self._ReadPair(self._CONFIG_BASE)
+
+  def _SetBitDirection(self, offset, output):
+    """Sets direction on a bit.
+
+    Args:
+      offset: The bit offset 0x0 to 0xf.
+      output: True to set this bit as output. False to set this bit as input.
+    """
+    # Reads the current directions and only modifies the specified bit.
+    old_value = self._GetDirection()
+
+    if output:
+      # 0 means output in SetDirection.
+      mask = ~(1 << offset) & 0xffff
+      new_value = old_value & mask
+    else:
+      # 1 means input in SetDirection.
+      mask = (1 << offset) & 0xffff
+      new_value = old_value | mask
+
+    self.SetDirection(new_value)
+
   def GetInput(self):
     """Gets the input ports value.
 
@@ -97,6 +126,33 @@ class IoExpander(i2c.I2cSlave):
       mask: The bitwise mask.
     """
     self.SetOutput(self.GetOutput() & ~mask)
+
+  def SetBit(self, offset, value):
+    """Sets a bit as output and sets its value to 1 or 0.
+
+    Args:
+      offset: The bit offset 0x0 to 0xf.
+      value: 1 or 0.
+    """
+    self._SetBitDirection(offset, True)
+    mask = 1 << offset
+    if value:
+      self.SetOutputMask(mask)
+    else:
+      self.ClearOutputMask(mask)
+
+  def ReadBit(self, offset):
+    """Sets a bit as input and reads its value.
+
+    Args:
+      offset: The bit offset 0x0 to 0xf.
+
+    Returns:
+      1 or 0.
+    """
+    self._SetBitDirection(offset, False)
+    mask = 1 << offset
+    return 1 if self.GetInput() & mask else 0
 
 
 class PowerIo(IoExpander):
