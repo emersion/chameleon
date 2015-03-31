@@ -5,6 +5,7 @@
 
 import collections
 import logging
+import time
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import i2c
@@ -155,6 +156,129 @@ class _AudioBoardSwitchController(object):
     logging.info('Set switch %d to %s', number, enabled)
     index, offset = self._SWITCH_EXPANDER_BIT_MAP[number]
     self._io_controller.SetBit(index, offset, 1 if enabled else 0)
+
+
+class _JackPluggerException(Exception):
+  """Error in _JackPlugger."""
+  pass
+
+
+class _JackPlugger(object):
+  """Controls jack plugger.
+
+  There is a motor in the audio box which can plug/unplug 3.5mm 4-ring
+  audio cable to/from audio jack of Cros deivce.
+  This motor is controlled by audio board using 4 pins.
+  The pins are controlled by the I/O expander on i2c bus 3,
+  address 0x21, which is the I/O expander with index 1 in
+  _AudioBoardIOController.
+  This class provides the interface to plug/unplug 3.5mm 4-ring
+  audio cable to/from audio jack.
+
+  Here is the table of bit location.
+
+  =================================
+
+  I/O expander 1: address 0x21
+
+  bit      11     10      9      8
+  ---------------------------------
+  pin   stat1  stat0   cmd1   cmd0
+
+  =================================
+
+  The usages of 4 pins are defined as followes.
+
+  cmd0, cmd1 to set motor action.
+
+  cmd0   cmd1         action
+  --------------------------
+     0      1         plug
+     1      0         unplug
+
+  stat0, stat1 to read current status reported from the motor.
+
+  stat0 stat1         status
+  --------------------------
+     0      1         plug
+     1      0         unplug
+
+  """
+  # The I/O expander index is 1.
+  _INDEX = 1
+  # The mapping from register name to bit offset.
+  _BIT_MAP = {
+      'cmd0':  8,
+      'cmd1':  9,
+      'stat0': 10,
+      'stat1': 11}
+
+  _SLEEP_AFTER_COMMAND_SECONDS = 2
+
+  def __init__(self, io_controller):
+    """Constructs an _JackPlugger.
+
+    Args:
+      io_controller: An _AudioBoardIOController object.
+    """
+    self._io_controller = io_controller
+    self.Reset()
+
+    logging.info('_JackPlugger initialized')
+
+  def Reset(self):
+    """Unplugs the jack and checks status."""
+    self.SetPlugStateAndCheck(False)
+
+  def _SetPlugState(self, plug):
+    """Sets plugger state.
+
+    Args:
+      plug: True to plug. False otherwise.
+    """
+    if plug:
+      values = (0, 1)
+    else:
+      values = (1, 0)
+
+    self._io_controller.SetBit(self._INDEX, self._BIT_MAP['cmd0'], values[0])
+    self._io_controller.SetBit(self._INDEX, self._BIT_MAP['cmd1'], values[1])
+
+  def _GetPlugState(self):
+    """Gets plugger current state.
+
+    Returns:
+      Plugger status. True if plugged, False otherwise.
+
+    Raises:
+      _JackPluggerException if motor status can not be queried.
+    """
+    value0 = self._io_controller.ReadBit(self._INDEX, self._BIT_MAP['stat0'])
+    value1 = self._io_controller.ReadBit(self._INDEX, self._BIT_MAP['stat1'])
+
+    logging.info('Read motor status %r, %r', value0, value1)
+    if (value0, value1) == (0, 1):
+      return True
+    elif (value0, value1) == (1, 0):
+      return False
+    else:
+      raise _JackPluggerException('Can not get motor status')
+
+  def SetPlugStateAndCheck(self, plug):
+    """Plugs/unplugs audio jack and checks motor status.
+
+    Args:
+      plug: True to plug. False otherwise.
+
+    Raises:
+      _JackPluggerException if motor status does not meet the condition.
+    """
+    logging.info('Set plugger state to %s', 'Plug' if plug else 'Unplug')
+    self._SetPlugState(plug)
+    time.sleep(self._SLEEP_AFTER_COMMAND_SECONDS)
+    if self._GetPlugState() != plug:
+      raise _JackPluggerException(
+          'The motor plug status is not %s' % 'Plug' if plug else 'Unplug')
 
 
 class AudioBusEndpointException(Exception):
@@ -383,7 +507,8 @@ class AudioBoard(object):
   The audio functions includes:
   1. Audio source/sink routing on audio bus 1 and 2.
   2. TODO (cychiang) Audio jack mode switching between LRGM and LRMG.
-  3. TODO (cychiang) Audio jack plug/unplug control.
+  3. Audio jack plug/unplug control if audio board is connected to motor
+     in audio box.
   4. TODO (cychiang) Audio button function switching.
   5. TODO (cychiang) Audio button press control.
 
@@ -407,6 +532,11 @@ class AudioBoard(object):
       logging.error('Can not access I2c bus at %#x on audio board.',
                     i2c_bus.base_addr)
       raise AudioBoardException('Can not initialize audio board')
+    try:
+      self._jack_plugger = _JackPlugger(io_controller)
+    except _JackPluggerException:
+      logging.error('Can not access jack plugger.')
+      self._jack_plugger = None
 
     logging.info('Audio board initialized')
 
@@ -414,6 +544,8 @@ class AudioBoard(object):
     """Resets audio buses."""
     for bus in self._audio_buses.values():
       bus.Reset()
+    if self.HasJackPlugger():
+      self._jack_plugger.Reset()
 
   def SetConnection(self, bus_number, endpoint, enabled):
     """Connects or disconnects an endpoint on an audio bus.
@@ -469,3 +601,24 @@ class AudioBoard(object):
       bus_number: 1 or 2 for audio bus 1 or bus 2.
     """
     self._audio_buses[bus_number].Reset()
+
+  def HasJackPlugger(self):
+    """If this audio board has jack plugger.
+
+    Returns:
+      True if this audio board has jack plugger. False otherwise.
+    """
+    return self._jack_plugger is not None
+
+  def SetJackPlugger(self, enabled):
+    """Sets jack plugger status.
+
+    Args:
+      enabled: True to plug, False otherwise.
+
+    Raises:
+      AudioBoardException if there is no jack plugger on this audio board.
+    """
+    if not self.HasJackPlugger():
+      raise AudioBoardException('There is no jack plugger on this audio board.')
+    self._jack_plugger.SetPlugStateAndCheck(enabled)
