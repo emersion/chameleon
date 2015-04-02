@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 """This module provides interface to control audio board."""
 
-import collections
 import logging
 import time
 
