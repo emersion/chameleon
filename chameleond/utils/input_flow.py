@@ -556,12 +556,6 @@ class DpInputFlow(InputFlow):
       return False
     dual_pixel_mode = pclk >= self._PIXEL_MODE_PCLK_THRESHOLD_HIGH
 
-    # Guard the pixel mode by frame width. Pclk is not reliable; may get
-    # an unreasonably high pclk for low resolution.
-    # FIXME: remove the hack when we know what's going on with high pclk
-    if dual_pixel_mode and self._rx.GetFrameResolution()[0] < 1920:
-      dual_pixel_mode = False
-
     if self._is_dual_pixel_mode != dual_pixel_mode:
       self._is_dual_pixel_mode = dual_pixel_mode
       if dual_pixel_mode:

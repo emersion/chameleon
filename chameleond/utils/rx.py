@@ -23,7 +23,8 @@ class DpRx(i2c.I2cSlave):
   _AUDIO_RESET_DELAY = 0.001
   _VIDEO_RESET_DELAY = 0.001
 
-  _REG_PCLK_COUNT = 0x10
+  _REG_PCLK_COUNT_LOW = 0x10
+  _REG_PCLK_COUNT_HIGH = 0x11
 
   _REG_INPUT_STATUS = 0x11
   _BIT_VIDEO_STABLE = 1 << 4
@@ -103,7 +104,8 @@ class DpRx(i2c.I2cSlave):
   def GetPixelClock(self):
     """Returns the pixel clock of the input signal in MHz."""
     # PCLK = 27MHz * 1024 / PCLK_COUNT
-    pclk_count = self.Get(self._REG_PCLK_COUNT)
+    pclk_count = (self.Get(self._REG_PCLK_COUNT_LOW) +
+                  ((self.Get(self._REG_PCLK_COUNT_HIGH) & 0x0F) << 8))
     if pclk_count:
       return 27 * 1024 / pclk_count
     else:
