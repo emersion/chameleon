@@ -995,3 +995,27 @@ class ChameleondDriver(ChameleondInterface):
       bus_number: 1 or 2 for audio bus 1 or bus 2.
     """
     self._audio_board.ResetConnections(bus_number)
+
+  @_AudioBoardMethod
+  def AudioBoardHasJackPlugger(self):
+    """If there is jack plugger on audio board.
+
+    Audio board must have the motor cable connected in order to control
+    jack plugger of audio box.
+
+    Returns:
+      True if there is jack plugger on audio board. False otherwise.
+    """
+    return self._audio_board.HasJackPlugger()
+
+  @_AudioBoardMethod
+  def AudioBoardAudioJackPlug(self):
+    """Plugs audio jack to connect audio board and Cros device."""
+    logging.info('Plug audio jack to connect audio board and Cros device.')
+    self._audio_board.SetJackPlugger(True)
+
+  @_AudioBoardMethod
+  def AudioBoardAudioJackUnplug(self):
+    """Unplugs audio jack to disconnect audio board and Cros device."""
+    logging.info('Unplug audio jack to disconnect audio board and Cros device.')
+    self._audio_board.SetJackPlugger(False)

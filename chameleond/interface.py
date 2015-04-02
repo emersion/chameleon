@@ -593,3 +593,22 @@ class ChameleondInterface(object):
       bus_number: 1 or 2 for audio bus 1 or bus 2.
     """
     raise NotImplementedError('AudioBoardClearRoutes')
+
+  def AudioBoardHasJackPlugger(self):
+    """If there is jack plugger on audio board.
+
+    Audio board must have the motor cable connected in order to control
+    jack plugger of audio box.
+
+    Returns:
+      True if there is jack plugger on audio board. False otherwise.
+    """
+    raise NotImplementedError('AudioBoardHasJackPlugger')
+
+  def AudioBoardAudioJackPlug(self):
+    """Plugs audio jack to connect audio board and Cros device."""
+    raise NotImplementedError('AudioBoardAudioJackPlug')
+
+  def AudioBoardAudioJackUnplug(self):
+    """Unplugs audio jack to disconnect audio board and Cros device."""
+    raise NotImplementedError('AudioBoardAudioJackUnplug')
