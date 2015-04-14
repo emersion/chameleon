@@ -1019,3 +1019,15 @@ class ChameleondDriver(ChameleondInterface):
     """Unplugs audio jack to disconnect audio board and Cros device."""
     logging.info('Unplug audio jack to disconnect audio board and Cros device.')
     self._audio_board.SetJackPlugger(False)
+
+  @_AudioBoardMethod
+  def AudioBoardResetBluetooth(self):
+    """Resets bluetooth module on audio board."""
+    logging.info('Resets bluetooth module on audio board.')
+    self._audio_board.ResetBluetooth()
+
+  @_AudioBoardMethod
+  def AudioBoardDisableBluetooth(self):
+    """Disables bluetooth module on audio board."""
+    logging.info('Disables bluetooth module on audio board.')
+    self._audio_board.DisableBluetooth()
