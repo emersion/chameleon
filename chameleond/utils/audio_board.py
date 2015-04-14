@@ -280,6 +280,78 @@ class _JackPlugger(object):
           'The motor plug status is not %s' % 'Plug' if plug else 'Unplug')
 
 
+class _BluetoothController(object):
+  """Controls bluetooth module on audio board.
+
+  There is a bluetooth module on audio board.
+  The pins are controlled by the I/O expander on i2c bus 3,
+  address 0x21, which is the I/O expander with index 1 in
+  _AudioBoardIOController.
+  This class provides the interface to control bluetooth module.
+
+  Here is the table of bit location.
+
+  ==================================================
+
+  I/O expander 1: address 0x21
+
+  bit           7           6           5          4
+  --------------------------------------------------
+  pin       reset volume down   volume up    forward
+
+  bit           3           2           1          0
+  --------------------------------------------------
+  pin    backward   play/stop
+
+  ==================================================
+
+  """
+  # The I/O expander index is 1.
+  _INDEX = 1
+  # The mapping from register name to bit offset.
+  # TODO(cychiang) implement play/forward/backward/volume functions.
+  _BIT_MAP = {'reset': 7}
+
+  def __init__(self, io_controller):
+    """Constructs an _BluetoothController.
+
+    Args:
+      io_controller: An _AudioBoardIOController object.
+    """
+    self._io_controller = io_controller
+    self.Reset()
+
+    logging.info('_BluetoothController initialized')
+
+  def _SetResetPin(self, value):
+    """Sets reset pin value.
+
+    Args:
+      value: 0 or 1.
+    """
+    self._io_controller.SetBit(self._INDEX, self._BIT_MAP['reset'], value)
+
+  def Disable(self):
+    """Disables bluetooth module by holding the reset bit.
+
+    This bluetooth module does not support disconnect command from module side.
+    Once bluetooth module is disabled, bluetooth adapter will notice this
+    bluetooth module is lost after a timeout. On Cros, this timeout duration is
+    60 seconds.
+    """
+    self._SetResetPin(0)
+
+  def Reset(self):
+    """Resets bluetooth module.
+
+    After reset, it takes about 20 seconds for bluetooth module to become
+    available for connection. Connection attempt results in "Device or resource
+    busy" error during this time window.
+    """
+    self._SetResetPin(0)
+    self._SetResetPin(1)
+
+
 class AudioBusEndpointException(Exception):
   """Exception in AudioBusEndpoint."""
   pass
@@ -537,6 +609,8 @@ class AudioBoard(object):
       logging.error('Can not access jack plugger.')
       self._jack_plugger = None
 
+    self._bluetooth_ctrl = _BluetoothController(io_controller)
+
     logging.info('Audio board initialized')
 
   def Reset(self):
@@ -621,3 +695,11 @@ class AudioBoard(object):
     if not self.HasJackPlugger():
       raise AudioBoardException('There is no jack plugger on this audio board.')
     self._jack_plugger.SetPlugStateAndCheck(enabled)
+
+  def ResetBluetooth(self):
+    """Resets bluetooth module."""
+    self._bluetooth_ctrl.Reset()
+
+  def DisableBluetooth(self):
+    """Disables bluetooth module."""
+    self._bluetooth_ctrl.Disable()
