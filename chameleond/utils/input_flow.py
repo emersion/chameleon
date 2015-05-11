@@ -635,12 +635,12 @@ class HdmiInputFlow(InputFlowWithAudio):
   _CONNECTOR_TYPE = 'HDMI'
 
   # The firmware for the 6803 reference board sets the rx in dual pixel mode
-  # when the pixel clock is greater than 160. Here, we use 125 instead of 160
+  # when the pixel clock is greater than 160. Here, we use 130 instead of 160
   # as the FPGA works more reliably when the pixel clock is under this value.
   # Two thresholds defining a hysteresis zone to avoid rapid mode changes due
   # to pixel clock noise.
-  _PIXEL_MODE_PCLK_THRESHOLD_HIGH = 125 # MHz
-  _PIXEL_MODE_PCLK_THRESHOLD_LOW = 115 # MHz
+  _PIXEL_MODE_PCLK_THRESHOLD_HIGH = 130 # MHz
+  _PIXEL_MODE_PCLK_THRESHOLD_LOW = 126 # MHz
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
