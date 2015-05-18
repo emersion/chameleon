@@ -5,6 +5,28 @@
 
 import logging
 from SimpleXMLRPCServer import SimpleXMLRPCServer
+from SimpleXMLRPCServer import SimpleXMLRPCRequestHandler
+
+class ChameleonXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
+  """XMLRPC request handler for Chameleon server.
+
+  During the response of SimpleXMLRPCRequestHandler, it will try to obtain
+  client's domain name for logging. When there is no DNS server in the
+  network, this step will take a long time and delay the returning of calls
+  from server proxy. We override address_string method to bypass requesting
+  domain name.
+  """
+  def address_string(self):
+    """Returns the client address formatted for logging.
+
+    This method is overridden to bypass requesting domain name.
+
+    Returns:
+      The formatted string for client address.
+    """
+    host = self.client_address[0]
+    # original: return socket.getfqdn(host)
+    return '%s (no getfqdn)' % host
 
 
 class ChameleonServer(object):
@@ -43,6 +65,7 @@ class ChameleonServer(object):
     """
     # Launch the XMLRPC server to serve Chameleond APIs.
     server = SimpleXMLRPCServer((host, port), allow_none=True,
+                                requestHandler=ChameleonXMLRPCRequestHandler,
                                 logRequests=True)
     server.register_introspection_functions()
     server.register_instance(self._driver)
