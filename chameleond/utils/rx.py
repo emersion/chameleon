@@ -391,13 +391,12 @@ class HdmiRx(i2c.I2cSlave):
     return bool(self.Get(self._REG_P0_HDCP_CONTROL) & self._BIT_P0_HDCP_ENABLE)
 
   def IsVideoInputEncrypted(self):
-    """Returns True if the video input is encrypted.
+    """Returns True if the received video signal is encrypted.
 
     Returns:
-      True if the video input is content-protected; otherwise, False.
+      True if the video input is encrypted; otherwise, False.
     """
-    return self.IsContentProtectionEnabled() and bool(
-        self.Get(self._REG_HDCP_STATUS) & self._BIT_P0_HDCP_ON)
+    return bool(self.Get(self._REG_HDCP_STATUS) & self._BIT_P0_HDCP_ON)
 
 
 class VgaRx(i2c.I2cSlave):
