@@ -620,3 +620,7 @@ class ChameleondInterface(object):
   def AudioBoardDisableBluetooth(self):
     """Disables bluetooth module on audio board."""
     raise NotImplementedError('AudioBoardDisableBluetooth')
+
+  def GetMacAddress(self):
+    """Gets the MAC address of this Chameleon."""
+    raise NotImplementedError('GetMacAddress')

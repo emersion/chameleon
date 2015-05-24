@@ -1031,3 +1031,11 @@ class ChameleondDriver(ChameleondInterface):
     """Disables bluetooth module on audio board."""
     logging.info('Disables bluetooth module on audio board.')
     self._audio_board.DisableBluetooth()
+
+  def GetMacAddress(self):
+    """Gets the MAC address of this Chameleon.
+
+    Returns:
+      A string for MAC address.
+    """
+    return open('/sys/class/net/eth0/address').read().strip()
