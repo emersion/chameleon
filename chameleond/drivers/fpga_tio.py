@@ -6,6 +6,7 @@
 import functools
 import logging
 import os
+import tempfile
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
@@ -814,14 +815,14 @@ class ChameleondDriver(ChameleondInterface):
 
   @_AudioMethod(input_only=True)
   def StopCapturingAudio(self, port_id):
-    """Stops capturing audio and returns recorded audio raw data.
+    """Stops capturing audio and returns recorded data path and format.
 
     Args:
       port_id: The ID of the audio input port.
 
     Returns:
-      A tuple (data, format).
-      data: The captured audio data wrapped in an xmlrpclib.Binary object.
+      A tuple (path, format).
+      path: The path to the captured audio data.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
         Currently, the data format supported is
@@ -838,7 +839,12 @@ class ChameleondDriver(ChameleondInterface):
           'The input is selected to %r not %r', self._selected_input, port_id)
     data, data_format = self._flows[port_id].StopCapturingAudio()
     logging.info('Stopped capturing audio from port #%d', port_id)
-    return xmlrpclib.Binary(data), data_format
+    with tempfile.NamedTemporaryFile(
+        prefix='audio_', suffix='.raw', delete=False) as recorded_file:
+      recorded_file.write(data)
+      recorded_file.flush()
+      logging.info('Saved captured audio to %s', recorded_file.name)
+      return recorded_file.name, data_format
 
   @_AudioMethod(output_only=True)
   def StartPlayingAudio(self, port_id, data, data_format):

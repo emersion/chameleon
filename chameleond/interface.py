@@ -475,18 +475,24 @@ class ChameleondInterface(object):
     raise NotImplementedError('StartCapturingAudio')
 
   def StopCapturingAudio(self, port_id):
-    """Stops capturing audio and returns recorded audio raw data.
+    """Stops capturing audio and returns recorded data path and format.
 
     Args:
       port_id: The ID of the audio input port.
 
     Returns:
-      A tuple (data, format).
-      data: The captured audio data wrapped in an xmlrpclib.Binary object.
+      A tuple (path, format).
+      path: The path to the captured audio data.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
         Currently, the data format supported is
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+
+    Raises:
+      DriverError: Input is selected to port other than port_id.
+        This happens if user has used API related to input operation on
+        other port. The API includes CaptureVideo, StartCapturingVideo,
+        DetectResolution, StartCapturingAudio, StartPlayingEcho.
     """
     raise NotImplementedError('StopCapturingAudio')
 
