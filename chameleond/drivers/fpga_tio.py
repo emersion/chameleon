@@ -4,6 +4,7 @@
 """Chameleond Driver for FPGA customized platform with the TIO card."""
 
 import functools
+import glob
 import logging
 import os
 import tempfile
@@ -144,6 +145,8 @@ class ChameleondDriver(ChameleondInterface):
 
     if self.HasAudioBoard():
       self._audio_board.Reset()
+
+    self._ClearAudioFiles()
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
@@ -933,6 +936,15 @@ class ChameleondDriver(ChameleondInterface):
           'The output is selected to %r not %r', self._selected_output, port_id)
     logging.info('Stop playing audio from port #%d', port_id)
     self._flows[port_id].StopPlayingAudio()
+
+  def _ClearAudioFiles(self):
+    """Clears temporary audio files.
+
+    Chameleon board does not reboot very often. We should clear the temporary
+    audio files used in capturing audio or playing audio when Reset is called.
+    """
+    for path in glob.glob('/tmp/audio_*'):
+      os.unlink(path)
 
   @_AudioBoardMethod
   def AudioBoardConnect(self, bus_number, endpoint):
