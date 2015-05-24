@@ -847,14 +847,14 @@ class ChameleondDriver(ChameleondInterface):
       return recorded_file.name, data_format
 
   @_AudioMethod(output_only=True)
-  def StartPlayingAudio(self, port_id, data, data_format):
+  def StartPlayingAudio(self, port_id, path, data_format):
     """Playing audio data from an output port.
 
-    Unwrap audio data and play that data from port_id port.
+    Play audio data at given path using given format from port_id port.
 
     Args:
       port_id: The ID of the output connector.
-      data: The audio data to play wrapped in xmlrpclib.Binary.
+      path: The path to the audio data to play.
       data_format: The dict representation of AudioDataFormat.
         Refer to docstring of utils.audio.AudioDataFormat for detail.
         Currently Chameleon only accepts data format if it meets
@@ -863,11 +863,14 @@ class ChameleondDriver(ChameleondInterface):
         on Chameleon board.
 
     Raises:
-      DriverError: There is any audio input port recording.
+      DriverError: There is no file at the path.
     """
+    if not os.path.exists(path):
+      raise DriverError('File path %r does not exist' % path)
     self._SelectOutput(port_id)
     logging.info('Start playing audio from port #%d', port_id)
-    self._flows[port_id].StartPlayingAudioData((data.data, data_format))
+    self._flows[port_id].StartPlayingAudioData(
+        (open(path, 'r').read(), data_format))
 
   @_AudioMethod(output_only=True)
   def StartPlayingEcho(self, port_id, input_id):

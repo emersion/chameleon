@@ -496,20 +496,23 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('StopCapturingAudio')
 
-  def StartPlayingAudio(self, port_id, data, data_format):
+  def StartPlayingAudio(self, port_id, path, data_format):
     """Playing audio data from an output port.
 
-    Unwrap audio data and play that data from output_id port.
+    Play audio data at given path using given format from port_id port.
 
     Args:
       port_id: The ID of the output connector.
-      data: The audio data to play wrapped in xmlrpclib.Binary.
+      path: The path to the audio data to play.
       data_format: The dict representation of AudioDataFormat.
         Refer to docstring of utils.audio.AudioDataFormat for detail.
         Currently Chameleon only accepts data format if it meets
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
         Chameleon user should do the format conversion to minimize work load
         on Chameleon board.
+
+    Raises:
+      DriverError: There is no file at the path.
     """
     raise NotImplementedError('StartPlayingAudio')
 
