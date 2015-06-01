@@ -68,6 +68,18 @@ class _AudioBoardIOController(object):
     """
     return self._io_expanders[index].ReadBit(offset)
 
+  def ReadOutputBit(self, index, offset):
+    """Reads current value of an output bit.
+
+    Args:
+      index: The index number of I/O expander.
+      offset: The bit offset 0x0 to 0xf.
+
+    Returns:
+      1 or 0.
+    """
+    return self._io_expanders[index].ReadOutputBit(offset)
+
 
 class _AudioBoardSwitchController(object):
   """Controls switches on audio board.
@@ -350,6 +362,17 @@ class _BluetoothController(object):
     """
     self._SetResetPin(0)
     self._SetResetPin(1)
+
+  def IsEnabled(self):
+    """Checks if bluetooth module is enabled.
+
+    Bluetooth module is enabled when reset pin is not hold to 0.
+
+    Returns:
+      True if bluetooth module is enabled. False otherwise.
+    """
+    return (self._io_controller.ReadOutputBit(
+        self._INDEX, self._BIT_MAP['reset']) == 1)
 
 
 class AudioBusEndpointException(Exception):
@@ -703,3 +726,11 @@ class AudioBoard(object):
   def DisableBluetooth(self):
     """Disables bluetooth module."""
     self._bluetooth_ctrl.Disable()
+
+  def IsBluetoothEnabled(self):
+    """Checks if bluetooth is enabled.
+
+    Returns:
+      True if bluetooth module is enabled. False otherwise.
+    """
+    return self._bluetooth_ctrl.IsEnabled()

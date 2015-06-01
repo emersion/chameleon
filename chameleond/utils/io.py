@@ -91,7 +91,7 @@ class IoExpander(i2c.I2cSlave):
     """Gets the output ports value.
 
     Returns:
-      A 2-byte value of the input ports.
+      A 2-byte value of the output ports.
     """
     return self._ReadPair(self._OUTPUT_BASE)
 
@@ -153,6 +153,18 @@ class IoExpander(i2c.I2cSlave):
     self._SetBitDirection(offset, False)
     mask = 1 << offset
     return 1 if self.GetInput() & mask else 0
+
+  def ReadOutputBit(self, offset):
+    """Reads the value of an output bit.
+
+    Args:
+      offset: The bit offset 0x0 to 0xf.
+
+    Returns:
+      1 or 0.
+    """
+    mask = 1 << offset
+    return 1 if self.GetOutput() & mask else 0
 
 
 class PowerIo(IoExpander):
