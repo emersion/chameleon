@@ -1053,6 +1053,15 @@ class ChameleondDriver(ChameleondInterface):
     logging.info('Disables bluetooth module on audio board.')
     self._audio_board.DisableBluetooth()
 
+  @_AudioBoardMethod
+  def AudioBoardIsBluetoothEnabled(self):
+    """Checks if bluetooth module on audio board is enabled.
+
+    Returns:
+      True if bluetooth module is enabled. False otherwise.
+    """
+    return self._audio_board.IsBluetoothEnabled()
+
   def GetMacAddress(self):
     """Gets the MAC address of this Chameleon.
 
