@@ -520,7 +520,6 @@ class _AudioBus(object):
     Args:
       switch_controller: An _AudioBoardSwitchController object.
       bus_number: 1 or 2 for bus number.
-
     """
     self._switch_controller = switch_controller
     self._bus_number = bus_number
