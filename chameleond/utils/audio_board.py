@@ -322,7 +322,7 @@ class _BluetoothController(object):
   _INDEX = 1
   # The mapping from register name to bit offset.
   # TODO(cychiang) implement play/forward/backward/volume functions.
-  _BIT_MAP = {'reset': 7}
+  _BIT_RESET = 7
 
   def __init__(self, io_controller):
     """Constructs an _BluetoothController.
@@ -341,7 +341,7 @@ class _BluetoothController(object):
     Args:
       value: 0 or 1.
     """
-    self._io_controller.SetBit(self._INDEX, self._BIT_MAP['reset'], value)
+    self._io_controller.SetBit(self._INDEX, self._BIT_RESET, value)
 
   def Disable(self):
     """Disables bluetooth module by holding the reset bit.
@@ -372,7 +372,7 @@ class _BluetoothController(object):
       True if bluetooth module is enabled. False otherwise.
     """
     return (self._io_controller.ReadOutputBit(
-        self._INDEX, self._BIT_MAP['reset']) == 1)
+        self._INDEX, self._BIT_RESET) == 1)
 
 
 class AudioBusEndpointException(Exception):
