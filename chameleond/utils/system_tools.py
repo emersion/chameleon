@@ -18,6 +18,7 @@ class _SystemTools(object):
       'i2cset': '/usr/local/sbin/i2cset',
       'hpd_control': '/usr/bin/hpd_control',
       'memtool': '/usr/bin/memtool',
+      'modprobe':'/sbin/modprobe',
       'reboot': '/sbin/reboot',
       'pixeldump': '/usr/bin/pixeldump',
   }
