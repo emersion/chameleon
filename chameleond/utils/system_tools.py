@@ -12,6 +12,8 @@ class _SystemTools(object):
   """A class to wrap the required tools for Chameleond execution."""
 
   _TOOL_PATHS = {
+      'aplay': '/usr/bin/aplay',
+      'arecord': '/usr/bin/arecord',
       'chameleond': '/etc/init.d/chameleond',
       'i2cdump': '/usr/local/sbin/i2cdump',
       'i2cget': '/usr/local/sbin/i2cget',
