@@ -872,8 +872,7 @@ class ChameleondDriver(ChameleondInterface):
       raise DriverError('File path %r does not exist' % path)
     self._SelectOutput(port_id)
     logging.info('Start playing audio from port #%d', port_id)
-    self._flows[port_id].StartPlayingAudioData(
-        (open(path, 'r').read(), data_format))
+    self._flows[port_id].StartPlayingAudio(path, data_format)
 
   @_AudioMethod(output_only=True)
   def StartPlayingEcho(self, port_id, input_id):

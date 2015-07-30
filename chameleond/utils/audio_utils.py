@@ -131,7 +131,7 @@ class AudioStreamManager(object):
     """The manager is streaming."""
     return self._stream.is_streaming
 
-  def StartPlayingAudio(self, audio_data):
+  def StartPlayingAudioData(self, audio_data):
     """Starts playing audio_data.
 
     Currently AudioStreamManager only accepts data format if it is identical

@@ -202,22 +202,22 @@ class OutputCodecFlow(CodecFlow):
     self._audio_route_manager.SetupRouteFromInputToI2S(source_id)
     self._fpga.aiis.Enable()
 
-  def StartPlayingAudioData(self, audio_data):
-    """Starts playing audio_data.
+  def StartPlayingAudio(self, path, data_format):
+    """Starts playing audio data at path.
 
     Currently AudioStreamManager only accepts data format if it is identical
     to audio.AudioDataFormat(
       file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
 
     Args:
-      audio_data: A tuple (data, format).
-        data: The audio data to play.
-        format: The dict representation of AudioDataFormat. Refer to docstring
-          of utils.audio.AudioDataFormat for detail.
+      path: path to the audio data to play.
+      data_format: The dict representation of AudioDataFormat. Refer to
+        docstring of utils.audio.AudioDataFormat for detail.
     """
     self._audio_route_manager.SetupRouteFromMemoryToI2S()
     self._fpga.aiis.Enable()
-    self._audio_stream_manager.StartPlayingAudio(audio_data)
+    audio_data = (open(path, 'r').read(), data_format)
+    self._audio_stream_manager.StartPlayingAudioData(audio_data)
 
   @property
   def is_playing_audio_from_memory(self):
