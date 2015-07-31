@@ -39,6 +39,18 @@ class _SystemTools(object):
       if not os.path.isfile(path):
         raise IOError('Required tool %s not existed' % path)
 
+  def _MakeCommand(self, name, args):
+    """Combines the system tool and its parameters into a list.
+
+    Args:
+      name: Name of the system tool.
+      args: List of arguments passed in by user.
+
+    Returns:
+      A list representing the complete command.
+    """
+    return [self._TOOL_PATHS[name]] + map(str, args)
+
   def Call(self, name, *args):
     """Calls the tool with arguments.
 
@@ -46,7 +58,7 @@ class _SystemTools(object):
       name: The name of the tool.
       *args: The arguments of the tool.
     """
-    command = [self._TOOL_PATHS[name]] + map(str, args)
+    command = self._MakeCommand(name, args)
     subprocess.check_call(command)
 
   def Output(self, name, *args):
@@ -59,7 +71,7 @@ class _SystemTools(object):
     Returns:
       The output message of the call, including stderr message.
     """
-    command = [self._TOOL_PATHS[name]] + map(str, args)
+    command = self._MakeCommand(name, args)
     return subprocess.check_output(command, stderr=subprocess.STDOUT)
 
   def DelayedCall(self, time, name, *args):
