@@ -86,6 +86,22 @@ class _SystemTools(object):
     """
     threading.Timer(time, lambda: self.Call(name, *args)).start()
 
+  def RunInSubprocess(self, name, *args):
+    """Calls the tool and run it in a separate process.
+
+    This tool will be useful for starting and later killing aplay and arecord
+    processes which have to be interrupted.
+
+    Args:
+      name: The name of the tool.
+      *args: The arguments of the tool.
+
+    Returns:
+      process: The subprocess spawned for the command.
+    """
+    command = self._MakeCommand(name, args)
+    process = subprocess.Popen(command)
+    return process
 
 # Singleton
 SystemTools = _SystemTools()
