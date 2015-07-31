@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """This module specifies the configuration needed for USB audio driver"""
 
+
 class USBAudioDriverConfigs(object):
   """The class that encapsulates the parameters of USB audio driver."""
 
@@ -101,3 +102,31 @@ class USBAudioDriverConfigs(object):
       A dict containing all six parameters of device info.
     """
     return self._device_info
+
+  def GetPlaybackConfigsDict(self):
+    """Returns playback-related data configurations in dict form.
+
+    Returns:
+      A 3-item dictionary with keys: sample_size, channel_mask and
+      sampling_rate.
+    """
+    playback_configs = {
+        'sample_size': self._p_sample_size,
+        'channel_mask': self._p_channel_mask,
+        'sampling_rate': self._p_sampling_rate,
+    }
+    return playback_configs
+
+  def GetCaptureConfigsDict(self):
+    """Returns capture-related data configurations in dict form.
+
+    Returns:
+      A 3-item dictionary with keys: sample_size, channel_mask and
+      sampling_rate.
+    """
+    capture_configs = {
+        'sample_size': self._c_sample_size,
+        'channel_mask': self._c_channel_mask,
+        'sampling_rate': self._c_sampling_rate,
+    }
+    return capture_configs
