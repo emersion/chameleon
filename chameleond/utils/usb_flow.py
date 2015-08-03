@@ -5,6 +5,12 @@
 
 import logging
 
+
+class USBFlowError(Exception):
+  """Exception raised when there is any error in USBFlow."""
+  pass
+
+
 class USBFlow(object):
   """An abstraction for the entire USB flow.
 
