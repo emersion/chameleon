@@ -4,6 +4,7 @@
 """Codec flow module which abstracts the entire flow for codec input/output."""
 
 import logging
+import tempfile
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import audio_utils
@@ -148,8 +149,8 @@ class InputCodecFlow(CodecFlow):
     """Stops capturing audio.
 
     Returns:
-      A tuple (data, format).
-      data: The captured audio data.
+      A tuple (path, format).
+      path: The path to the captured audio data.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
 
@@ -157,10 +158,15 @@ class InputCodecFlow(CodecFlow):
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    return_value = self._audio_capture_manager.StopCapturingAudio()
+    data, data_format = self._audio_capture_manager.StopCapturingAudio()
     self._audio_codec.SelectInput(codec.CodecInput.NONE)
     self.ResetRoute()
-    return return_value
+    with tempfile.NamedTemporaryFile(
+        prefix='audio_', suffix='.raw', delete=False) as recorded_file:
+      recorded_file.write(data)
+      recorded_file.flush()
+      logging.info('Saved captured audio to %s', recorded_file.name)
+      return recorded_file.name, data_format
 
   def ResetRoute(self):
     """Resets the audio route."""

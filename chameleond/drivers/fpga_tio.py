@@ -7,7 +7,6 @@ import functools
 import glob
 import logging
 import os
-import tempfile
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
@@ -840,14 +839,9 @@ class ChameleondDriver(ChameleondInterface):
     if self._selected_input != port_id:
       raise DriverError(
           'The input is selected to %r not %r', self._selected_input, port_id)
-    data, data_format = self._flows[port_id].StopCapturingAudio()
+    path, data_format = self._flows[port_id].StopCapturingAudio()
     logging.info('Stopped capturing audio from port #%d', port_id)
-    with tempfile.NamedTemporaryFile(
-        prefix='audio_', suffix='.raw', delete=False) as recorded_file:
-      recorded_file.write(data)
-      recorded_file.flush()
-      logging.info('Saved captured audio to %s', recorded_file.name)
-      return recorded_file.name, data_format
+    return path, data_format
 
   @_AudioMethod(output_only=True)
   def StartPlayingAudio(self, port_id, path, data_format):
