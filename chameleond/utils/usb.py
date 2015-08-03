@@ -125,3 +125,20 @@ class USBController(object):
       data_format = self._ConvertConfigsToDataFormat(capture_configs)
       self._supported_capture_data_format = data_format
     return self._supported_capture_data_format
+
+  def CheckPlaybackFormat(self, data_format):
+    """Check whether format of playback data match that of audio driver.
+
+    Args:
+      data_format: An AudioDataFormat object in dict form
+
+    Returns:
+      True if the relevant key-value pairs in data_format match those of
+      playback_configs.
+      False otherwise.
+    """
+    supported_format = self.GetSupportedPlaybackDataFormat()
+    for key in supported_format.keys():
+      if data_format[key] != supported_format[key]:
+        return False
+    return True
