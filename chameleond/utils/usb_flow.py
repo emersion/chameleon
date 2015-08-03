@@ -117,9 +117,17 @@ class OutputUSBFlow(USBFlow):
       raise USBFlowError('Data format incompatible with driver configurations')
 
   def StopPlayingAudio(self):
-    """Stops playing audio data."""
-    logging.info('Stopped playing audio.')
-    raise NotImplementedError('StopPlayingAudio')
+    """Stops playing audio data.
+
+    Raises:
+      USBFlowError if this is called before StartPlayingAudio() is called.
+    """
+    if self._subprocess is None:
+      raise USBFlowError('Stop playing audio before Start')
+
+    elif self._subprocess.poll() is None:
+      self._subprocess.terminate()
+      logging.info('Stopped playing audio.')
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
