@@ -5,6 +5,8 @@
 
 import logging
 
+import chameleon_common #pylint: disable=W0611
+from chameleond.utils import system_tools
 
 class USBFlowError(Exception):
   """Exception raised when there is any error in USBFlow."""
@@ -17,6 +19,7 @@ class USBFlow(object):
   Properties:
     _port_id: The ID of the input/output connector. Check the value in ids.py.
     _usb_ctrl: An USBController object.
+    _subprocess: The subprocess spawned for audio events.
   """
   def __init__(self, port_id, usb_ctrl):
     """Initializes USBFlow object with two properties.
@@ -27,6 +30,7 @@ class USBFlow(object):
     """
     self._port_id = port_id
     self._usb_ctrl = usb_ctrl
+    self._subprocess = None
 
   def Initialize(self):
     """Starts and initializes USB audio driver with preset configurations.
@@ -82,6 +86,7 @@ class InputUSBFlow(USBFlow):
     """Returns the human readable string for the connector type."""
     return 'USBIn'
 
+
 class OutputUSBFlow(USBFlow):
   """Subclass of USBFlow that handles output audio data."""
 
@@ -96,9 +101,20 @@ class OutputUSBFlow(USBFlow):
       path: The path to the audio file for playing.
       data_format: The dict representation of AudioDataFormat. Refer to
         docstring of utils.audio.AudioDataFormat for detail.
+
+    Raises:
+      USBFlowError if data format of the file at path does not comply with the
+        configurations of the USB driver.
     """
-    logging.info('Started playing audio.')
-    raise NotImplementedError('StartPlayingAudio')
+    if self._usb_ctrl.CheckPlaybackFormat(data_format):
+      params_list = self._GetAlsaUtilCommandArgs(data_format)
+      params_list.append(path)
+      self._subprocess = system_tools.SystemTools.RunInSubprocess('aplay',
+                                                                  *params_list)
+      logging.info('Started playing audio using aplay %s',
+                   ' '.join(params_list))
+    else:
+      raise USBFlowError('Data format incompatible with driver configurations')
 
   def StopPlayingAudio(self):
     """Stops playing audio data."""
