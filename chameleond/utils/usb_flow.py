@@ -4,8 +4,10 @@
 """This module specifies the interface for usb flows."""
 
 import logging
+import tempfile
 
 import chameleon_common #pylint: disable=W0611
+from chameleond.utils import audio
 from chameleond.utils import system_tools
 
 class USBFlowError(Exception):
@@ -66,16 +68,51 @@ class USBFlow(object):
 
 
 class InputUSBFlow(USBFlow):
-  """Subclass of USBFlow that handles input audio data."""
+  """Subclass of USBFlow that handles input audio data.
+
+  Properties:
+    _data_format: An AudioDataFormat object encapsulating the data format
+                  derived from the USB driver's capture configurations.
+    _file_path: The file path that captured data will be saved at.
+  """
+
+  _DEFAULT_FILE_TYPE = 'wav'
 
   def __init__(self, *args):
     """Constructs an InputUSBFlow object."""
     super(InputUSBFlow, self).__init__(*args)
+    self._file_path = None
+    self._data_format = None
 
   def StartCapturingAudio(self):
     """Starts recording audio data."""
-    logging.info('Started capturing audio.')
-    raise NotImplementedError('StartCapturingAudio')
+    data_format = self._GetDataFormat()
+    params_list = self._GetAlsaUtilCommandArgs(data_format)
+    file_suffix = '.' + data_format['file_type']
+    recorded_file = tempfile.NamedTemporaryFile(prefix='recorded',
+                                                suffix=file_suffix,
+                                                delete=False)
+    self._file_path = recorded_file.name
+    params_list.append(self._file_path)
+    self._subprocess = system_tools.SystemTools.RunInSubprocess('arecord',
+                                                                *params_list)
+    logging.info('Started capturing audio using arecord %s',
+                 ' '.join(params_list))
+
+  def _GetDataFormat(self):
+    """Returns capture data format in dictionary form.
+
+    Returns:
+      A 4-entry dictionary representing the supported format in AudioDataFormat
+      form.
+    """
+    supported_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
+    self._data_format = audio.AudioDataFormat(self._DEFAULT_FILE_TYPE,
+                                              supported_format['sample_format'],
+                                              supported_format['channel'],
+                                              supported_format['rate'])
+    data_format_dict = self._data_format.AsDict()
+    return data_format_dict
 
   def StopCapturingAudio(self):
     """Stops recording audio data."""
