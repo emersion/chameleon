@@ -5,6 +5,7 @@
 
 import itertools
 import logging
+import tempfile
 import time
 from abc import ABCMeta
 
@@ -385,8 +386,8 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
     """Stops capturing audio.
 
     Returns:
-      A tuple (data, format).
-      data: The captured audio data.
+      A tuple (path, format).
+      path: The path to the captured audio data.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
 
@@ -394,9 +395,14 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    return_value = self._audio_capture_manager.StopCapturingAudio()
+    data, data_format = self._audio_capture_manager.StopCapturingAudio()
     self.ResetRoute()
-    return return_value
+    with tempfile.NamedTemporaryFile(
+        prefix='audio_', suffix='.raw', delete=False) as recorded_file:
+      recorded_file.write(data)
+      recorded_file.flush()
+      logging.info('Saved captured audio to %s', recorded_file.name)
+      return recorded_file.name, data_format
 
   def ResetRoute(self):
     """Resets the audio route."""
