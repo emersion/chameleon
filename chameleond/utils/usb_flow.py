@@ -115,9 +115,25 @@ class InputUSBFlow(USBFlow):
     return data_format_dict
 
   def StopCapturingAudio(self):
-    """Stops recording audio data."""
-    logging.info('Stopped capturing audio.')
-    raise NotImplementedError('StopCapturingAudio')
+    """Stops recording audio data.
+
+    Returns:
+      A tuple (path, format).
+      path: The path to the captured audio data.
+      format: The dict representation of AudioDataFormat. Refer to docstring
+        of utils.audio.AudioDataFormat for detail.
+
+    Raises:
+      USBFlowError if this is called before StartCapturingAudio() is called.
+    """
+    if self._subprocess is None:
+      raise USBFlowError('Stop capturing audio before start.')
+
+    elif self._subprocess.poll() is None:
+      self._subprocess.terminate()
+      logging.info('Stopped capturing audio.')
+
+    return (self._file_path, self._data_format.AsDict())
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
