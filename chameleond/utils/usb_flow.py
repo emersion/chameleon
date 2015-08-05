@@ -41,6 +41,25 @@ class USBFlow(object):
     """Returns the human readable string for the connector type."""
     raise NotImplementedError('GetConnectorType')
 
+  def _GetAlsaUtilCommandArgs(self, data_format):
+    """Returns a list of parameter flags paired with corresponding arguments.
+
+    The argument values are taken from data_format.
+
+    Args:
+      data_format: The dictionary form of an AudioDataFormat object
+        whose values are passed as arguments into the Alsa util command.
+
+    Returns:
+      A list containing argument strings
+    """
+    params_list = ['-D', 'hw:0,0',
+                   '-t', data_format['file_type'],
+                   '-f', data_format['sample_format'],
+                   '-c', data_format['channel'],
+                   '-r', data_format['rate']]
+    return params_list
+
 
 class InputUSBFlow(USBFlow):
   """Subclass of USBFlow that handles input audio data."""
