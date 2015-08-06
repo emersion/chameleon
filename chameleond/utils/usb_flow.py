@@ -66,6 +66,24 @@ class USBFlow(object):
                    '-r', data_format['rate']]
     return params_list
 
+  @property
+  def _subprocess_is_running(self):
+    """The subprocess spawned for running a command is running.
+
+    Returns:
+      True if subprocess has yet to return a result.
+      False if there is no subprocess spawned yet, or if the subprocess has
+        returned a value.
+    """
+    if self._subprocess is None:
+      return False
+
+    elif self._subprocess.poll() is None:
+      return True
+
+    else:
+      return False
+
 
 class InputUSBFlow(USBFlow):
   """Subclass of USBFlow that handles input audio data.
@@ -135,6 +153,15 @@ class InputUSBFlow(USBFlow):
 
     return (self._file_path, self._data_format.AsDict())
 
+  @property
+  def is_capturing_audio(self):
+    """InputUSBFlow is capturing audio.
+
+    Returns:
+      True if InputUSBFlow is capturing audio.
+    """
+    return self._subprocess_is_running
+
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
     return 'USBIn'
@@ -181,6 +208,15 @@ class OutputUSBFlow(USBFlow):
     elif self._subprocess.poll() is None:
       self._subprocess.terminate()
       logging.info('Stopped playing audio.')
+
+  @property
+  def is_playing_audio(self):
+    """OutputUSBFlow is playing audio.
+
+    Returns:
+      True if OutputUSBFlow is playing audio.
+    """
+    return self._subprocess_is_running
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
