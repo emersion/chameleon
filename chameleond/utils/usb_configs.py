@@ -24,14 +24,12 @@ class USBAudioDriverConfigs(object):
     self._c_sampling_rate = self._DEFAULT_SAMPLING_RATE
     self._p_sample_size = self._DEFAULT_SAMPLE_SIZE
     self._c_sample_size = self._DEFAULT_SAMPLE_SIZE
-
-    self._device_info = {
-        'idVendor': None,
-        'idProduct': None,
-        'bcdDevice': None,
-        'iSerialNumber': None,
-        'iManufacturer': None,
-        'iProduct': None,}
+    self._idVendor = None
+    self._idProduct = None
+    self._bcdDevice = None
+    self._iSerialNumber = None
+    self._iManufacturer = None
+    self._iProduct = None
 
   def SetPlaybackConfigs(self, channel_mask, sampling_rate, sample_size):
     """Sets different configs for playback.
@@ -73,13 +71,12 @@ class USBAudioDriverConfigs(object):
       manufacturer: USB manufacturer string.
       product: USB product string.
     """
-    self._device_info = {
-        'idVendor': vendor_id,
-        'idProduct': product_id,
-        'bcdDevice': bcd_device,
-        'iSerialNumber': serial_number,
-        'iManufacturer': manufacturer,
-        'iProduct': product,}
+    self._idVendor = vendor_id
+    self._idProduct = product_id
+    self._bcdDevice = bcd_device
+    self._iSerialNumber = serial_number
+    self._iManufacturer = manufacturer
+    self._iProduct = product
 
   def GetDriverAudioConfigsDict(self):
     """Get the audio data parameters in dict form.
@@ -93,7 +90,8 @@ class USBAudioDriverConfigs(object):
         'p_ssize': self._p_sample_size,
         'c_chmask': self._c_channel_mask,
         'c_srate': self._c_sampling_rate,
-        'c_ssize': self._c_sample_size,}
+        'c_ssize': self._c_sample_size,
+    }
 
   def GetDeviceInfoDict(self):
     """Get the device information in dict form.
@@ -101,7 +99,14 @@ class USBAudioDriverConfigs(object):
     Returns:
       A dict containing all six parameters of device info.
     """
-    return self._device_info
+    return {
+        'idVendor': self._idVendor,
+        'idProduct': self._idProduct,
+        'bcdDevice': self._bcdDevice,
+        'iSerialNumber': self._iSerialNumber,
+        'iManufacturer': self._iManufacturer,
+        'iProduct': self._iProduct,
+    }
 
   def GetPlaybackConfigsDict(self):
     """Returns playback-related data configurations in dict form.
