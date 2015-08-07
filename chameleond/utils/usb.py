@@ -6,6 +6,11 @@
 import chameleon_common #pylint: disable=W0611
 from chameleond.utils import system_tools
 
+class USBControllerError(Exception):
+  """Exception raised when any error occurs in USBController."""
+  pass
+
+
 class USBController(object):
   """Provides interface to control USB driver.
 
