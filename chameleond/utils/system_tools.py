@@ -106,5 +106,21 @@ class _SystemTools(object):
                                stderr=subprocess.PIPE)
     return process
 
+  def GetSubprocessOutput(self, process):
+    """Returns the output of the command called in the process spawned.
+
+    Args:
+      process: The subprocess in which a command is called.
+
+    Returns:
+      A tuple (return_code, out, err).
+      return_code: 0 on success, 1 on error.
+      out: Content of command output to stdout, usually when command succeeds.
+      err: Content of command output to stderr when an error occurs.
+    """
+    out, err = process.communicate()
+    return_code = process.returncode
+    return (return_code, out, err)
+
 # Singleton
 SystemTools = _SystemTools()
