@@ -43,9 +43,54 @@ class USBFlow(object):
     self._usb_ctrl.InitializeAudioDriver()
     logging.info('Initialized USB flow #%d.', self._port_id)
 
+  def Select(self):
+    """Selects the USB flow."""
+    raise NotImplementedError('Select')
+
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
     raise NotImplementedError('GetConnectorType')
+
+  def ResetRoute(self):
+    """Resets the audio route."""
+    logging.warning('ResetRoute for USBFlow is not implemented. Do nothing.')
+
+  def IsPhysicalPlugged(self):
+    """Returns if the physical cable is plugged."""
+    # TODO
+    logging.warning(
+        'IsPhysicalPlugged on USBFlow is not implemented.'
+        ' Always returns True')
+    return True
+
+  def IsPlugged(self):
+    """Currently always returns true.
+
+    Returns:
+      True.
+    """
+    logging.warning('IsPlugged on USBFlow is not implemented.'
+                    'Always returns True')
+    return True
+
+  def Plug(self):
+    """Emulates plug for USB audio gadget."""
+    # TODO
+    logging.warning(
+        'Plug on USBFlow is not implemented. Do nothing.')
+
+  def Unplug(self):
+    """Emulates unplug for USB audio gadget."""
+    # TODO
+    logging.warning(
+        'Unplug on USBFlow is not implemented. Do nothing.')
+
+  def Do_FSM(self):
+    """Do nothing for USBFlow.
+
+    fpga_tio calls Do_FSM after a flow is selected.
+    """
+    pass
 
   def _GetAlsaUtilCommandArgs(self, data_format):
     """Returns a list of parameter flags paired with corresponding arguments.
@@ -162,6 +207,13 @@ class InputUSBFlow(USBFlow):
     """
     return self._subprocess_is_running
 
+  def Select(self):
+    """Selects the USB flow.
+
+    This is a dummy method because USBInputFlow is selected by default.
+    """
+    logging.info('Select InputUSBFlow for input id #%d.', self._port_id)
+
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
     return 'USBIn'
@@ -217,6 +269,13 @@ class OutputUSBFlow(USBFlow):
       True if OutputUSBFlow is playing audio.
     """
     return self._subprocess_is_running
+
+  def Select(self):
+    """Selects the USB flow.
+
+    This is a dummy method because USBOutputFlow is selected by default.
+    """
+    logging.info('Select OutputUSBFlow for input id #%d.', self._port_id)
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
