@@ -90,7 +90,8 @@ class _SystemTools(object):
     """Calls the tool and run it in a separate process.
 
     This tool will be useful for starting and later killing aplay and arecord
-    processes which have to be interrupted.
+    processes which have to be interrupted. The command outputs are channelled
+    to stdout and/or stderr.
 
     Args:
       name: The name of the tool.
@@ -100,7 +101,9 @@ class _SystemTools(object):
       process: The subprocess spawned for the command.
     """
     command = self._MakeCommand(name, args)
-    process = subprocess.Popen(command)
+    process = subprocess.Popen(command,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
     return process
 
 # Singleton
