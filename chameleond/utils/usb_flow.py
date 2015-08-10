@@ -38,12 +38,7 @@ class USBFlow(object):
     self._subprocess = None
 
   def Initialize(self):
-    """Starts and initializes USB audio driver with preset configurations.
-
-    The driver configurations are initially set using USBAudioDriverConfigs
-    class.
-    """
-    self._usb_ctrl.EnableAudioDriver()
+    """Do nothing here."""
     logging.info('Initialized USB flow #%d.', self._port_id)
 
   def Select(self):
@@ -67,26 +62,26 @@ class USBFlow(object):
     return True
 
   def IsPlugged(self):
-    """Currently always returns true.
+    """Returns a Boolean value reflecting the status of USB audio gadget driver.
 
     Returns:
-      True.
+      True if USB audio gadget driver is enabled. False otherwise.
     """
-    logging.warning('IsPlugged on USBFlow is not implemented.'
-                    'Always returns True')
-    return True
+    return self._usb_ctrl.DriverIsEnabled()
 
   def Plug(self):
-    """Emulates plug for USB audio gadget."""
-    # TODO
-    logging.warning(
-        'Plug on USBFlow is not implemented. Do nothing.')
+    """Emulates plug for USB audio gadget.
+
+    The USB audio gadget driver module is enabled.
+    """
+    self._usb_ctrl.EnableAudioDriver()
 
   def Unplug(self):
-    """Emulates unplug for USB audio gadget."""
-    # TODO
-    logging.warning(
-        'Unplug on USBFlow is not implemented. Do nothing.')
+    """Emulates unplug for USB audio gadget.
+
+    The USB audio gadget driver module is disabled.
+    """
+    self._usb_ctrl.DisableAudioDriver()
 
   def Do_FSM(self):
     """Do nothing for USBFlow.
