@@ -18,6 +18,8 @@ from chameleond.utils import fpga
 from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import input_flow
+from chameleond.utils import usb
+from chameleond.utils import usb_flow
 
 
 class DriverError(Exception):
@@ -97,6 +99,8 @@ class ChameleondDriver(ChameleondInterface):
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
     audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
     fpga_ctrl = fpga.FpgaController()
+    usb_ctrl = usb.USBController()
+
     self._flows = {
         ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
         ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
@@ -106,7 +110,9 @@ class ChameleondDriver(ChameleondInterface):
         ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_codec_bus,
                                               fpga_ctrl),
         ids.LINEOUT: codec_flow.OutputCodecFlow(
-            ids.LINEOUT, audio_codec_bus, fpga_ctrl)
+            ids.LINEOUT, audio_codec_bus, fpga_ctrl),
+        ids.USBIN: usb_flow.InputUSBFlow(ids.USBIN, usb_ctrl),
+        ids.USBOUT: usb_flow.OutputUSBFlow(ids.USBOUT, usb_ctrl),
     }
 
     for flow in self._flows.itervalues():
