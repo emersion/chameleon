@@ -61,7 +61,8 @@ class USBAudioDriverConfigs(object):
                     serial_number=None, manufacturer=None, product=None):
     """Allows user to configure the driver into a particular product/device.
 
-    Fields not specified as keyword arguments will be overwritten to None.
+    Only fields corresponding to given arguments will be set to the argument
+    values.
 
     Args:
       vendor_id: USB vendor ID as string.
@@ -71,12 +72,18 @@ class USBAudioDriverConfigs(object):
       manufacturer: USB manufacturer string.
       product: USB product string.
     """
-    self._idVendor = vendor_id
-    self._idProduct = product_id
-    self._bcdDevice = bcd_device
-    self._iSerialNumber = serial_number
-    self._iManufacturer = manufacturer
-    self._iProduct = product
+    if vendor_id is not None:
+      self._idVendor = vendor_id
+    if product_id is not None:
+      self._idProduct = product_id
+    if bcd_device is not None:
+      self._bcdDevice = bcd_device
+    if serial_number is not None:
+      self._iSerialNumber = serial_number
+    if manufacturer is not None:
+      self._iManufacturer = manufacturer
+    if product is not None:
+      self._iProduct = product
 
   def GetDriverAudioConfigsDict(self):
     """Get the audio data parameters in dict form.
