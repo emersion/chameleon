@@ -38,16 +38,35 @@ update-rc.d "${UPDATER_NAME}" defaults 90 10
 FPGA_DIR="$(dirname ${SCRIPT})/../updatable/${CHAMELEON_BOARD}"
 FPGA_BOOT_PART=$(fdisk -l /dev/mmcblk0 | grep 'a2  Unknown' | cut -f1 -d' ')
 FPGA_FAT_PART=$(fdisk -l /dev/mmcblk0 | grep ' b  W95 FAT32' | cut -f1 -d' ')
+FPGA_LINUX_PART=$(fdisk -l /dev/mmcblk0 | grep '83  Linux' | cut -f1 -d' ')
 MOUNT_DIR='/media/mmc1'
 
 mount "${FPGA_FAT_PART}" "${MOUNT_DIR}"
-for file in 'fpga.rbf' 'socfpga.dtb'; do
+for file in 'fpga.rbf' 'socfpga.dtb' 'zImage'; do
     if ! diff -q "${FPGA_DIR}/${file}" "${MOUNT_DIR}/${file}"; then
         echo "Updating ${file}"
         cp -f "${FPGA_DIR}/${file}" "${MOUNT_DIR}"
         need_reboot=1
     fi
 done
+umount "${MOUNT_DIR}"
+
+mount "${FPGA_LINUX_PART}" "${MOUNT_DIR}"
+MODULE_DIR="${MOUNT_DIR}/lib/modules"
+file="${FPGA_DIR}/modules.tgz"
+if [[ -e "${file}" ]]; then
+    new_modules_version="$(tar tf "${file}" |head -n 1)"
+    new_modules_version="${new_modules_version%?}"
+    echo "new_modules_version ${new_modules_version}"
+    current_modules_version="$(ls -1 "${MODULE_DIR}" |head -n 1)"
+    echo "current_modules_version ${current_modules_version}"
+    if [ "${new_modules_version}" != "${current_modules_version}" ]; then
+        echo "Updating ${file}"
+        rm -rf "${MODULE_DIR}"/*
+        tar zxvf "${file}" -C "${MODULE_DIR}"
+        need_reboot=1
+    fi
+fi
 umount "${MOUNT_DIR}"
 
 file='boot-partition.img'
