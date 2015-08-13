@@ -31,8 +31,11 @@ class USBAudioDriverConfigs(object):
     self._iManufacturer = None
     self._iProduct = None
 
-  def SetPlaybackConfigs(self, channel_mask, sampling_rate, sample_size):
+  def SetPlaybackConfigs(self, channel_mask=None, sampling_rate=None,
+                         sample_size=None):
     """Sets different configs for playback.
+
+    The caller can specify the field to be changed without affecting others.
 
     Args:
       channel_mask: int value of binary mask specifying the number of channels,
@@ -40,12 +43,18 @@ class USBAudioDriverConfigs(object):
       sampling_rate: sampling rate, e.g., 48000Hz.
       sample_size: size of each sample in bytes.
     """
-    self._p_channel_mask = channel_mask
-    self._p_sampling_rate = sampling_rate
-    self._p_sample_size = sample_size
+    if channel_mask is not None:
+      self._p_channel_mask = channel_mask
+    if sampling_rate is not None:
+      self._p_sampling_rate = sampling_rate
+    if sample_size is not None:
+      self._p_sample_size = sample_size
 
-  def SetCaptureConfigs(self, channel_mask, sampling_rate, sample_size):
+  def SetCaptureConfigs(self, channel_mask=None, sampling_rate=None,
+                        sample_size=None):
     """Sets different configs for capture.
+
+    The caller can specify the field to be changed without affecting others.
 
     Args:
       channel_mask: int value of binary mask specifying the number of channels.
@@ -53,9 +62,12 @@ class USBAudioDriverConfigs(object):
       sampling_rate: sampling rate, e.g., 48000Hz.
       sample_size: size of each sample in bytes.
     """
-    self._c_channel_mask = channel_mask
-    self._c_sampling_rate = sampling_rate
-    self._c_sample_size = sample_size
+    if channel_mask is not None:
+      self._c_channel_mask = channel_mask
+    if sampling_rate is not None:
+      self._c_sampling_rate = sampling_rate
+    if sample_size is not None:
+      self._c_sample_size = sample_size
 
   def SetDeviceInfo(self, vendor_id=None, product_id=None, bcd_device=None,
                     serial_number=None, manufacturer=None, product=None):
