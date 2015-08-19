@@ -22,11 +22,15 @@ OUTPUT_PORTS = [LINEOUT, USBOUT]
 AUDIO_PORTS = [HDMI, MIC, LINEIN, LINEOUT, USBIN, USBOUT]
 VIDEO_PORTS = [DP1, DP2, HDMI, VGA]
 
+# Ports that support USB
+USB_PORTS = [USBIN, USBOUT]
+
 # Convenience methods
 IsInputPort = lambda port_id: port_id in INPUT_PORTS
 IsOutputPort = lambda port_id: port_id in OUTPUT_PORTS
 IsAudioPort = lambda port_id: port_id in AUDIO_PORTS
 IsVideoPort = lambda port_id: port_id in VIDEO_PORTS
+IsUSBPort = lambda port_id: port_id in USB_PORTS
 
 # IDs of EDIDs
 EDID_ID_DEFAULT = 0
