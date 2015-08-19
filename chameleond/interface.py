@@ -638,6 +638,14 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('AudioBoardIsBluetoothEnabled')
 
+  def SetUSBDriverPlaybackConfigs(self, playback_data_format):
+    """Updates the corresponding playback configurations."""
+    raise NotImplementedError('SetUSBDriverPlaybackConfigs')
+
+  def SetUSBDriverCaptureConfigs(self, capture_data_format):
+    """Updates the corresponding capture configurations."""
+    raise NotImplementedError('SetUSBDriverCaptureConfigs')
+
   def GetMacAddress(self):
     """Gets the MAC address of this Chameleon."""
     raise NotImplementedError('GetMacAddress')

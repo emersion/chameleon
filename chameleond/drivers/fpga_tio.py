@@ -1061,6 +1061,50 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._audio_board.IsBluetoothEnabled()
 
+  def SetUSBDriverPlaybackConfigs(self, playback_data_format):
+    """Updates the corresponding playback configurations to argument values.
+
+    This provides flexibility for simulating the USB gadget driver using other
+    configurations different from the default values.
+
+    Args:
+      playback_data_format: The dict form of an AudioDataFormat object. The
+        'file_type' field will be ignored since for playback, there is no need
+        for setting file type before playing audio. It is specified by the audio
+        file passed in for playback. Other fields are used to set USB driver
+        configurations.
+
+    Raises:
+      DriverError if any of the USB Flows is playing or capturing audio.
+    """
+    if (self._flows[ids.USBIN].is_capturing_audio or
+        self._flows[ids.USBOUT].is_playing_audio):
+      error_message = ('Configuration changes not allowed when USB driver is '
+                       'still performing playback/capture in one of the flows.')
+      raise DriverError(error_message)
+    self._flows[ids.USBOUT].SetDriverPlaybackConfigs(playback_data_format)
+
+  def SetUSBDriverCaptureConfigs(self, capture_data_format):
+    """Updates the corresponding capture configurations to argument values.
+
+    This provides flexibility for simulating the USB gadget driver using other
+    configurations different from the default values.
+
+    Args:
+      capture_data_format: The dict form of an AudioDataFormat object. The
+        'file_type' field will be saved by InputUSBFlow as the file type for
+        captured data. Other fields are used to set USB driver configurations.
+
+    Raises:
+      DriverError if any of the USB Flows is playing or capturing audio.
+    """
+    if (self._flows[ids.USBIN].is_capturing_audio or
+        self._flows[ids.USBOUT].is_playing_audio):
+      error_message = ('Configuration changes not allowed when USB driver is '
+                       'still performing playback/capture in one of the flows.')
+      raise DriverError(error_message)
+    self._flows[ids.USBIN].SetDriverCaptureConfigs(capture_data_format)
+
   def GetMacAddress(self):
     """Gets the MAC address of this Chameleon.
 
