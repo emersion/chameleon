@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """This module specifies the configuration needed for USB audio driver"""
 
+import logging
 
 class USBAudioDriverConfigs(object):
   """The class that encapsulates the parameters of USB audio driver."""
@@ -45,10 +46,16 @@ class USBAudioDriverConfigs(object):
     """
     if channel_mask is not None:
       self._p_channel_mask = channel_mask
+      logging.info('Configs attribute p_channel_mask is set to %d',
+                   channel_mask)
     if sampling_rate is not None:
       self._p_sampling_rate = sampling_rate
+      logging.info('Configs attribute p_sampling_rate is set to %dHz',
+                   sampling_rate)
     if sample_size is not None:
       self._p_sample_size = sample_size
+      logging.info('Configs attribute p_sample_size is set to %dbytes',
+                   sample_size)
 
   def SetCaptureConfigs(self, channel_mask=None, sampling_rate=None,
                         sample_size=None):
@@ -64,10 +71,16 @@ class USBAudioDriverConfigs(object):
     """
     if channel_mask is not None:
       self._c_channel_mask = channel_mask
+      logging.info('Configs attribute c_channel_mask is set to %d',
+                   channel_mask)
     if sampling_rate is not None:
       self._c_sampling_rate = sampling_rate
+      logging.info('Configs attribute c_sampling_rate is set to %dHz',
+                   sampling_rate)
     if sample_size is not None:
       self._c_sample_size = sample_size
+      logging.info('Configs attribute c_sample_size is set to %dbytes',
+                   sample_size)
 
   def SetDeviceInfo(self, vendor_id=None, product_id=None, bcd_device=None,
                     serial_number=None, manufacturer=None, product=None):
