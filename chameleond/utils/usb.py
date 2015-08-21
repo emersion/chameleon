@@ -75,6 +75,7 @@ class USBController(object):
     """
     args_list = self._MakeArgsForInsertModule()
     process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
+    logging.info('Modprobe command is run with arguments: %s', str(args_list))
     process_output = system_tools.SystemTools.GetSubprocessOutput(process)
     self._CheckModprobeResultAndUpdateConfigs(process_output)
 
