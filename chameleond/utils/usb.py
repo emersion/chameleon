@@ -24,6 +24,7 @@ class USBController(object):
                             the configurations currently in use by the driver,
                             if it is successfully modprobed.
   """
+  _MODPROBE_GAUDIO_ARGS_VERBOSE = ['g_audio', '-v', '--first-time']
 
   def __init__(self):
     """Initializes a USBController object.
@@ -38,12 +39,12 @@ class USBController(object):
     """Modprobes g_audio module with params from driver_configs_to_set."""
     params_dict = self.\
                   _FormatDriverConfigsForModprobe(self._driver_configs_to_set)
-    params_list = []
+    args_list = list(self._MODPROBE_GAUDIO_ARGS_VERBOSE)
     for key, value in params_dict.iteritems():
       if value is not None:
         item = key + '=' + str(value)
-        params_list.append(item)
-    system_tools.SystemTools.Call('modprobe', 'g_audio', *params_list)
+        args_list.append(item)
+    system_tools.SystemTools.Call('modprobe', *args_list)
     #TODO(hsuying): Need to add logic to check modprobe result before setting
     # driver_configs_in_use to driver_configs_to_set. Right now we assume that
     # modprobe has installed the driver with driver_configs_to_set successfully,
@@ -135,7 +136,9 @@ class USBController(object):
 
   def DisableAudioDriver(self):
     """Removes the g_audio module from kernel."""
-    system_tools.SystemTools.call('modprobe', '-r', 'g_audio')
+    args_list = list(self._MODPROBE_GAUDIO_ARGS_VERBOSE)
+    args_list.append('-r')
+    system_tools.SystemTools.call('modprobe', *args_list)
 
   def GetSupportedPlaybackDataFormat(self):
     """Returns the playback data format as supported by the USB driver.
