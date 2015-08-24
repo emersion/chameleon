@@ -36,7 +36,26 @@ class USBController(object):
     self._driver_configs_in_use = None
 
   def EnableAudioDriver(self):
-    """Modprobes g_audio module with params from driver_configs_to_set."""
+    """Modprobes g_audio module with params from _driver_configs_to_set."""
+    args_list = self._MakeArgsForInsertModule()
+    system_tools.SystemTools.Call('modprobe', *args_list)
+    #TODO(hsuying): Need to add logic to check modprobe result before setting
+    # driver_configs_in_use to driver_configs_to_set. Right now we assume that
+    # modprobe has installed the driver with driver_configs_to_set successfully,
+    # which is not always the case.
+    self._driver_configs_in_use = self._driver_configs_to_set
+
+  def _MakeArgsForInsertModule(self):
+    """Puts all relevant driver configs from _driver_configs_to_set into a list.
+
+    The list consists of arguments formatted for the modprobe command to insert
+    g_audio module. It also includes -v (--verbose) flag and --first-time flag,
+    which makes the modprobe command fail if it does not in fact do anything.
+
+    Returns:
+      A list of arguments formatted for calling modprobe command to insert
+        module.
+    """
     params_dict = self.\
                   _FormatDriverConfigsForModprobe(self._driver_configs_to_set)
     args_list = list(self._MODPROBE_GAUDIO_ARGS_VERBOSE)
@@ -44,12 +63,7 @@ class USBController(object):
       if value is not None:
         item = key + '=' + str(value)
         args_list.append(item)
-    system_tools.SystemTools.Call('modprobe', *args_list)
-    #TODO(hsuying): Need to add logic to check modprobe result before setting
-    # driver_configs_in_use to driver_configs_to_set. Right now we assume that
-    # modprobe has installed the driver with driver_configs_to_set successfully,
-    # which is not always the case.
-    self._driver_configs_in_use = self._driver_configs_to_set
+    return args_list
 
   def _FormatDriverConfigsForModprobe(self, driver_configs):
     """Converts configurations stored in driver_configs into modprobe arguments.
