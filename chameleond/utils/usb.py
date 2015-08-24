@@ -39,6 +39,18 @@ class USBController(object):
     system_tools.SystemTools.Call('modprobe', '-r', 'g_audio')
     self._driver_configs_in_use = None
 
+  @property
+  def _is_modprobed(self):
+    """A property that is True when g_audio driver module is enabled.
+
+    This property depends on whether there is a valid driver_configs_in_use.
+
+    Returns:
+      True when driver_configs_in_use is not None, i.e. it is set to a valid
+      copy of USBAudioDriverConfigs.
+    """
+    return self._driver_configs_in_use is not None
+
   def EnableAudioDriver(self):
     """Modprobes g_audio module with params from _driver_configs_to_set."""
     args_list = self._MakeArgsForInsertModule()
