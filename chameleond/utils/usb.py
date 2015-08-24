@@ -24,7 +24,7 @@ class USBController(object):
     """
     self._driver_configs = driver_configs
 
-  def InitializeAudioDriver(self):
+  def EnableAudioDriver(self):
     """Modprobes g_audio module with params from driver_configs."""
     params_dict = self._FormatDriverConfigsForModprobe(self._driver_configs)
     params_list = []

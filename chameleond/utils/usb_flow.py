@@ -40,7 +40,7 @@ class USBFlow(object):
     The driver configurations are initially set using USBAudioDriverConfigs
     class.
     """
-    self._usb_ctrl.InitializeAudioDriver()
+    self._usb_ctrl.EnableAudioDriver()
     logging.info('Initialized USB flow #%d.', self._port_id)
 
   def Select(self):
