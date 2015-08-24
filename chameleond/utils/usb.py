@@ -202,10 +202,10 @@ class USBController(object):
       An AudioDataFormat object that stores the playback data format supported
         by the USB driver.
     """
-    #TODO(hsuying): Need to check that there is a valid copy of configurations
-    # stored by _driver_configs_in_use before trying to get configurations from
-    # it. Now we assume that this method is only called when driver has been
-    # successfully enabled with valid configurations.
+    if not self._is_modprobed:
+      error_message = ('Invalid Call: Supported format not applicable '
+                       'since driver is not enabled.')
+      raise USBControllerError(error_message)
     return self._driver_configs_in_use.GetPlaybackConfigs()
 
   def GetSupportedCaptureDataFormat(self):
@@ -215,10 +215,10 @@ class USBController(object):
       An AudioDataFormat object that stores the capture data format supported by
         the USB driver.
     """
-    #TODO(hsuying): Need to check that there is a valid copy of configurations
-    # stored by _driver_configs_in_use before trying to get configurations from
-    # it. Now we assume that this method is only called when driver has been
-    # successfully enabled with valid configurations.
+    if not self._is_modprobed:
+      error_message = ('Invalid Call: Supported format not applicable '
+                       'since driver is not enabled.')
+      raise USBControllerError(error_message)
     return self._driver_configs_in_use.GetCaptureConfigs()
 
   def CheckPlaybackFormat(self, data_format):
