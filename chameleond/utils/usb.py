@@ -150,9 +150,23 @@ class USBController(object):
 
   def DisableAudioDriver(self):
     """Removes the g_audio module from kernel."""
+    args_list = self._MakeArgsForRemoveModule()
+    system_tools.SystemTools.call('modprobe', *args_list)
+
+  def _MakeArgsForRemoveModule(self):
+    """Puts flags and arguments needed for removing g_audio module into a list.
+
+    The list consists of arguments formatted for the modprobe command to remove
+    g_audio module. It also includes -v (--verbose) flag and --first-time flag,
+    which makes the modprobe command fail if it does not in fact do anything.
+
+    Returns:
+      A list of arguments formatted for calling modprobe command to remove
+        module.
+    """
     args_list = list(self._MODPROBE_GAUDIO_ARGS_VERBOSE)
     args_list.append('-r')
-    system_tools.SystemTools.call('modprobe', *args_list)
+    return args_list
 
   def GetSupportedPlaybackDataFormat(self):
     """Returns the playback data format as supported by the USB driver.
