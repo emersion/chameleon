@@ -65,7 +65,14 @@ class USBController(object):
     return self._is_modprobed
 
   def EnableAudioDriver(self):
-    """Modprobes g_audio module with params from _driver_configs_to_set."""
+    """Modprobes g_audio module with params from _driver_configs_to_set.
+
+    If the user wishes to change the current configurations into
+    _driver_configs_to_set, the user should disable the driver with
+    DisableAudioDriver() before changing the configurations via
+    SetDriverPlaybackConfigs() or SetDriverCaptureConfigs(), and calling
+    EnableAudioDriver() again.
+    """
     args_list = self._MakeArgsForInsertModule()
     process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
     process_output = system_tools.SystemTools.GetSubprocessOutput(process)
@@ -209,7 +216,40 @@ class USBController(object):
   def DisableAudioDriver(self):
     """Removes the g_audio module from kernel."""
     args_list = self._MakeArgsForRemoveModule()
-    system_tools.SystemTools.call('modprobe', *args_list)
+    process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
+    process_output = system_tools.SystemTools.GetSubprocessOutput(process)
+    self._CheckRemoveModuleResultAndUpdateConfigs(process_output)
+
+  def _CheckRemoveModuleResultAndUpdateConfigs(self, process_output):
+    """Checks result of remove module command and update _driver_configs_in_use.
+
+    Args:
+      process_output: A tuple (return_code, out, err) containing the return
+        code, standard output and error message (if applicable) of the
+        the subprocess spawned by the modprobe command to remove the driver
+        module.
+
+    Raises:
+      USBControllerError if _is_modprobed returns True, meaning the driver was
+        not successfully disabled by the remove module command.
+    """
+    return_code, out, err = process_output
+    error_message = 'FATAL: Module g_audio is not in kernel.'
+    if return_code == 0:
+      if 'rmmod' in out and err == '':
+        self._driver_configs_in_use = None
+
+    else:
+      if error_message in err:
+        self._driver_configs_in_use = None
+        logging.warning('g_audio module is already removed from the kernel.')
+      else:
+        logging.error('Modprobe (rmmod) return code: %d', return_code)
+        logging.error('Modprobe (rmmod) stdout: %s', out)
+        logging.error('Modprobe (rmmod) error (if any): %s', err)
+        logging.exception('Modprobe failed to remove g_audio module from '
+                          'kernel.')
+        raise USBControllerError('Driver failed to be disabled.')
 
   def _MakeArgsForRemoveModule(self):
     """Puts flags and arguments needed for removing g_audio module into a list.
