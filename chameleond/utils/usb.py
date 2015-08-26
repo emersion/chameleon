@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 """This module provides interface to control USB driver module."""
 
+import re
+
 import chameleon_common #pylint: disable=W0611
 from chameleond.utils import system_tools
 
@@ -33,101 +35,122 @@ class USBController(object):
 
   def InitializeAudioDriver(self):
     """Modprobes g_audio module with params from driver_configs."""
-    driver_audio_configs = self._driver_configs.GetDriverAudioConfigsDict()
+    params_dict = self._FormatDriverConfigsForModprobe(self._driver_configs)
     params_list = []
-    for key, value in driver_audio_configs.iteritems():
-      item = key + '=' + str(value)
-      params_list.append(item)
-
-    device_info_configs = self._driver_configs.GetDeviceInfoDict()
-    for key, value in device_info_configs.iteritems():
+    for key, value in params_dict.iteritems():
       if value is not None:
         item = key + '=' + str(value)
         params_list.append(item)
-
     system_tools.SystemTools.Call('modprobe', 'g_audio', *params_list)
+
+  def _FormatDriverConfigsForModprobe(self, driver_configs):
+    """Converts configurations stored in driver_configs into modprobe arguments.
+
+    Args:
+      driver_configs: A USBAudioDriverConfigs object storing configurations to
+        be applied to the driver when enabled.
+
+    Returns:
+      A dictionary containing modprobe-appropriate parameters and their
+        corresponding argument values derived from driver_configs.
+    """
+    p_configs = driver_configs.GetPlaybackConfigs()
+    p_chmask = self._TransformChannelNumberToChannelMask(p_configs.channel)
+    p_srate = p_configs.rate
+    p_ssize_in_bits = self._ExtractBitsFromSampleFormat(p_configs.sample_format)
+    p_ssize_in_bytes = p_ssize_in_bits / 8
+
+    c_configs = driver_configs.GetCaptureConfigs()
+    c_chmask = self._TransformChannelNumberToChannelMask(c_configs.channel)
+    c_srate = c_configs.rate
+    c_ssize_in_bits = self._ExtractBitsFromSampleFormat(c_configs.sample_format)
+    c_ssize_in_bytes = c_ssize_in_bits / 8
+
+    device_info = driver_configs.GetDeviceInfoDict()
+
+    params_dict = {
+        'p_chmask': p_chmask,
+        'p_srate': p_srate,
+        'p_ssize': p_ssize_in_bytes,
+        'c_chmask': c_chmask,
+        'c_srate': c_srate,
+        'c_ssize': c_ssize_in_bytes,
+        'idVendor': device_info['vendor_id'],
+        'idProduct': device_info['product_id'],
+        'bcdDevice': device_info['bcd_device'],
+        'iSerialNumber': device_info['serial_number'],
+        'iManufacturer': device_info['manufacturer'],
+        'iProduct': device_info['product'],
+    }
+    return params_dict
+
+  def _TransformChannelNumberToChannelMask(self, channel_number):
+    """Transforms channel number to integer equivalent of a binary mask.
+
+    For example, channel_number = 2 will be transformed to 3, which is the
+    integer value for binary number 0b11.
+
+    Args:
+      channel_number: The number of channels used.
+
+    Returns:
+      An integer representing the binary channel mask.
+    """
+    channel_mask = pow(2, channel_number) - 1
+    return channel_mask
+
+  def _ExtractBitsFromSampleFormat(self, sample_format):
+    """Checks whether sample_format is valid and extracts sample size in bits.
+
+    In this test suite, only sample formats with signed bits Little Endian are
+    allowed.
+
+    Args:
+      sample_format: A string representing format of audio samples, e.g.,
+        'S16_LE' means Signed 16 bits Little Endian.
+
+    Returns:
+      sample_size: An integer representing sample size in bits.
+    """
+    try:
+      sample_format_lower = sample_format.lower()
+      pattern = re.compile(r's(\d+)_le')
+      match_result = pattern.match(sample_format_lower)
+      if match_result is not None:
+        sample_size = int(match_result.group(1))
+        return sample_size
+      else:
+        raise USBControllerError('Sample format %s in driver configs is'
+                                 ' invalid.' % sample_format)
+    except ValueError:
+      raise USBControllerError('Sample format %s in driver configs is'
+                               ' invalid.' % sample_format)
 
   def DisableAudioDriver(self):
     """Removes the g_audio module from kernel."""
     system_tools.SystemTools.call('modprobe', '-r', 'g_audio')
 
-  def _GetSampleFormat(self, sample_size):
-    """Based on sample size, gets sample format as Signed bits in Little Endian.
-
-    Sample size is converted from bytes to bits.
-
-    Args:
-      sample_size: Either playback or capture sample size in bytes
-
-    Returns:
-      A format string e.g., 'S32_LE' for 32 Signed Bits Little Endian.
-    """
-    sample_format = 'S' + str(sample_size * 8) + '_LE'
-    return sample_format
-
-  def _ConvertChannelMaskToChannelNumber(self, channel_mask):
-    """Converts size of a binary mask to number e.g., 0b11 ---> 2
-
-    Returns:
-      An integer for channel number.
-    """
-    count = 0
-    while channel_mask:
-      count += channel_mask & 1
-      channel_mask = channel_mask >> 1
-    return count
-
-  def _ConvertConfigsToDataFormat(self, configs_dict):
-    """Converts a configs dictionary into a data format dictionary.
-
-    Args:
-      configs_dict: A three-item dictionary with the following keys -
-        sample_size: Size of each sample in bytes
-        channel_mask: Number of channels in binary mask form
-        sampling_rate: Rate at which data is sampled
-
-    Returns:
-      A three-item dictionary with the following keys:
-        sample_format: See _GetSampleFormat() docstring for details
-        channel: Number of channels in integer form
-        rate: Same as sampling_rate
-    """
-    sample_format = self._GetSampleFormat(configs_dict['sample_size'])
-    channel_mask = configs_dict['channel_mask']
-    channel = self._ConvertChannelMaskToChannelNumber(channel_mask)
-    rate = configs_dict['sampling_rate']
-    data_format = {
-        'sample_format': sample_format,
-        'channel': channel,
-        'rate': rate,
-    }
-    return data_format
-
   def GetSupportedPlaybackDataFormat(self):
     """Returns the playback data format as supported by the USB driver.
 
-    This method converts the driver's playback configurations into data format.
-
     Returns:
-      A three-entry dictionary with keys: sample_format, channel and rate.
+      An AudioDataFormat object that stores the playback data format supported
+        by the USB driver.
     """
     if self._supported_playback_data_format is None:
-      playback_configs = self._driver_configs.GetPlaybackConfigsDict()
-      data_format = self._ConvertConfigsToDataFormat(playback_configs)
+      data_format = self._driver_configs.GetPlaybackConfigs()
       self._supported_playback_data_format = data_format
     return self._supported_playback_data_format
 
   def GetSupportedCaptureDataFormat(self):
     """Returns the capture data format as supported by the USB driver.
 
-    This method converts the driver's capture configurations into data format.
-
     Returns:
-      A three-entry dictionary with keys: sample_format, channel and rate.
+      An AudioDataFormat object that stores the capture data format supported by
+        the USB driver.
     """
     if self._supported_capture_data_format is None:
-      capture_configs = self._driver_configs.GetCaptureConfigsDict()
-      data_format = self._ConvertConfigsToDataFormat(capture_configs)
+      data_format = self._driver_configs.GetCaptureConfigs()
       self._supported_capture_data_format = data_format
     return self._supported_capture_data_format
 
@@ -139,10 +162,9 @@ class USBController(object):
 
     Returns:
       True if the relevant key-value pairs in data_format match those of
-      playback_configs.
-      False otherwise.
+        supported_format. False otherwise.
     """
-    supported_format = self.GetSupportedPlaybackDataFormat()
+    supported_format = self.GetSupportedPlaybackDataFormat().AsDict()
     for key in supported_format.keys():
       if data_format[key] != supported_format[key]:
         return False
