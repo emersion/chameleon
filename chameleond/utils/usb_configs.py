@@ -3,15 +3,17 @@
 # found in the LICENSE file.
 """This module specifies the configuration needed for USB audio driver"""
 
-import logging
+import chameleon_common #pylint: disable=W0611
+from chameleond.utils import audio
 
 class USBAudioDriverConfigs(object):
   """The class that encapsulates the parameters of USB audio driver."""
 
   # Default values for initializing the class object.
-  _DEFAULT_CHANNEL_MASK = 0b11
-  _DEFAULT_SAMPLING_RATE = 48000
-  _DEFAULT_SAMPLE_SIZE = 2
+  _DEFAULT_FILE_TYPE = None
+  _DEFAULT_SAMPLE_FORMAT = 'S16_LE'
+  _DEFAULT_CHANNEL = 2
+  _DEFAULT_RATE = 48000
 
   def __init__(self):
     """Initializes a configs object with default values.
@@ -19,111 +21,54 @@ class USBAudioDriverConfigs(object):
     Default values for the audio data fields are specified in the class
     variables above. All fields for device info are set to None.
     """
-    self._p_channel_mask = self._DEFAULT_CHANNEL_MASK
-    self._c_channel_mask = self._DEFAULT_CHANNEL_MASK
-    self._p_sampling_rate = self._DEFAULT_SAMPLING_RATE
-    self._c_sampling_rate = self._DEFAULT_SAMPLING_RATE
-    self._p_sample_size = self._DEFAULT_SAMPLE_SIZE
-    self._c_sample_size = self._DEFAULT_SAMPLE_SIZE
-    self._idVendor = None
-    self._idProduct = None
-    self._bcdDevice = None
-    self._iSerialNumber = None
-    self._iManufacturer = None
-    self._iProduct = None
+    self._playback_configs = audio.AudioDataFormat(self._DEFAULT_FILE_TYPE,
+                                                   self._DEFAULT_SAMPLE_FORMAT,
+                                                   self._DEFAULT_CHANNEL,
+                                                   self._DEFAULT_RATE)
 
-  def SetPlaybackConfigs(self, channel_mask=None, sampling_rate=None,
-                         sample_size=None):
-    """Sets different configs for playback.
+    self._capture_configs = audio.AudioDataFormat(self._DEFAULT_FILE_TYPE,
+                                                  self._DEFAULT_SAMPLE_FORMAT,
+                                                  self._DEFAULT_CHANNEL,
+                                                  self._DEFAULT_RATE)
+    self._device_info = {
+        'vendor_id': None,
+        'product_id': None,
+        'bcd_device': None,
+        'serial_number': None,
+        'manufacturer': None,
+        'product': None,
+    }
 
-    The caller can specify the field to be changed without affecting others.
-
-    Args:
-      channel_mask: int value of binary mask specifying the number of channels,
-                    e.g., 0b11 for two channels.
-      sampling_rate: sampling rate, e.g., 48000Hz.
-      sample_size: size of each sample in bytes.
-    """
-    if channel_mask is not None:
-      self._p_channel_mask = channel_mask
-      logging.info('Configs attribute p_channel_mask is set to %d',
-                   channel_mask)
-    if sampling_rate is not None:
-      self._p_sampling_rate = sampling_rate
-      logging.info('Configs attribute p_sampling_rate is set to %dHz',
-                   sampling_rate)
-    if sample_size is not None:
-      self._p_sample_size = sample_size
-      logging.info('Configs attribute p_sample_size is set to %dbytes',
-                   sample_size)
-
-  def SetCaptureConfigs(self, channel_mask=None, sampling_rate=None,
-                        sample_size=None):
-    """Sets different configs for capture.
-
-    The caller can specify the field to be changed without affecting others.
+  def SetPlaybackConfigs(self, playback_data_format):
+    """Sets different configurations for playback.
 
     Args:
-      channel_mask: int value of binary mask specifying the number of channels.
-                    e.g., 0b11 for two channels.
-      sampling_rate: sampling rate, e.g., 48000Hz.
-      sample_size: size of each sample in bytes.
+      playback_data_format: An AudioDataFormat object with playback
+        configurations.
     """
-    if channel_mask is not None:
-      self._c_channel_mask = channel_mask
-      logging.info('Configs attribute c_channel_mask is set to %d',
-                   channel_mask)
-    if sampling_rate is not None:
-      self._c_sampling_rate = sampling_rate
-      logging.info('Configs attribute c_sampling_rate is set to %dHz',
-                   sampling_rate)
-    if sample_size is not None:
-      self._c_sample_size = sample_size
-      logging.info('Configs attribute c_sample_size is set to %dbytes',
-                   sample_size)
+    self._playback_configs = playback_data_format
 
-  def SetDeviceInfo(self, vendor_id=None, product_id=None, bcd_device=None,
-                    serial_number=None, manufacturer=None, product=None):
+  def SetCaptureConfigs(self, capture_data_format):
+    """Sets different configurations for capture.
+
+    Args:
+      capture_data_format: An AudioDataFormat object with capture
+        configurations.
+    """
+    self._capture_configs = capture_data_format
+
+  def SetDeviceInfo(self, device_info):
     """Allows user to configure the driver into a particular product/device.
 
-    Only fields corresponding to given arguments will be set to the argument
-    values.
-
     Args:
-      vendor_id: USB vendor ID as string.
-      product_id: USB product ID as string.
-      bcd_device: USB device release number as string with format "0xABCD".
-      serial_number: serial number string.
-      manufacturer: USB manufacturer string.
-      product: USB product string.
+      device_info: A six-entry dictionary with the following keys: 'vendor_id',
+        'product_id', 'bcd_device', 'serial_number', 'manufacturer' and
+        'product'. Keys with None as corresponding value will be ignored, and
+        its original value saved self._device_info will be unchanged.
     """
-    if vendor_id is not None:
-      self._idVendor = vendor_id
-    if product_id is not None:
-      self._idProduct = product_id
-    if bcd_device is not None:
-      self._bcdDevice = bcd_device
-    if serial_number is not None:
-      self._iSerialNumber = serial_number
-    if manufacturer is not None:
-      self._iManufacturer = manufacturer
-    if product is not None:
-      self._iProduct = product
-
-  def GetDriverAudioConfigsDict(self):
-    """Get the audio data parameters in dict form.
-
-    Returns:
-      A dict containing all six parameters of driver configs.
-    """
-    return {
-        'p_chmask': self._p_channel_mask,
-        'p_srate': self._p_sampling_rate,
-        'p_ssize': self._p_sample_size,
-        'c_chmask': self._c_channel_mask,
-        'c_srate': self._c_sampling_rate,
-        'c_ssize': self._c_sample_size,
-    }
+    for key, value in device_info.iteritems():
+      if value is not None:
+        self._device_info[key] = value
 
   def GetDeviceInfoDict(self):
     """Get the device information in dict form.
@@ -131,39 +76,22 @@ class USBAudioDriverConfigs(object):
     Returns:
       A dict containing all six parameters of device info.
     """
-    return {
-        'idVendor': self._idVendor,
-        'idProduct': self._idProduct,
-        'bcdDevice': self._bcdDevice,
-        'iSerialNumber': self._iSerialNumber,
-        'iManufacturer': self._iManufacturer,
-        'iProduct': self._iProduct,
-    }
+    return self._device_info
 
-  def GetPlaybackConfigsDict(self):
-    """Returns playback-related data configurations in dict form.
+  def GetPlaybackConfigs(self):
+    """Returns playback-related data configurations.
 
     Returns:
-      A 3-item dictionary with keys: sample_size, channel_mask and
-      sampling_rate.
+      An AudioDataFormat object containing values of playback-related
+        configurations.
     """
-    playback_configs = {
-        'sample_size': self._p_sample_size,
-        'channel_mask': self._p_channel_mask,
-        'sampling_rate': self._p_sampling_rate,
-    }
-    return playback_configs
+    return self._playback_configs
 
-  def GetCaptureConfigsDict(self):
-    """Returns capture-related data configurations in dict form.
+  def GetCaptureConfigs(self):
+    """Returns capture-related data configurations.
 
     Returns:
-      A 3-item dictionary with keys: sample_size, channel_mask and
-      sampling_rate.
+      An AudioDataFormat object containing values of capture-related
+        configurations.
     """
-    capture_configs = {
-        'sample_size': self._c_sample_size,
-        'channel_mask': self._c_channel_mask,
-        'sampling_rate': self._c_sampling_rate,
-    }
-    return capture_configs
+    return self._capture_configs
