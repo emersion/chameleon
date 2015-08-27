@@ -7,7 +7,6 @@ import logging
 import tempfile
 
 import chameleon_common #pylint: disable=W0611
-from chameleond.utils import audio
 from chameleond.utils import system_tools
 
 class USBFlowError(Exception):
@@ -22,6 +21,8 @@ class USBFlow(object):
     _port_id: The ID of the input/output connector. Check the value in ids.py.
     _usb_ctrl: An USBController object.
     _subprocess: The subprocess spawned for audio events.
+    _supported_data_format: An AudioDataFormat object storing data format
+                            supported by the USB driver when it's enabled.
   """
 
   _VALID_AUDIO_FILE_TYPES = ['wav', 'raw']
@@ -36,6 +37,7 @@ class USBFlow(object):
     self._port_id = port_id
     self._usb_ctrl = usb_ctrl
     self._subprocess = None
+    self._supported_data_format = None
 
   def Initialize(self):
     """Do nothing here."""
@@ -96,17 +98,17 @@ class USBFlow(object):
     The argument values are taken from data_format.
 
     Args:
-      data_format: The dictionary form of an AudioDataFormat object
-        whose values are passed as arguments into the Alsa util command.
+      data_format: An AudioDataFormat object whose values are passed as
+        arguments into the Alsa util command.
 
     Returns:
       A list containing argument strings
     """
     params_list = ['-D', 'hw:0,0',
-                   '-t', data_format['file_type'],
-                   '-f', data_format['sample_format'],
-                   '-c', data_format['channel'],
-                   '-r', data_format['rate']]
+                   '-t', data_format.file_type,
+                   '-f', data_format.sample_format,
+                   '-c', str(data_format.channel),
+                   '-r', str(data_format.rate),]
     return params_list
 
   @property
@@ -132,8 +134,6 @@ class InputUSBFlow(USBFlow):
   """Subclass of USBFlow that handles input audio data.
 
   Properties:
-    _data_format: An AudioDataFormat object encapsulating the data format
-                  derived from the USB driver's capture configurations.
     _file_path: The file path that captured data will be saved at.
   """
 
@@ -143,13 +143,12 @@ class InputUSBFlow(USBFlow):
     """Constructs an InputUSBFlow object."""
     super(InputUSBFlow, self).__init__(*args)
     self._file_path = None
-    self._data_format = None
 
   def StartCapturingAudio(self):
     """Starts recording audio data."""
-    data_format = self._GetDataFormat()
-    params_list = self._GetAlsaUtilCommandArgs(data_format)
-    file_suffix = '.' + data_format['file_type']
+    self._supported_data_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
+    params_list = self._GetAlsaUtilCommandArgs(self._supported_data_format)
+    file_suffix = '.' + self._supported_data_format.file_type
     recorded_file = tempfile.NamedTemporaryFile(prefix='recorded',
                                                 suffix=file_suffix,
                                                 delete=False)
@@ -159,21 +158,6 @@ class InputUSBFlow(USBFlow):
                                                                 *params_list)
     logging.info('Started capturing audio using arecord %s',
                  ' '.join(params_list))
-
-  def _GetDataFormat(self):
-    """Returns capture data format in dictionary form.
-
-    Returns:
-      A 4-entry dictionary representing the supported format in AudioDataFormat
-      form.
-    """
-    supported_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
-    self._data_format = audio.AudioDataFormat(self._DEFAULT_FILE_TYPE,
-                                              supported_format['sample_format'],
-                                              supported_format['channel'],
-                                              supported_format['rate'])
-    data_format_dict = self._data_format.AsDict()
-    return data_format_dict
 
   def StopCapturingAudio(self):
     """Stops recording audio data.
@@ -194,7 +178,7 @@ class InputUSBFlow(USBFlow):
       self._subprocess.terminate()
       logging.info('Stopped capturing audio.')
 
-    return (self._file_path, self._data_format.AsDict())
+    return (self._file_path, self._supported_data_format.AsDict())
 
   @property
   def is_capturing_audio(self):
@@ -236,8 +220,11 @@ class OutputUSBFlow(USBFlow):
       USBFlowError if data format of the file at path does not comply with the
         configurations of the USB driver.
     """
+    self._supported_data_format = \
+        self._usb_ctrl.GetSupportedPlaybackDataFormat()
     if self._InputDataFormatIsCompatible(data_format):
-      params_list = self._GetAlsaUtilCommandArgs(data_format)
+      data_format_object = audio.CreateAudioDataFormatFromDict(data_format)
+      params_list = self._GetAlsaUtilCommandArgs(data_format_object)
       params_list.append(path)
       self._subprocess = system_tools.SystemTools.RunInSubprocess('aplay',
                                                                   *params_list)
@@ -250,8 +237,12 @@ class OutputUSBFlow(USBFlow):
     """Checks whether data_format_dict passed in matches supported data format.
 
     This method checks the 'file_type' field separately from the other three
-    fields in the data_format_dict passed in, because supported_format gathered
-    from _usb_ctrl does not keep track of the playback file type.
+    fields in the data_format_dict passed in, because _supported_data_format
+    gathered from _usb_ctrl does not keep track of the playback file type.
+
+    This method should be called after _supported_data_format is set to the
+    correct supported data format from _usb_ctrl in preparation for playing
+    audio.
 
     Args:
       data_format_dict: A dictionary in the format of an AudioDataFormat object
@@ -261,8 +252,7 @@ class OutputUSBFlow(USBFlow):
       True if data_format_dict corresponds to supported format from _usb_ctrl
         and file_type is valid. False otherwise.
     """
-    supported_format = self._usb_ctrl.GetSupportedPlaybackDataFormat()
-    supported_format_dict = supported_format.AsDict()
+    supported_format_dict = self._supported_data_format.AsDict()
     for key, value in data_format_dict.iteritems():
       if key == 'file_type':
         if value not in self._VALID_AUDIO_FILE_TYPES:
