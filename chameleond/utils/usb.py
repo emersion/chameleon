@@ -51,6 +51,17 @@ class USBController(object):
     """
     return self._driver_configs_in_use is not None
 
+  def DriverIsEnabled(self):
+    """Returns a Boolean indicating whether driver is modprobed.
+
+    This hides the concept of modprobe from callers of USBController methods
+    and only exposes the status of USB audio driver.
+
+    Returns:
+      True if driver is enabled. False otherwise.
+    """
+    return self._is_modprobed
+
   def EnableAudioDriver(self):
     """Modprobes g_audio module with params from _driver_configs_to_set."""
     args_list = self._MakeArgsForInsertModule()
