@@ -23,6 +23,9 @@ class USBFlow(object):
     _usb_ctrl: An USBController object.
     _subprocess: The subprocess spawned for audio events.
   """
+
+  _VALID_AUDIO_FILE_TYPES = ['wav', 'raw']
+
   def __init__(self, port_id, usb_ctrl):
     """Initializes USBFlow object with two properties.
 
@@ -238,7 +241,7 @@ class OutputUSBFlow(USBFlow):
       USBFlowError if data format of the file at path does not comply with the
         configurations of the USB driver.
     """
-    if self._usb_ctrl.CheckPlaybackFormat(data_format):
+    if self._InputDataFormatIsCompatible(data_format):
       params_list = self._GetAlsaUtilCommandArgs(data_format)
       params_list.append(path)
       self._subprocess = system_tools.SystemTools.RunInSubprocess('aplay',
@@ -247,6 +250,31 @@ class OutputUSBFlow(USBFlow):
                    ' '.join(params_list))
     else:
       raise USBFlowError('Data format incompatible with driver configurations')
+
+  def _InputDataFormatIsCompatible(self, data_format_dict):
+    """Checks whether data_format_dict passed in matches supported data format.
+
+    This method checks the 'file_type' field separately from the other three
+    fields in the data_format_dict passed in, because supported_format gathered
+    from _usb_ctrl does not keep track of the playback file type.
+
+    Args:
+      data_format_dict: A dictionary in the format of an AudioDataFormat object
+        that is passed in by the user.
+
+    Returns:
+      True if data_format_dict corresponds to supported format from _usb_ctrl
+        and file_type is valid. False otherwise.
+    """
+    supported_format = self._usb_ctrl.GetSupportedPlaybackDataFormat()
+    supported_format_dict = supported_format.AsDict()
+    for key, value in data_format_dict.iteritems():
+      if key == 'file_type':
+        if value not in self._VALID_AUDIO_FILE_TYPES:
+          return False
+      elif value != supported_format_dict[key]:
+        return False
+    return True
 
   def StopPlayingAudio(self):
     """Stops playing audio data.

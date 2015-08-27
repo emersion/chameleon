@@ -301,22 +301,6 @@ class USBController(object):
       raise USBControllerError(error_message)
     return self._driver_configs_in_use.GetCaptureConfigs()
 
-  def CheckPlaybackFormat(self, data_format):
-    """Check whether format of playback data match that of audio driver.
-
-    Args:
-      data_format: An AudioDataFormat object in dict form
-
-    Returns:
-      True if the relevant key-value pairs in data_format match those of
-        supported_format. False otherwise.
-    """
-    supported_format = self.GetSupportedPlaybackDataFormat().AsDict()
-    for key in supported_format.keys():
-      if data_format[key] != supported_format[key]:
-        return False
-    return True
-
   def SetDriverPlaybackConfigs(self, playback_configs):
     """Sets playback-related configs in _driver_configs_to_set.
 
