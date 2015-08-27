@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 """This module provides interface to control USB driver module."""
 
+import copy
+import logging
 import re
 
 import chameleon_common #pylint: disable=W0611
@@ -65,12 +67,9 @@ class USBController(object):
   def EnableAudioDriver(self):
     """Modprobes g_audio module with params from _driver_configs_to_set."""
     args_list = self._MakeArgsForInsertModule()
-    system_tools.SystemTools.Call('modprobe', *args_list)
-    #TODO(hsuying): Need to add logic to check modprobe result before setting
-    # driver_configs_in_use to driver_configs_to_set. Right now we assume that
-    # modprobe has installed the driver with driver_configs_to_set successfully,
-    # which is not always the case.
-    self._driver_configs_in_use = self._driver_configs_to_set
+    process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
+    process_output = system_tools.SystemTools.GetSubprocessOutput(process)
+    self._CheckModprobeResultAndUpdateConfigs(process_output)
 
   def _MakeArgsForInsertModule(self):
     """Puts all relevant driver configs from _driver_configs_to_set into a list.
@@ -174,6 +173,38 @@ class USBController(object):
     except ValueError:
       raise USBControllerError('Sample format %s in driver configs is'
                                ' invalid.' % sample_format)
+
+  def _CheckModprobeResultAndUpdateConfigs(self, process_output):
+    """Checks result of insert module command and update _driver_configs_in_use.
+
+    Args:
+      process_output: A tuple (return_code, out, err) containing the return
+        code, standard output and error message (if applicable) of the
+        the subprocess spawned by the modprobe command to insert the driver
+        module into kernel.
+
+    Raises:
+      USBControllerError if _is_modprobed returns False, meaning the driver
+        was not successfully enabled by modprobe.
+    """
+    return_code, out, err = process_output
+    error_message = ('ERROR: could not insert \'g_audio\': Module already in '
+                     'kernel\n')
+    if return_code == 0:
+      if 'insmod' in out and err == '':
+        self._driver_configs_in_use = copy.deepcopy(self._driver_configs_to_set)
+
+    else:
+      if error_message in err and self._driver_configs_in_use is not None:
+        logging.warning('g_audio module is already in the kernel.')
+      else:
+        self._driver_configs_in_use = None
+        logging.error('Modprobe return code: %d', return_code)
+        logging.error('Modprobe stdout: %s', out)
+        logging.error('Modprobe error (if any): %s', err)
+        logging.exception('Modprobe failed to insert g_audio module into '
+                          'kernel.')
+        raise USBControllerError('Driver failed to be enabled.')
 
   def DisableAudioDriver(self):
     """Removes the g_audio module from kernel."""
