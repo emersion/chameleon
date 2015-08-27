@@ -40,3 +40,9 @@ class AudioDataFormat(object):
         sample_format=self.sample_format,
         channel=self.channel,
         rate=self.rate)
+
+def CreateAudioDataFormatFromDict(data_format_dict):
+  return AudioDataFormat(data_format_dict['file_type'],
+                         data_format_dict['sample_format'],
+                         data_format_dict['channel'],
+                         data_format_dict['rate'])
