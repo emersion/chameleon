@@ -236,3 +236,35 @@ class USBController(object):
       if data_format[key] != supported_format[key]:
         return False
     return True
+
+  def SetDriverPlaybackConfigs(self, playback_configs):
+    """Sets playback-related configs in _driver_configs_to_set.
+
+    The driver will be disabled before the driver configurations are set. If the
+    driver was initially enabled/modprobed, then the driver will be enabled
+    again after configurations are set.
+
+    Args:
+      playback_configs: An AudioDataFormat object with playback configurations.
+    """
+    was_modprobed = self._is_modprobed
+    self.DisableAudioDriver()
+    self._driver_configs_to_set.SetPlaybackConfigs(playback_configs)
+    if was_modprobed:
+      self.EnableAudioDriver()
+
+  def SetDriverCaptureConfigs(self, capture_configs):
+    """Sets capture-related configs in _driver_configs_to_set.
+
+    The driver will be disabled before the driver configurations are set. If the
+    driver was initially enabled/modprobed, then the driver will be enabled
+    again after configurations are set.
+
+    Args:
+      capture_configs: An AudioDataFormat object with capture configurations.
+    """
+    was_modprobed = self._is_modprobed
+    self.DisableAudioDriver()
+    self._driver_configs_to_set.SetCaptureConfigs(capture_configs)
+    if was_modprobed:
+      self.EnableAudioDriver()
