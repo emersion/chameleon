@@ -14,14 +14,7 @@ class USBControllerError(Exception):
 
 
 class USBController(object):
-  """Provides interface to control USB driver.
-
-  Properties:
-    _supported_playback_data_format: Allowed data format for audio playback
-                                     based on driver configs.
-    _supported_capture_data_format: Allowed data format for audio capture based
-                                    on driver configs.
-  """
+  """Provides interface to control USB driver."""
 
   def __init__(self, driver_configs):
     """Initializes a USBController object with given driver configurations.
@@ -30,8 +23,6 @@ class USBController(object):
       driver_configs: a USBAudioDriverConfigs object.
     """
     self._driver_configs = driver_configs
-    self._supported_playback_data_format = None
-    self._supported_capture_data_format = None
 
   def InitializeAudioDriver(self):
     """Modprobes g_audio module with params from driver_configs."""
@@ -137,10 +128,7 @@ class USBController(object):
       An AudioDataFormat object that stores the playback data format supported
         by the USB driver.
     """
-    if self._supported_playback_data_format is None:
-      data_format = self._driver_configs.GetPlaybackConfigs()
-      self._supported_playback_data_format = data_format
-    return self._supported_playback_data_format
+    return self._driver_configs.GetPlaybackConfigs()
 
   def GetSupportedCaptureDataFormat(self):
     """Returns the capture data format as supported by the USB driver.
@@ -149,10 +137,7 @@ class USBController(object):
       An AudioDataFormat object that stores the capture data format supported by
         the USB driver.
     """
-    if self._supported_capture_data_format is None:
-      data_format = self._driver_configs.GetCaptureConfigs()
-      self._supported_capture_data_format = data_format
-    return self._supported_capture_data_format
+    return self._driver_configs.GetCaptureConfigs()
 
   def CheckPlaybackFormat(self, data_format):
     """Check whether format of playback data match that of audio driver.
