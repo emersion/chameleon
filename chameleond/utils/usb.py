@@ -7,6 +7,7 @@ import re
 
 import chameleon_common #pylint: disable=W0611
 from chameleond.utils import system_tools
+from chameleond.utils import usb_configs
 
 class USBControllerError(Exception):
   """Exception raised when any error occurs in USBController."""
@@ -14,25 +15,40 @@ class USBControllerError(Exception):
 
 
 class USBController(object):
-  """Provides interface to control USB driver."""
+  """Provides interface to control USB driver.
 
-  def __init__(self, driver_configs):
-    """Initializes a USBController object with given driver configurations.
+  Properties:
+    _driver_configs_to_set: A USBAudioDriverConfigs object used to store user-
+                            set changes.
+    _driver_configs_in_use: A USBAudioDriverConfigs object representing the
+                            the configurations currently in use by the driver,
+                            if it is successfully modprobed.
+  """
 
-    Args:
-      driver_configs: a USBAudioDriverConfigs object.
+  def __init__(self):
+    """Initializes a USBController object.
+
+    _driver_configs_to_set is initially set to a USBAudioDriverConfigs object
+    with default configurations.
     """
-    self._driver_configs = driver_configs
+    self._driver_configs_to_set = usb_configs.USBAudioDriverConfigs()
+    self._driver_configs_in_use = None
 
   def EnableAudioDriver(self):
-    """Modprobes g_audio module with params from driver_configs."""
-    params_dict = self._FormatDriverConfigsForModprobe(self._driver_configs)
+    """Modprobes g_audio module with params from driver_configs_to_set."""
+    params_dict = self.\
+                  _FormatDriverConfigsForModprobe(self._driver_configs_to_set)
     params_list = []
     for key, value in params_dict.iteritems():
       if value is not None:
         item = key + '=' + str(value)
         params_list.append(item)
     system_tools.SystemTools.Call('modprobe', 'g_audio', *params_list)
+    #TODO(hsuying): Need to add logic to check modprobe result before setting
+    # driver_configs_in_use to driver_configs_to_set. Right now we assume that
+    # modprobe has installed the driver with driver_configs_to_set successfully,
+    # which is not always the case.
+    self._driver_configs_in_use = self._driver_configs_to_set
 
   def _FormatDriverConfigsForModprobe(self, driver_configs):
     """Converts configurations stored in driver_configs into modprobe arguments.
@@ -128,7 +144,11 @@ class USBController(object):
       An AudioDataFormat object that stores the playback data format supported
         by the USB driver.
     """
-    return self._driver_configs.GetPlaybackConfigs()
+    #TODO(hsuying): Need to check that there is a valid copy of configurations
+    # stored by _driver_configs_in_use before trying to get configurations from
+    # it. Now we assume that this method is only called when driver has been
+    # successfully enabled with valid configurations.
+    return self._driver_configs_in_use.GetPlaybackConfigs()
 
   def GetSupportedCaptureDataFormat(self):
     """Returns the capture data format as supported by the USB driver.
@@ -137,7 +157,11 @@ class USBController(object):
       An AudioDataFormat object that stores the capture data format supported by
         the USB driver.
     """
-    return self._driver_configs.GetCaptureConfigs()
+    #TODO(hsuying): Need to check that there is a valid copy of configurations
+    # stored by _driver_configs_in_use before trying to get configurations from
+    # it. Now we assume that this method is only called when driver has been
+    # successfully enabled with valid configurations.
+    return self._driver_configs_in_use.GetCaptureConfigs()
 
   def CheckPlaybackFormat(self, data_format):
     """Check whether format of playback data match that of audio driver.
