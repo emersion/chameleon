@@ -7,6 +7,7 @@ import logging
 import tempfile
 
 import chameleon_common #pylint: disable=W0611
+from chameleond.utils import audio
 from chameleond.utils import system_tools
 
 class USBFlowError(Exception):
@@ -146,6 +147,37 @@ class InputUSBFlow(USBFlow):
     self._file_path = None
     self._captured_file_type = self._DEFAULT_FILE_TYPE
 
+  def SetDriverCaptureConfigs(self, capture_data_format):
+    """Sets USB driver capture configurations in AudioDataFormat form.
+
+    The 'file_type' field in the capture_data_format is not relevant to USB
+    driver configurations, but is used by InputUSBFlow as _captured_file_type
+    for saving captured data. This field is checked against a list of valid file
+    types accepted by USBFlow. If file_type is not valid, an exception is
+    raised.
+
+    Capture configs can still be set even when the flow is plugged in. See
+    docstring of USBController.SetDriverCaptureConfigs for more details.
+
+    Args:
+      capture_data_format: The dict form of an AudioDataFormat object.
+
+    Raises:
+      USBFlowError if this InputUSBFlow is still capturing audio when this
+        method is called, or if file_type specified in capture_data_format is
+        not valid.
+    """
+    if self.is_capturing_audio:
+      error_message = ('Driver configs should remain unchanged while USB '
+                       'Flow is capturing audio.')
+      raise USBFlowError(error_message)
+    capture_configs = audio.CreateAudioDataFormatFromDict(capture_data_format)
+    if capture_configs.file_type not in self._VALID_AUDIO_FILE_TYPES:
+      error_message = 'file_type passed in is not valid.'
+      raise USBFlowError(error_message)
+    self._captured_file_type = capture_configs.file_type
+    self._usb_ctrl.SetDriverCaptureConfigs(capture_configs)
+
   def StartCapturingAudio(self):
     """Starts recording audio data."""
     self._supported_data_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
@@ -210,6 +242,30 @@ class OutputUSBFlow(USBFlow):
   def __init__(self, *args):
     """Constructs an OutputUSBFlow object."""
     super(OutputUSBFlow, self).__init__(*args)
+
+  def SetDriverPlaybackConfigs(self, playback_data_format):
+    """Sets USB driver playback configurations in AudioDataFormat form.
+
+    Playback configs can still be set even when the flow is plugged in. See
+    docstring of USBController.SetDriverPlaybackConfigs for more details.
+
+    The 'file_type' field in the playback_data_format passed in is ignored. Only
+    the 'file_type' in the playback file data format passed into
+    StartPlayingAudio() is checked before starting playback.
+
+    Args:
+      playback_data_format: The dict form of an AudioDataFormat object.
+
+    Raises:
+      USBFlowError if this InputUSBFlow is still capturing audio when this
+        method is called.
+    """
+    if self.is_playing_audio:
+      error_message = ('Driver configs should remain unchanged while USB '
+                       'Flow is playing audio.')
+      raise USBFlowError(error_message)
+    playback_configs = audio.CreateAudioDataFormatFromDict(playback_data_format)
+    self._usb_ctrl.SetDriverPlaybackConfigs(playback_configs)
 
   def StartPlayingAudio(self, path, data_format):
     """Starts playing audio data from the path.
