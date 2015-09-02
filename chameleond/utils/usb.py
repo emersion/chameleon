@@ -101,6 +101,9 @@ class USBController(object):
   def _FormatDriverConfigsForModprobe(self, driver_configs):
     """Converts configurations stored in driver_configs into modprobe arguments.
 
+    Note that 'file_type' attribute in driver_configs is left out because it is
+    not a relevant parameter for modprobing the driver module.
+
     Args:
       driver_configs: A USBAudioDriverConfigs object storing configurations to
         be applied to the driver when enabled.
@@ -269,6 +272,9 @@ class USBController(object):
   def GetSupportedPlaybackDataFormat(self):
     """Returns the playback data format as supported by the USB driver.
 
+    Note that the 'file_type' attribute of the returned AudioDataFormat object
+    is ignored and not actively managed by USBController.
+
     Returns:
       An AudioDataFormat object that stores the playback data format supported
         by the USB driver.
@@ -281,6 +287,9 @@ class USBController(object):
 
   def GetSupportedCaptureDataFormat(self):
     """Returns the capture data format as supported by the USB driver.
+
+    Note that the 'file_type' attribute of the returned AudioDataFormat object
+    is ignored and not actively managed by USBController.
 
     Returns:
       An AudioDataFormat object that stores the capture data format supported by
@@ -315,6 +324,8 @@ class USBController(object):
     driver was initially enabled/modprobed, then the driver will be enabled
     again after configurations are set.
 
+    The 'file_type' attribute of playback_configs is ignored by this class.
+
     Args:
       playback_configs: An AudioDataFormat object with playback configurations.
     """
@@ -330,6 +341,8 @@ class USBController(object):
     The driver will be disabled before the driver configurations are set. If the
     driver was initially enabled/modprobed, then the driver will be enabled
     again after configurations are set.
+
+    The 'file_type' attribute of capture_configs is ignored by this class.
 
     Args:
       capture_configs: An AudioDataFormat object with capture configurations.
