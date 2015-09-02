@@ -19,7 +19,12 @@ class USBAudioDriverConfigs(object):
     """Initializes a configs object with default values.
 
     Default values for the audio data fields are specified in the class
-    variables above. All fields for device info are set to None.
+    variables above. _DEFAULT_FILE_TYPE is set to None because this class
+    ignores the 'file_type' attribute of AudioDataFormat objects used to save
+    playback and capture configs. This is because 'file_type' is not relevant
+    to USB driver configurations.
+
+    All fields for device info are set to None.
     """
     self._playback_configs = audio.AudioDataFormat(self._DEFAULT_FILE_TYPE,
                                                    self._DEFAULT_SAMPLE_FORMAT,
@@ -42,6 +47,8 @@ class USBAudioDriverConfigs(object):
   def SetPlaybackConfigs(self, playback_data_format):
     """Sets different configurations for playback.
 
+    The 'file_type' attribute in playback_data_format is ignored.
+
     Args:
       playback_data_format: An AudioDataFormat object with playback
         configurations.
@@ -50,6 +57,8 @@ class USBAudioDriverConfigs(object):
 
   def SetCaptureConfigs(self, capture_data_format):
     """Sets different configurations for capture.
+
+    The 'file_type' attribute in capture_data_format is ignored.
 
     Args:
       capture_data_format: An AudioDataFormat object with capture
@@ -81,6 +90,9 @@ class USBAudioDriverConfigs(object):
   def GetPlaybackConfigs(self):
     """Returns playback-related data configurations.
 
+    The 'file_type' attribute in _playback_configs is ignored and thus not
+    actively handled by this class.
+
     Returns:
       An AudioDataFormat object containing values of playback-related
         configurations.
@@ -89,6 +101,9 @@ class USBAudioDriverConfigs(object):
 
   def GetCaptureConfigs(self):
     """Returns capture-related data configurations.
+
+    The 'file_type' attribute in _capture_configs is ignored and thus not
+    actively handled by this class.
 
     Returns:
       An AudioDataFormat object containing values of capture-related
