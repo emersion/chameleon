@@ -135,20 +135,23 @@ class InputUSBFlow(USBFlow):
 
   Properties:
     _file_path: The file path that captured data will be saved at.
+    _captured_file_type: The file type that captured data will be saved in.
   """
 
-  _DEFAULT_FILE_TYPE = 'wav'
+  _DEFAULT_FILE_TYPE = 'raw'
 
   def __init__(self, *args):
     """Constructs an InputUSBFlow object."""
     super(InputUSBFlow, self).__init__(*args)
     self._file_path = None
+    self._captured_file_type = self._DEFAULT_FILE_TYPE
 
   def StartCapturingAudio(self):
     """Starts recording audio data."""
     self._supported_data_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
+    self._supported_data_format.file_type = self._captured_file_type
     params_list = self._GetAlsaUtilCommandArgs(self._supported_data_format)
-    file_suffix = '.' + self._supported_data_format.file_type
+    file_suffix = '.' + self._captured_file_type
     recorded_file = tempfile.NamedTemporaryFile(prefix='recorded',
                                                 suffix=file_suffix,
                                                 delete=False)
