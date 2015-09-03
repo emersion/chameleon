@@ -31,8 +31,12 @@ class USBController(object):
 
     _driver_configs_to_set is initially set to a USBAudioDriverConfigs object
     with default configurations.
+
+    Modprobe command to remove driver module from kernel is called to make sure
+    the module is not in kernel at initialization.
     """
     self._driver_configs_to_set = usb_configs.USBAudioDriverConfigs()
+    system_tools.SystemTools.Call('modprobe', '-r', 'g_audio')
     self._driver_configs_in_use = None
 
   def EnableAudioDriver(self):
