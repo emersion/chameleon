@@ -337,3 +337,11 @@ class USBController(object):
     self._driver_configs_to_set.SetCaptureConfigs(capture_configs)
     if was_modprobed:
       self.EnableAudioDriver()
+
+  def EnableUSBOTGDriver(self):
+    """Enables dwc2 driver so USB port can be controlled by Chameleon."""
+    system_tools.SystemTools.Call('modprobe', 'dwc2')
+
+  def DisableUSBOTGDriver(self):
+    """Disables dwc2 driver so USB port does not get controlled by Chameleon."""
+    system_tools.SystemTools.Call('modprobe', '-r', 'dwc2')

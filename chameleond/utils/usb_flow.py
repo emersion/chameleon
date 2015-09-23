@@ -75,16 +75,18 @@ class USBFlow(object):
   def Plug(self):
     """Emulates plug for USB audio gadget.
 
-    The USB audio gadget driver module is enabled.
+    The dwc2 USB driver module and audio gadget driver module is enabled.
     """
+    self._usb_ctrl.EnableUSBOTGDriver()
     self._usb_ctrl.EnableAudioDriver()
 
   def Unplug(self):
     """Emulates unplug for USB audio gadget.
 
-    The USB audio gadget driver module is disabled.
+    The dwc2 USB driver module and audio gadget driver module is disabled.
     """
     self._usb_ctrl.DisableAudioDriver()
+    self._usb_ctrl.DisableUSBOTGDriver()
 
   def Do_FSM(self):
     """Do nothing for USBFlow.
