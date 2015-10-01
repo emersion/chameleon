@@ -131,10 +131,6 @@ class ChameleondDriver(ChameleondInterface):
 
     self.Reset()
 
-    # Set all ports unplugged on initialization.
-    for port_id in self.GetSupportedPorts():
-      self.Unplug(port_id)
-
   def Reset(self):
     """Resets Chameleon board."""
     logging.info('Execute the reset process')
@@ -152,6 +148,10 @@ class ChameleondDriver(ChameleondInterface):
       self._audio_board.Reset()
 
     self._ClearAudioFiles()
+
+    # Set all ports unplugged on initialization.
+    for port_id in self.GetSupportedPorts():
+      self.Unplug(port_id)
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
