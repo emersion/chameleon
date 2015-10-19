@@ -59,6 +59,7 @@ ifdef CHAMELEON_HOST
 	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
 	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
 	    "cd /tmp && tar zxf $(BUNDLE) && cd $(BUNDLEDIR) &&" \
+	    "find -exec touch -c {} \; &&" \
 	    "make install " \
                 "BUNDLE_VERSION=$(BUNDLE_VERSION) " \
                 "CHAMELEON_BOARD=$(CHAMELEON_BOARD)"
