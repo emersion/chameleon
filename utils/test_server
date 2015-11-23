@@ -1,0 +1,92 @@
+#!/usr/bin/python
+# Copyright 2015 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""A simple utility to connect to Chameleond in an interactive shell."""
+
+import argparse
+import code
+import logging
+import readline
+import rlcompleter
+import xmlrpclib
+
+
+def ShowMessages(proxy):
+  """Shows the messages for usage.
+
+  Args:
+    proxy: The xmlrpclib.ServerProxy to chameleond.
+  """
+  logging.info('In interactive shell, p is the proxy to chameleond server')
+  supported_ports = proxy.GetSupportedPorts()
+  linein_port = None
+  hdmi_port = None
+  port_messages = []
+  for port in supported_ports:
+    port_type = proxy.GetConnectorType(port)
+    if port_type == 'LineIn':
+      linein_port = port
+    if port_type == 'HDMI':
+      hdmi_port = port
+    port_messages.append('Port %d is %s.' % (port, port_type))
+
+  logging.info('''
+      %s
+      E.g.
+      p.StartCapturingAudio(%d) to capture from LineIn.
+      p.StopCapturingAudio(%d) to stop capturing from LineIn.
+      p.Plug(%d) to plug HDMI.
+      p.UnPlug(%d) to unplug HDMI.''',
+      '\n      '.join(port_messages), linein_port, linein_port,
+      hdmi_port, hdmi_port)
+
+
+def StartInteractiveShell(p):
+  """Starts an interactive shell.
+
+  Args:
+    p: The xmlrpclib.ServerProxy to chameleond.
+  """
+  vars = globals()
+  vars.update(locals())
+  readline.set_completer(rlcompleter.Completer(vars).complete)
+  readline.parse_and_bind("tab: complete")
+  shell = code.InteractiveConsole(vars)
+  shell.interact()
+
+
+def ParseArgs():
+  """Parses the arguments.
+
+  Returns: the namespace containing parsed arguments.
+
+  """
+  parser = argparse.ArgumentParser(
+      description='Connect to Chameleond and use interactive shell.',
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  parser.add_argument('--chameleon_host', type=str, dest='host', required=True,
+                      help='host address of Chameleond')
+  parser.add_argument('--port', type=int, dest='port', default=9992,
+                      help='port number of Chameleond')
+  return parser.parse_args()
+
+
+def Main():
+  """The Main program."""
+  logging.basicConfig(
+      format='%(asctime)s:%(levelname)s:%(message)s', level=logging.DEBUG)
+
+  options = ParseArgs()
+
+  address = 'http://%s:%s' % (options.host, options.port)
+  proxy = xmlrpclib.ServerProxy(address)
+  logging.info('Connected to %s with MAC address %s',
+               address, proxy.GetMacAddress())
+  ShowMessages(proxy)
+  StartInteractiveShell(proxy)
+
+
+if __name__ == '__main__':
+  Main()
