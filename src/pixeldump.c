@@ -26,7 +26,8 @@ void usage_exit()
           "\t[area_x area_y area_width area_height]\\\n"
           "\t[area_skip_pixel area_skip_line]\\\n"
           "\t[-a start_addr_a] [-b start_addr_b]\n"
-          "Dump the pixels of a selected area from the screen to a file.\n",
+          "Dump the pixels of a selected area from the screen to a file.\n"
+          "Support dumping to stdout with filename set to '-'.\n",
           prog);
   exit(1);
 }
@@ -61,6 +62,7 @@ int main(int argc, char **argv)
   int src_offset;
   int region_dump = 0;
   int num_buffer = 1;
+  int dump_to_stdout = 0;
   char *filename;
   int opt;
   int i;
@@ -122,10 +124,21 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  ofd = open(filename, O_RDWR | O_CREAT, 0644);
-  if (ofd == -1) {
-    perror("can't open dest file\n");
-    exit(1);
+  if (strcmp(filename, "-") == 0) {
+    dump_to_stdout = 1;
+    dst = malloc(area_size);
+  } else {
+    ofd = open(filename, O_RDWR | O_CREAT, 0644);
+    if (ofd == -1) {
+      perror("can't open dest file\n");
+      exit(1);
+    }
+    dummy = ftruncate(ofd, area_size);
+    dst = mmap(0, area_size, PROT_WRITE, MAP_SHARED, ofd, 0);
+    if (dst == MAP_FAILED) {
+      perror("cannot mmap dst\n");
+      exit(1);
+    }
   }
 
   page_aligned_size = screen_size + (-screen_size % getpagesize());
@@ -136,13 +149,6 @@ int main(int argc, char **argv)
       perror("cannot mmap src\n");
       exit(1);
     }
-  }
-
-  dummy = ftruncate(ofd, area_size);
-  dst = mmap(0, area_size, PROT_WRITE, MAP_SHARED, ofd, 0);
-  if (dst == MAP_FAILED) {
-    perror("cannot mmap dst\n");
-    exit(1);
   }
 
   if (region_dump) {
@@ -187,8 +193,15 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < num_buffer; i++)
     munmap(src[i], page_aligned_size);
-  munmap(dst, area_size);
-  close(ofd);
+
+  if (dump_to_stdout) {
+    fwrite(dst, 1, area_size, stdout);
+    fflush(stdout);
+  } else {
+    munmap(dst, area_size);
+    close(ofd);
+  }
+
   close(ifd);
   return 0;
 }
