@@ -93,6 +93,13 @@ class AudioCaptureManager(object):
       raise AudioCaptureManagerError(
           'No audio data was captured. Perhaps this input is not plugged ?')
 
+    # Workaround for issue crbug.com/574683 where the last two pages should
+    # be neglected.
+    if page_count < 2:
+      raise AudioCaptureManagerError(
+          'Not enough audio data was captured.')
+    page_count = page_count - 2
+
     # Use pixeldump to dump a range of memory into file.
     # Originally, the area size is
     # screen_width * screen_height * byte_per_pixel.
