@@ -6,7 +6,9 @@
 
 import logging
 import serial
+import time
 
+import common
 import serial_utils
 
 
@@ -37,7 +39,12 @@ class RN42(object):
 
   DRIVER = 'ftdi_sio'
   CHIP_NAME = 'RNBT'
-  RETRY = 2                   # Try (RETRY + 1) times in total.
+  RETRY = 2                     # Try (RETRY + 1) times in total.
+  RETRY_INTERVAL_SECS = 0.1     # the time interval between retries in seconds
+  CONNECTION_TIMEOUT_SECS = 10  # the connection timeout in seconds
+  POST_CONNECTION_WAIT_SECS = 1 # waiting time in seconds for a connection
+                                # to become stable
+  REBOOT_SLEEP_SECS = 0.5       # the time to sleep after reboot.
 
   # A newline is a carriage return '\r' followed by line feed '\n'.
   NEWLINE = '\r\n'
@@ -62,8 +69,7 @@ class RN42(object):
 
   # authentication mode
   CMD_GET_AUTHENTICATION_MODE = 'GA'
-  CMD_SET_AUTHENTICATION_OPEN_MODE = 'SA,0'   # no authentication
-  CMD_SET_AUTHENTICATION_PIN_MODE = 'SA,4'    # host to send a matching pin
+  CMD_SET_AUTHENTICATION_MODE = 'SA,'
 
   # bluetooth service profiles
   PROFILE_SPP = '0'
@@ -76,6 +82,8 @@ class RN42(object):
   CMD_GET_RN42_BLUETOOTH_MAC = 'GB'
   CMD_GET_CONNECTION_STATUS = 'GK'
   CMD_GET_REMOTE_CONNECTED_BLUETOOTH_MAC = 'GF'
+  CMD_ENABLE_CONNECTION_STATUS_MESSAGE = 'SO,1'
+  CMD_DISABLE_CONNECTION_STATUS_MESSAGE = 'SO,0'
 
   # HID device classes
   CMD_GET_HID = 'GH'
@@ -84,6 +92,14 @@ class RN42(object):
   CMD_SET_HID_MOUSE = 'SH,0020'
   CMD_SET_HID_COMBO = 'SH,0030'
   CMD_SET_HID_JOYSTICK = 'SH,0040'
+
+  # Set remote bluetooth address
+  CMD_SET_REMOTE_ADDRESS = 'SR,'
+
+  # Connect to the stored remote address
+  CMD_CONNECT_REMOTE_ADDRESS = 'C'
+  # Disconnect from the remote device
+  CMD_DISCONNECT_REMOTE_ADDRESS = chr(0)
 
   # the operation mode
   OPERATION_MODE = {
@@ -97,11 +113,15 @@ class RN42(object):
   }
 
   # the authentication mode
+  OPEN_MODE = '0'
+  SSP_KEYBOARD_MODE = '1'
+  SSP_JUST_WORK_MODE = '2'
+  PIN_CODE_MODE = '4'
   AUTHENTICATION_MODE = {
-      '0': 'OPEN',
-      '1': 'SSP_KEYBOARD',
-      '2': 'SSP_JUST_WORK',
-      '4': 'PIN_CODE'}
+      OPEN_MODE: 'OPEN',
+      SSP_KEYBOARD_MODE: 'SSP_KEYBOARD',
+      SSP_JUST_WORK_MODE: 'SSP_JUST_WORK',
+      PIN_CODE_MODE: 'PIN_CODE'}
 
   # the service profile
   SERVICE_PROFILE = {
@@ -146,7 +166,9 @@ class RN42(object):
   def Close(self):
     """Close the device gracefully."""
     if not self._closed:
-      self.LeaveCommandMode()
+      # It is possible that RN-42 has left command mode. In that case, do not
+      # expect any response from the kit.
+      self.LeaveCommandMode(expect_in='')
       self._serial.Disconnect()
       self._closed = True
 
@@ -176,6 +198,7 @@ class RN42(object):
       result = self._serial.SendReceive(command + self.NEWLINE,
                                         size=0,
                                         retry=self.RETRY).strip()
+      logging.debug('  SerialSendReceive: %s', result)
       if ((expect and expect != result) or
           (expect_in and expect_in not in result)):
         error_msg = 'Failulre in %s: %s' % (msg, result)
@@ -233,15 +256,21 @@ class RN42(object):
       msg = 'Incorrect response in entering command mode: %s'
       raise RN42Exception(msg % result)
 
-  def LeaveCommandMode(self):
+  def LeaveCommandMode(self, expect_in='END'):
     """Make the chip leave command mode.
+
+    An 'END' string is returned from RN-42 if it leaves the command mode
+    normally.
+
+    Args:
+      expect_in: expect the string in the response
 
     Returns:
       True if the kit left the command mode successfully.
     """
     if self._command_mode:
       self.SerialSendReceive(self.CMD_LEAVE_COMMAND_MODE,
-                             expect='END',
+                             expect_in=expect_in,
                              msg='leaving command mode')
       self._command_mode = False
     return True
@@ -256,8 +285,9 @@ class RN42(object):
       True if the kit rebooted successfully.
     """
     self.SerialSendReceive(self.CMD_REBOOT,
-                           expect='Reboot',
+                           expect_in='Reboot',
                            msg='rebooting RN-42')
+    time.sleep(self.REBOOT_SLEEP_SECS)
     return True
 
   def GetChipName(self):
@@ -331,26 +361,21 @@ class RN42(object):
                                     msg='getting authentication mode')
     return self.AUTHENTICATION_MODE.get(result)
 
-  def SetAuthenticationOpenMode(self):
-    """Set the authentication to open mode (no authentication).
+  def SetAuthenticationMode(self, mode):
+    """Set the authentication mode to the specified mode.
+
+    Args:
+      mode: the authentication mode
 
     Returns:
-      True if setting open mode successfully.
+      True if setting the mode successfully.
     """
-    self.SerialSendReceive(self.CMD_SET_AUTHENTICATION_OPEN_MODE,
-                           expect=self.AOK,
-                           msg='setting authentication open mode')
-    return True
+    if mode not in self.AUTHENTICATION_MODE:
+      raise RN42Exception('The mode "%s" is not supported.' % mode)
 
-  def SetAuthenticationPinMode(self):
-    """Set the authentication to pin mode (host to send a matching pin).
-
-    Returns:
-      True if setting pin code mode successfully.
-    """
-    self.SerialSendReceive(self.CMD_SET_AUTHENTICATION_PIN_MODE,
+    self.SerialSendReceive(self.CMD_SET_AUTHENTICATION_MODE + mode,
                            expect=self.AOK,
-                           msg='setting authentication pin mode')
+                           msg='setting authentication mode "%s"' % mode)
     return True
 
   def GetServiceProfile(self):
@@ -408,6 +433,36 @@ class RN42(object):
                                     msg='getting connection status')
     connection = result.split(',')[0]
     return connection == '1'
+
+  def EnableConnectionStatusMessage(self):
+    """Enable the connection status message.
+
+    If this is enabled, a connection status message shows
+      '...CONNECT...' when connected and
+      '...DISCONNECT...' when disconnected
+    in the serial console.
+
+    Returns:
+      True if enabling the connection status message successfully.
+    """
+    self.SerialSendReceive(self.CMD_ENABLE_CONNECTION_STATUS_MESSAGE,
+                           expect=self.AOK,
+                           msg='enabling connection status message')
+    return True
+
+  def DisableConnectionStatusMessage(self):
+    """Disable the connection status message.
+
+    If this is disabled, the serial console would not show any connection
+    status message when connected/disconnected.
+
+    Returns:
+      True if disabling the connection status message successfully.
+    """
+    self.SerialSendReceive(self.CMD_DISABLE_CONNECTION_STATUS_MESSAGE,
+                           expect=self.AOK,
+                           msg='disabling connection status message')
+    return True
 
   def GetRemoteConnectedBluetoothAddress(self):
     """Get the bluetooth mac address of the current connected remote host.
@@ -484,6 +539,93 @@ class RN42(object):
     self.SerialSendReceive(self.CMD_SET_HID_JOYSTICK,
                            expect=self.AOK,
                            msg='setting joystick as HID device')
+    return True
+
+  def SetRemoteAddress(self, remote_address):
+    """Set the remote bluetooth address.
+
+    Args:
+      remote_address: the remote bluetooth address such as '0029951AD46F'
+                      when given '00:29:95:1A:D4:6F', it will be
+                      converted to '0029951AD46F' automatically.
+
+    Returns:
+      True if setting the remote address successfully.
+    """
+    reduced_remote_address = remote_address.replace(':', '')
+    if len(reduced_remote_address) != 12:
+      raise RN42Exception('"%s" is not a valid bluetooth address.' %
+                          remote_address)
+
+    self.SerialSendReceive(self.CMD_SET_REMOTE_ADDRESS + reduced_remote_address,
+                           expect=self.AOK,
+                           msg='setting a remote address ' + remote_address)
+    return True
+
+  def Connect(self):
+    """Connect to the stored remote bluetooth address.
+
+    When a connection command is issued, it first returns a response 'TRYING'.
+    If the connection is successful, it returns something like
+    '...%CONNECT,6C29951AD46F,0'  where '6C29951AD46F' is the remote_address
+    after a few seconds.
+
+    Returns:
+      True if connecting to the stored remote address successfully, and
+      False if a timeout occurs.
+    """
+    # Expect an immediately 'TRYING' response.
+    self.SerialSendReceive(self.CMD_CONNECT_REMOTE_ADDRESS,
+                           expect='TRYING',
+                           msg='connecting to the stored remote address')
+
+    # Expect a 'CONNECT' response in a few seconds.
+    try:
+      # It usually takes a few seconds to establish a connection.
+      common.WaitForCondition(lambda: 'CONNECT' in self._serial.Receive(size=0),
+                              True,
+                              self.RETRY_INTERVAL_SECS,
+                              self.CONNECTION_TIMEOUT_SECS)
+
+      # Have to wait for a while. Otherwise, the initial characters sent
+      # may get lost.
+      time.sleep(self.POST_CONNECTION_WAIT_SECS)
+      return True
+    except common.TimeoutError:
+      # The connection process may be flaky. Hence, do not raise an exception.
+      # Just return False and let the caller handle the connection timeout.
+      logging.error('RN42 failed to connect.')
+      return False
+
+  def ConnectToRemoteAddress(self, remote_address):
+    """Connect to the remote address.
+
+    This is performed by the following steps:
+    1. Set the remote address to connect.
+    2. Connect to the remote address.
+
+    Args:
+      remote_address: the remote bluetooth address such as '0029951AD46F'
+                      when given '00:29:95:1A:D4:6F', it will be
+                      converted to '0029951AD46F' automatically.
+
+    Returns:
+      True if connecting to the remote address successfully; otherwise, False.
+    """
+    return self.SetRemoteAddress(remote_address) and self.Connect()
+
+  def Disconnect(self):
+    """Disconnect from the remote device.
+
+    This is done by sending a 0x0.
+    A '%DISCONNECT' string would be received as a response.
+
+    Returns:
+      True if disconnecting from the remote device successfully.
+    """
+    self.SerialSendReceive(self.CMD_DISCONNECT_REMOTE_ADDRESS,
+                           expect_in='DISCONNECT',
+                           msg='disconnecting from the remote device')
     return True
 
 
