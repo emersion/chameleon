@@ -8,11 +8,42 @@ from __future__ import print_function
 
 import argparse
 import errno
+import operator
+import os
 import subprocess
 import sys
 import tempfile
 import time
 import xmlrpclib
+
+
+class Edid(object):
+    """Edid is an abstraction of Extended Display Identification Data."""
+
+    def __init__(self, data):
+        """Construct an Edid.
+
+        @param data: A byte-array of EDID data.
+        """
+        self.data = data
+
+    @classmethod
+    def from_file(cls, filename):
+        """Construct an Edid from a file.
+
+        @param filename: A string of filename.
+        """
+        if not os.path.exists(filename):
+            raise ValueError('EDID file %r does not exist' % filename)
+
+        if filename.upper().endswith('.TXT'):
+            # Convert the EDID text format, returning from xrandr.
+            data = reduce(operator.add,
+                          map(lambda s: s.strip().decode('hex'),
+                              open(filename).readlines()))
+        else:
+            data = open(filename).read()
+        return cls(data)
 
 
 def main():
@@ -26,6 +57,8 @@ def main():
                       help='port number of Chameleond')
   parser.add_argument('--replug', dest='replug', action='store_true',
                       help='unplug and plug before capturing screen')
+  parser.add_argument('--edid_file', type=str, dest='edid_file', default=None,
+                      help='filename of the edid to apply')
   parser.add_argument('--area', type=str, dest='area',
                       help='only capture the area, e.g. \'x,y,width,height\'')
   parser.add_argument('--output', type=str, dest='output', default='image.png',
@@ -49,18 +82,35 @@ def main():
   inputs = chameleon.ProbeInputs()
   main_input = inputs[0]
   print('Use the main port:', chameleon.GetConnectorType(main_input))
-  if options.replug:
-    print('Replugging...')
-    chameleon.FireHpdPulse(main_input, 1000000)
+
+  if options.replug or options.edid_file:
+    print('Unplugging...')
+    chameleon.Unplug(main_input)
+
+  if options.edid_file:
+    print('Reading EDID from %s...' % options.edid_file)
+    edid = Edid.from_file(options.edid_file)
+    print('Applying EDID...')
+    edid_id = chameleon.CreateEdid(xmlrpclib.Binary(edid.data))
+    chameleon.ApplyEdid(main_input, edid_id)
+    chameleon.DestroyEdid(edid_id)
+    time.sleep(1)
+
+  if options.replug or options.edid_file:
+    print('Plugging...')
+    chameleon.Plug(main_input)
     time.sleep(5)
+
   width, height = chameleon.DetectResolution(main_input)
   print('Detected screen size %dx%d' % (width, height))
   if area_args:
     size_str = '%dx%d' % (area_args[2], area_args[3])
   else:
     size_str = '%dx%d' % (width, height)
+
   print('Capturing the screen size %s...' % size_str)
   pixels = chameleon.DumpPixels(main_input, *area_args).data
+
   print('Got pixel size %d' % len(pixels))
   with tempfile.NamedTemporaryFile(suffix='.rgb') as f:
     print('Temporarily write to file:', f.name)
