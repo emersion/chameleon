@@ -117,6 +117,20 @@ class _Memory(object):
     time.sleep(delay_secs)
     self.ClearMask(address, mask)
 
+  def ClearAndSetMask(self, address, mask, delay_secs=_REG_SET_DELAY):
+    """Clears and then sets the mask on the given memory address.
+
+    It is a blocking call for at least delay_secs seconds.
+
+    Args:
+      address: The memory address.
+      mask: The bitwise mask.
+      delay_secs: The time between clear and set. Default: _REG_SET_DELAY
+    """
+    self.ClearMask(address, mask)
+    time.sleep(delay_secs)
+    self.SetMask(address, mask)
+
   def Fill(self, address, data):
     """Fills memory with data.
 
