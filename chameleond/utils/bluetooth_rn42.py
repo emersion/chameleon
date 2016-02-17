@@ -101,6 +101,129 @@ class RN42(object):
   # Disconnect from the remote device
   CMD_DISCONNECT_REMOTE_ADDRESS = chr(0)
 
+  # UART input modes
+  # raw mode
+  UART_INPUT_RAW_MODE = 0xFD
+  RAW_REPORT_FORMAT_KEYBOARD_LENGTH = 9
+  RAW_REPORT_FORMAT_KEYBOARD_DESCRIPTOR = 1
+  RAW_REPORT_FORMAT_KEYBOARD_LEN_SCAN_CODES = 6
+  LEN_SCAN_CODES = 6
+  # shorthand mode
+  UART_INPUT_SHORTHAND_MODE = 0xFE
+  SHORTHAND_REPORT_FORMAT_KEYBOARD_MAX_LEN_SCAN_CODES = 6
+
+  # modifiers
+  LEFT_CTRL = 0x01
+  LEFT_SHIFT = 0x02
+  LEFT_ALT = 0x04
+  LEFT_GUI = 0x08
+  RIGHT_CTRL = 0x10
+  RIGHT_SHIFT = 0x20
+  RIGHT_ALT = 0x40
+  RIGHT_GUI = 0x80
+  MODIFIERS = [LEFT_CTRL, LEFT_SHIFT, LEFT_ALT, LEFT_GUI,
+               RIGHT_CTRL, RIGHT_SHIFT, RIGHT_ALT, RIGHT_GUI]
+
+  # ASCII to HID report scan codes
+  SCAN_SYSTEM_POWER = 0x81
+  SCAN_SYSTEM_SLEEP = 0x82
+  SCAN_SYSTEM_WAKE = 0x83
+  SCAN_NO_EVENT = 0x0
+  SCAN_OVERRUN_ERROR = 0x01
+  SCAN_POST_FAIL = 0x02
+  SCAN_ERROR_UNDEFINED = 0x03
+  SCAN_A = 0x04
+  SCAN_B = 0x05
+  SCAN_C = 0x06
+  SCAN_D = 0x07
+  SCAN_E = 0x08
+  SCAN_F = 0x09
+  SCAN_G = 0x0A
+  SCAN_H = 0x0B
+  SCAN_I = 0x0C
+  SCAN_J = 0x0D
+  SCAN_K = 0x0E
+  SCAN_L = 0x0F
+  SCAN_M = 0x10
+  SCAN_N = 0x11
+  SCAN_O = 0x12
+  SCAN_P = 0x13
+  SCAN_Q = 0x14
+  SCAN_R = 0x15
+  SCAN_S = 0x16
+  SCAN_T = 0x17
+  SCAN_U = 0x18
+  SCAN_V = 0x19
+  SCAN_W = 0x1A
+  SCAN_X = 0x1B
+  SCAN_Y = 0x1C
+  SCAN_Z = 0x1D
+  SCAN_1 = 0x1E                     # 1
+  SCAN_EXCLAMATION = 0x1E           # !
+  SCAN_2 = 0x1F                     # 2
+  SCAN_AMPERSAT = 0x1F              # @
+  SCAN_3 = 0x20                     # 3
+  SCAN_POUND = 0x20                 # #
+  SCAN_4 = 0x21                     # 4
+  SCAN_DOLLAR = 0x21                # $
+  SCAN_5 = 0x22                     # 5
+  SCAN_PERCENT = 0x22               # %
+  SCAN_6 = 0x23                     # 6
+  SCAN_CARET = 0x23                 # ^
+  SCAN_7 = 0x24                     # 7
+  SCAN_AMPERSAND = 0x24             # &
+  SCAN_8 = 0x25                     # 8
+  SCAN_ASTERISK = 0x25              # *
+  SCAN_9 = 0x26                     # 9
+  SCAN_OPEN_PARENTHESIS = 0x26      # (
+  SCAN_0 = 0x27                     # 0
+  SCAN_CLOSE_PARENTHESIS = 0x27     # )
+  SCAN_RETURN = 0x28
+  SCAN_ESCAPE = 0x29
+  SCAN_BACKSPACE = 0x2A
+  SCAN_TAB = 0x2B
+  SCAN_SPACE = 0x2C
+  SCAN_MINUS = 0x2D                 # -
+  SCAN_UNDERSCORE = 0x2D            # _
+  SCAN_EQUAL = 0x2E                 # =
+  SCAN_PLUS = 0x2E                  # +
+  SCAN_OPEN_BRACKET = 0x2F          # [
+  SCAN_OPEN_BRACE = 0x2F            # {
+  SCAN_CLOSE_BRACKET = 0x30         # ]
+  SCAN_CLOSE_BRACE = 0x30           # }
+  SCAN_BACK_SLASH = 0x31            # \
+  SCAN_PIPE = 0x31                  # |
+  SCAN_EUROPE1 = 0x32
+  SCAN_SEMICOLON = 0x33             # ;
+  SCAN_COLON = 0x33                 # :
+  SCAN_APOSTROPHE = 0x34            # '
+  SCAN_QUOTE = 0x34                 # "
+  SCAN_ACUTE = 0x35                 # `
+  SCAN_TILDE = 0x35                 # ~
+  SCAN_COMMA = 0x36                 # ,
+  SCAN_OPEN_ANGLE_BRACKET = 0x36    # <
+  SCAN_PERIOD = 0x37                # .
+  SCAN_CLOSE_ANGLE_BRACKET = 0x37   # >
+  SCAN_SLASH = 0x38                 # /
+  SCAN_QUESTION = 0x38              # ?
+  SCAN_CAPS_LOCK = 0x39
+  SCAN_F1 = 0x3A
+  SCAN_F2 = 0x3B
+  SCAN_F3 = 0x3C
+  SCAN_F4 = 0x3D
+  SCAN_F5 = 0x3E
+  SCAN_F6 = 0x3F
+  SCAN_F7 = 0x40
+  SCAN_F8 = 0x41
+  SCAN_F9 = 0x42
+  SCAN_F10 = 0x43
+  SCAN_F11 = 0x44
+  SCAN_F12 = 0x45
+  SCAN_PRINT_SCREEN = 0x46
+  SCAN_SCROLL_LOCK = 0x47
+  SCAN_BREAK = 0x48
+  SCAN_PAUSE = 0x48
+
   # the operation mode
   OPERATION_MODE = {
       'Slav': 'SLAVE',      # slave mode
@@ -627,6 +750,113 @@ class RN42(object):
                            expect_in='DISCONNECT',
                            msg='disconnecting from the remote device')
     return True
+
+  def _CheckValidModifiers(self, modifiers):
+    invalid_modifiers = [m for m in modifiers if m not in self.MODIFIERS]
+    if invalid_modifiers:
+      logging.error('Modifiers not valid: "%s".', str(invalid_modifiers))
+      return False
+    return True
+
+  def _IsValidScanCode(self, code):
+    """Check if the code is a valid scan code.
+
+    Args:
+      code: the code to check
+
+    Returns:
+      True: if the code is a valid scan code.
+    """
+    return (self.SCAN_NO_EVENT <= code <= self.SCAN_PAUSE or
+            self.SCAN_SYSTEM_POWER <= code <= self.SCAN_SYSTEM_WAKE)
+
+  def _CheckValidScanCodes(self, keys):
+    invalid_keys = [k for k in keys if not self._IsValidScanCode(k)]
+    if invalid_keys:
+      logging.error('Keys not valid: "%s".', str(invalid_keys))
+      return False
+    return True
+
+  def RawKeyCodes(self, modifiers=None, keys=None):
+    """Generate the codes in raw keyboard report format.
+
+    This method sends data in the raw report mode. The first start
+    byte chr(UART_INPUT_RAW_MODE) is stripped and the following bytes
+    are sent without interpretation.
+
+    For example, generate the codes of 'shift-alt-i' by
+      codes = RawKeyCodes(modifiers=[RN42.LEFT_SHIFT, RN42.LEFT_ALT],
+                          keys=[RN42.SCAN_I])
+
+    Args:
+      modifiers: a list of modifiers
+      keys: a list of scan codes of keys
+
+    Returns:
+      a raw code string if both modifiers and keys are valid, or
+      None otherwise.
+    """
+    modifiers = modifiers or []
+    keys = keys or []
+
+    if not (self._CheckValidModifiers(modifiers) and
+            self._CheckValidScanCodes(keys)):
+      return None
+
+    real_scan_codes = map(chr, keys)
+    padding_0s = (chr(0) * (self.RAW_REPORT_FORMAT_KEYBOARD_LEN_SCAN_CODES -
+                            len(real_scan_codes)))
+
+    return (chr(self.UART_INPUT_RAW_MODE) +
+            chr(self.RAW_REPORT_FORMAT_KEYBOARD_LENGTH) +
+            chr(self.RAW_REPORT_FORMAT_KEYBOARD_DESCRIPTOR) +
+            chr(sum(modifiers)) +
+            chr(0x0) +
+            ''.join(real_scan_codes) +
+            padding_0s)
+
+  def PressShorthandCodes(self, modifiers=None, keys=None):
+    """Generate key press codes in shorthand report format.
+
+    Only key press is sent. The shorthand mode is useful in separating the
+    key press and key release events.
+
+    For example, generate the codes of 'shift-alt-i' by
+      codes = PressShorthandCodes(modifiers=[RN42.LEFT_SHIFT, RN42.LEFT_ALT],
+                                  keys=[RN42_I])
+
+    Args:
+      modifiers: a list of modifiers
+      keys: a list of scan codes of keys
+
+    Returns:
+      a shorthand code string if both modifiers and keys are valid, or
+      None otherwise.
+    """
+    modifiers = modifiers or []
+    keys = keys or []
+
+    if not (self._CheckValidModifiers(modifiers) and
+            self._CheckValidScanCodes(keys)):
+      return None
+
+    if len(keys) > self.SHORTHAND_REPORT_FORMAT_KEYBOARD_MAX_LEN_SCAN_CODES:
+      return None
+
+    return (chr(self.UART_INPUT_SHORTHAND_MODE) +
+            chr(len(keys) + 1) +
+            chr(sum(modifiers)) +
+            ''.join(map(chr, keys)))
+
+  def ReleaseShorthandCodes(self):
+    """Generate the shorthand report format code for key release.
+
+    Key release is sent.
+
+    Returns:
+      a special shorthand code string to release any pressed keys.
+    """
+    return chr(self.UART_INPUT_SHORTHAND_MODE) + chr(0x0)
 
 
 def GetRN42Info():

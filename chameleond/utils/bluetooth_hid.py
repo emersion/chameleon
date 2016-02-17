@@ -115,6 +115,8 @@ class BluetoothHIDKeyboard(BluetoothHID):
 
     Args:
       data: data to send to the remote host
+            data could be either a string of printable ASCII characters or
+            a special key combination.
     """
     # TODO(josephsih): should have a method to check the connection status.
     # Currently, once RN-42 is connected to a remote host, all characters
@@ -125,6 +127,22 @@ class BluetoothHIDKeyboard(BluetoothHID):
     logging.debug('HID device sending %r...', data)
     self.SerialSendReceive(data, msg='BluetoothHID.Send')
     time.sleep(self.send_delay)
+
+  def SendKeyCombination(self, modifiers=None, keys=None):
+    """Send special key combinations to the remote host.
+
+    Args:
+      modifiers: a list of modifiers
+      keys: a list of scan codes of keys
+    """
+    press_codes = self.PressShorthandCodes(modifiers=modifiers, keys=keys)
+    release_codes = self.ReleaseShorthandCodes()
+    if press_codes and release_codes:
+      self.Send(press_codes)
+      self.Send(release_codes)
+    else:
+      logging.warn('modifers: %s and keys: %s are not valid', modifiers, keys)
+      return None
 
 
 def _UsageAndExit():
@@ -158,9 +176,31 @@ def DemoBluetoothHIDKeyboard(remote_address, chars):
   print 'Connecting to the remote address %s...' % remote_address
   try:
     if keyboard.ConnectToRemoteAddress(remote_address):
-      for i in range(1, 11):
+      # Send printable ASCII strings a few times.
+      for i in range(1, 4):
         print 'Sending "%s" for the %dth time...' % (chars, i)
         keyboard.Send(chars + ' ' + str(i))
+
+      # Demo special key combinations below.
+      print 'Create a new chrome tab.'
+      keyboard.SendKeyCombination(modifiers=[RN42.LEFT_CTRL],
+                                  keys=[RN42.SCAN_T])
+
+      print 'Navigate to Google page.'
+      keyboard.Send('www.google.com')
+      time.sleep(1)
+
+      print 'Search hello world.'
+      keyboard.Send('hello world')
+      time.sleep(1)
+
+      print 'Navigate back to the previous page.'
+      keyboard.SendKeyCombination(keys=[RN42.SCAN_F1])
+      time.sleep(1)
+
+      print 'Switch to the previous tab.'
+      keyboard.SendKeyCombination(modifiers=[RN42.LEFT_CTRL, RN42.LEFT_SHIFT],
+                                  keys=[RN42.SCAN_TAB])
     else:
       print 'Something is wrong. Not able to connect to the remote address.'
       print 'Have you already paired RN-42 with the remote host?'
