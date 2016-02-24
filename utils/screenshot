@@ -83,7 +83,9 @@ def main():
   main_input = inputs[0]
   print('Use the main port:', chameleon.GetConnectorType(main_input))
 
-  if options.replug or options.edid_file:
+  was_plugged = chameleon.IsPlugged(main_input)
+
+  if was_plugged and (options.replug or options.edid_file):
     print('Unplugging...')
     chameleon.Unplug(main_input)
 
@@ -96,30 +98,36 @@ def main():
     chameleon.DestroyEdid(edid_id)
     time.sleep(1)
 
-  if options.replug or options.edid_file:
+  if not chameleon.IsPlugged(main_input):
     print('Plugging...')
     chameleon.Plug(main_input)
-    time.sleep(5)
+    chameleon.WaitVideoInputStable(main_input, 30)
 
-  width, height = chameleon.DetectResolution(main_input)
-  print('Detected screen size %dx%d' % (width, height))
-  if area_args:
-    size_str = '%dx%d' % (area_args[2], area_args[3])
-  else:
-    size_str = '%dx%d' % (width, height)
+  try:
+    width, height = chameleon.DetectResolution(main_input)
+    print('Detected screen size %dx%d' % (width, height))
+    if area_args:
+      size_str = '%dx%d' % (area_args[2], area_args[3])
+    else:
+      size_str = '%dx%d' % (width, height)
 
-  print('Capturing the screen size %s...' % size_str)
-  pixels = chameleon.DumpPixels(main_input, *area_args).data
+    print('Capturing the screen size %s...' % size_str)
+    pixels = chameleon.DumpPixels(main_input, *area_args).data
 
-  print('Got pixel size %d' % len(pixels))
-  with tempfile.NamedTemporaryFile(suffix='.rgb') as f:
-    print('Temporarily write to file:', f.name)
-    f.write(pixels)
-    f.flush()
-    command = ['convert', '-size', size_str, '-depth', '8']
-    command += [f.name, options.output]
-    subprocess.check_call(command)
-    print('Outputted to file:', options.output)
+    print('Got pixel size %d' % len(pixels))
+    with tempfile.NamedTemporaryFile(suffix='.rgb') as f:
+      print('Temporarily write to file:', f.name)
+      f.write(pixels)
+      f.flush()
+      command = ['convert', '-size', size_str, '-depth', '8']
+      command += [f.name, options.output]
+      subprocess.check_call(command)
+      print('Outputted to file:', options.output)
+
+  finally:
+    if not was_plugged:
+      print('Unplugging to the original state...')
+      chameleon.Unplug(main_input)
 
 
 if __name__ == '__main__':
