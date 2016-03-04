@@ -19,6 +19,7 @@ class _SystemTools(object):
       'i2cget': '/usr/local/sbin/i2cget',
       'i2cset': '/usr/local/sbin/i2cset',
       'hpd_control': '/usr/bin/hpd_control',
+      'lsmod':'/sbin/lsmod',
       'memtool': '/usr/bin/memtool',
       'modprobe':'/sbin/modprobe',
       'reboot': '/sbin/reboot',

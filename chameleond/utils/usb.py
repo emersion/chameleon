@@ -9,7 +9,8 @@ import re
 
 import chameleon_common #pylint: disable=W0611
 from chameleond.utils import system_tools
-from chameleond.utils import usb_configs
+from chameleond.utils import usb_audio_configs
+
 
 class USBControllerError(Exception):
   """Exception raised when any error occurs in USBController."""
@@ -20,71 +21,219 @@ class USBController(object):
   """Provides interface to control USB driver.
 
   Properties:
-    _driver_configs_to_set: A USBAudioDriverConfigs object used to store user-
-                            set changes.
-    _driver_configs_in_use: A USBAudioDriverConfigs object representing the
-                            the configurations currently in use by the driver,
-                            if it is successfully modprobed.
+    _module: Module name of USB driver.
   """
-  _MODPROBE_GAUDIO_ARGS_VERBOSE = ['g_audio', '-v', '--first-time']
+  # Enumeration of modprobe status.
+  MODPROBE_SUCCESS = 0  # successfully modprobe inserted/removed
+  MODPROBE_NO_ACTION = 1  # command is redundant and no error occurred
+  MODPROBE_DUPLICATED = 2  # module is already inserted/removed from the kernel
 
-  def __init__(self):
-    """Initializes a USBController object.
-
-    _driver_configs_to_set is initially set to a USBAudioDriverConfigs object
-    with default configurations.
+  def __init__(self, module):
+    """Initializes a USBAudioController object.
 
     Modprobe command to remove driver module from kernel is called to make sure
     the module is not in kernel at initialization.
     """
-    self._driver_configs_to_set = usb_configs.USBAudioDriverConfigs()
-    system_tools.SystemTools.Call('modprobe', '-r', 'g_audio')
-    self._driver_configs_in_use = None
+    self._module = module
+    system_tools.SystemTools.Call('modprobe', '-r', self._module)
 
   @property
   def _is_modprobed(self):
-    """A property that is True when g_audio driver module is enabled.
-
-    This property depends on whether there is a valid driver_configs_in_use.
+    """A property that is True when the driver module is enabled.
 
     Returns:
-      True when driver_configs_in_use is not None, i.e. it is set to a valid
-      copy of USBAudioDriverConfigs.
+      True when the module name is got from lsmod command. False otherwise.
     """
-    return self._driver_configs_in_use is not None
+    output = system_tools.SystemTools.Output('lsmod').splitlines()
+    return any(line.startswith(self._module) for line in output)
+
+  @property
+  def _modprobe_verbose_args(self):
+    """A property of modprobe command arguments.
+
+    Returns:
+      A list of modprobe command arguments with verbosity.
+    """
+    return [self._module, '-v', '--first-time']
 
   def DriverIsEnabled(self):
     """Returns a Boolean indicating whether driver is modprobed.
-
-    This hides the concept of modprobe from callers of USBController methods
-    and only exposes the status of USB audio driver.
 
     Returns:
       True if driver is enabled. False otherwise.
     """
     return self._is_modprobed
 
-  def EnableAudioDriver(self):
-    """Modprobes g_audio module with params from _driver_configs_to_set.
+  def EnableDriver(self):
+    """Modprobes USB driver module.
 
-    If the user wishes to change the current configurations into
-    _driver_configs_to_set, the user should disable the driver with
-    DisableAudioDriver() before changing the configurations via
-    SetDriverPlaybackConfigs() or SetDriverCaptureConfigs(), and calling
-    EnableAudioDriver() again.
+    Returns:
+      The status code of modprobe result.
     """
     args_list = self._MakeArgsForInsertModule()
     process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
     logging.info('Modprobe command is run with arguments: %s', str(args_list))
     process_output = system_tools.SystemTools.GetSubprocessOutput(process)
-    self._CheckModprobeResultAndUpdateConfigs(process_output)
+    return self._CheckModprobeResult(process_output)
+
+  def _MakeArgsForInsertModule(self):
+    """Puts flags and arguments needed for inserting module into a list.
+
+    The list includes -v (--verbose) flag and --first-time flag, which makes the
+    modprobe command fail if it does not in fact do anything.
+
+    Returns:
+      A list of arguments formatted for calling modprobe command to insert
+        module.
+    """
+    return self._modprobe_verbose_args
+
+  def _CheckModprobeResult(self, process_output):
+    """Checks result of insert module command.
+
+    Args:
+      process_output: A tuple (return_code, out, err) containing the return
+        code, standard output and error message (if applicable) of the
+        the subprocess spawned by the modprobe command to insert the driver
+        module into kernel.
+
+    Returns:
+      The status code of modprobe result.
+
+    Raises:
+      USBControllerError if _is_modprobed returns False, meaning the driver
+        was not successfully enabled by modprobe.
+    """
+    return_code, out, err = process_output
+    error_message = ('ERROR: could not insert \'%s\': Module already in '
+                     'kernel\n' % self._module)
+    if return_code == 0:
+      if 'insmod' in out and err == '':
+        return self.MODPROBE_SUCCESS
+      return self.MODPROBE_NO_ACTION
+    if error_message in err and self._is_modprobed:
+      logging.warning('%s module is already in the kernel.', self._module)
+      return self.MODPROBE_DUPLICATED
+    logging.error('Modprobe return code: %d', return_code)
+    logging.error('Modprobe stdout: %s', out)
+    logging.error('Modprobe error (if any): %s', err)
+    logging.exception('Modprobe failed to insert %s module into kernel.',
+                      self._module)
+    raise USBControllerError('Driver failed to be enabled.')
+
+  def DisableDriver(self):
+    """Removes USB driver module from kernel.
+
+    Returns:
+      The status code of modprobe result.
+    """
+    args_list = self._MakeArgsForRemoveModule()
+    process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
+    process_output = system_tools.SystemTools.GetSubprocessOutput(process)
+    return self._CheckRemoveModuleResult(process_output)
+
+  def _MakeArgsForRemoveModule(self):
+    """Puts flags and arguments needed for removing module into a list.
+
+    The list includes -v (--verbose) flag and --first-time flag, which makes the
+    modprobe command fail if it does not in fact do anything.
+
+    Returns:
+      A list of arguments formatted for calling modprobe command to remove
+        module.
+    """
+    args = self._modprobe_verbose_args
+    args.append('-r')
+    return args
+
+  def _CheckRemoveModuleResult(self, process_output):
+    """Checks result of remove module command.
+
+    Args:
+      process_output: A tuple (return_code, out, err) containing the return
+        code, standard output and error message (if applicable) of the
+        the subprocess spawned by the modprobe command to remove the driver
+        module.
+
+    Returns:
+      The status code of modprobe result.
+
+    Raises:
+      USBControllerError if _is_modprobed returns True, meaning the driver was
+        not successfully disabled by the remove module command.
+    """
+    return_code, out, err = process_output
+    error_message = 'FATAL: Module %s is not in kernel.' % self._module
+    if return_code == 0:
+      if 'rmmod' in out and err == '':
+        return self.MODPROBE_SUCCESS
+      return self.MODPROBE_NO_ACTION
+    if error_message in err:
+      logging.warning('%s module is already removed from the kernel.',
+                      self._module)
+      return self.MODPROBE_DUPLICATED
+    logging.error('Modprobe (rmmod) return code: %d', return_code)
+    logging.error('Modprobe (rmmod) stdout: %s', out)
+    logging.error('Modprobe (rmmod) error (if any): %s', err)
+    logging.exception('Modprobe failed to remove %s module from kernel.',
+                      self._module)
+    raise USBControllerError('Driver failed to be disabled.')
+
+  def EnableUSBOTGDriver(self):
+    """Enables dwc2 driver so USB port can be controlled by Chameleon."""
+    system_tools.SystemTools.Call('modprobe', 'dwc2')
+
+  def DisableUSBOTGDriver(self):
+    """Disables dwc2 driver so USB port does not get controlled by Chameleon."""
+    system_tools.SystemTools.Call('modprobe', '-r', 'dwc2')
+
+
+class USBAudioController(USBController):
+  """Provides interface to control USB audio driver.
+
+  Properties:
+    _driver_configs_to_set: A USBAudioDriverConfigs object used to store user-
+                            set changes.
+    _driver_configs_in_use: A USBAudioDriverConfigs object representing the
+                            the configurations currently in use by the driver,
+                            if it is successfully modprobed.
+  """
+  def __init__(self):
+    """Initializes a USBAudioController object.
+
+    _driver_configs_to_set is initially set to a USBAudioDriverConfigs object
+    with default configurations.
+    """
+    self._driver_configs_to_set = usb_audio_configs.USBAudioDriverConfigs()
+    self._driver_configs_in_use = None
+    super(USBAudioController, self).__init__('g_audio')
+
+  def EnableDriver(self):
+    """Modprobes g_audio module with params from _driver_configs_to_set.
+
+    If the user wishes to change the current configurations into
+    _driver_configs_to_set, the user should disable the driver with
+    DisableDriver() before changing the configurations via
+    SetDriverPlaybackConfigs() or SetDriverCaptureConfigs(), and calling
+    EnableDriver() again.
+
+    Returns:
+      The status code of modprobe result.
+
+    Raises:
+      USBControllerError if the driver was not successfully enabled.
+    """
+    try:
+      status = super(USBAudioController, self).EnableDriver()
+    except USBControllerError as e:
+      self._driver_configs_in_use = None
+      raise USBControllerError(e.message)
+    if status == self.MODPROBE_SUCCESS:
+      self._driver_configs_in_use = copy.deepcopy(self._driver_configs_to_set)
+    return status
 
   def _MakeArgsForInsertModule(self):
     """Puts all relevant driver configs from _driver_configs_to_set into a list.
-
-    The list consists of arguments formatted for the modprobe command to insert
-    g_audio module. It also includes -v (--verbose) flag and --first-time flag,
-    which makes the modprobe command fail if it does not in fact do anything.
 
     Returns:
       A list of arguments formatted for calling modprobe command to insert
@@ -92,7 +241,7 @@ class USBController(object):
     """
     params_dict = self.\
                   _FormatDriverConfigsForModprobe(self._driver_configs_to_set)
-    args_list = list(self._MODPROBE_GAUDIO_ARGS_VERBOSE)
+    args_list = self._modprobe_verbose_args
     for key, value in params_dict.iteritems():
       if value is not None:
         item = key + '=' + str(value)
@@ -185,90 +334,16 @@ class USBController(object):
       raise USBControllerError('Sample format %s in driver configs is'
                                ' invalid.' % sample_format)
 
-  def _CheckModprobeResultAndUpdateConfigs(self, process_output):
-    """Checks result of insert module command and update _driver_configs_in_use.
-
-    Args:
-      process_output: A tuple (return_code, out, err) containing the return
-        code, standard output and error message (if applicable) of the
-        the subprocess spawned by the modprobe command to insert the driver
-        module into kernel.
-
-    Raises:
-      USBControllerError if _is_modprobed returns False, meaning the driver
-        was not successfully enabled by modprobe.
-    """
-    return_code, out, err = process_output
-    error_message = ('ERROR: could not insert \'g_audio\': Module already in '
-                     'kernel\n')
-    if return_code == 0:
-      if 'insmod' in out and err == '':
-        self._driver_configs_in_use = copy.deepcopy(self._driver_configs_to_set)
-
-    else:
-      if error_message in err and self._driver_configs_in_use is not None:
-        logging.warning('g_audio module is already in the kernel.')
-      else:
-        self._driver_configs_in_use = None
-        logging.error('Modprobe return code: %d', return_code)
-        logging.error('Modprobe stdout: %s', out)
-        logging.error('Modprobe error (if any): %s', err)
-        logging.exception('Modprobe failed to insert g_audio module into '
-                          'kernel.')
-        raise USBControllerError('Driver failed to be enabled.')
-
-  def DisableAudioDriver(self):
-    """Removes the g_audio module from kernel."""
-    args_list = self._MakeArgsForRemoveModule()
-    process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
-    process_output = system_tools.SystemTools.GetSubprocessOutput(process)
-    self._CheckRemoveModuleResultAndUpdateConfigs(process_output)
-
-  def _CheckRemoveModuleResultAndUpdateConfigs(self, process_output):
-    """Checks result of remove module command and update _driver_configs_in_use.
-
-    Args:
-      process_output: A tuple (return_code, out, err) containing the return
-        code, standard output and error message (if applicable) of the
-        the subprocess spawned by the modprobe command to remove the driver
-        module.
-
-    Raises:
-      USBControllerError if _is_modprobed returns True, meaning the driver was
-        not successfully disabled by the remove module command.
-    """
-    return_code, out, err = process_output
-    error_message = 'FATAL: Module g_audio is not in kernel.'
-    if return_code == 0:
-      if 'rmmod' in out and err == '':
-        self._driver_configs_in_use = None
-
-    else:
-      if error_message in err:
-        self._driver_configs_in_use = None
-        logging.warning('g_audio module is already removed from the kernel.')
-      else:
-        logging.error('Modprobe (rmmod) return code: %d', return_code)
-        logging.error('Modprobe (rmmod) stdout: %s', out)
-        logging.error('Modprobe (rmmod) error (if any): %s', err)
-        logging.exception('Modprobe failed to remove g_audio module from '
-                          'kernel.')
-        raise USBControllerError('Driver failed to be disabled.')
-
-  def _MakeArgsForRemoveModule(self):
-    """Puts flags and arguments needed for removing g_audio module into a list.
-
-    The list consists of arguments formatted for the modprobe command to remove
-    g_audio module. It also includes -v (--verbose) flag and --first-time flag,
-    which makes the modprobe command fail if it does not in fact do anything.
+  def DisableDriver(self):
+    """Removes the g_audio module from kernel and update configs.
 
     Returns:
-      A list of arguments formatted for calling modprobe command to remove
-        module.
+      The status code of modprobe result.
     """
-    args_list = list(self._MODPROBE_GAUDIO_ARGS_VERBOSE)
-    args_list.append('-r')
-    return args_list
+    status = super(USBAudioController, self).DisableDriver()
+    if status in [self.MODPROBE_SUCCESS, self.MODPROBE_DUPLICATED]:
+      self._driver_configs_in_use = None
+    return status
 
   def GetSupportedPlaybackDataFormat(self):
     """Returns the playback data format as supported by the USB driver.
@@ -315,10 +390,10 @@ class USBController(object):
       playback_configs: An AudioDataFormat object with playback configurations.
     """
     was_modprobed = self._is_modprobed
-    self.DisableAudioDriver()
+    self.DisableDriver()
     self._driver_configs_to_set.SetPlaybackConfigs(playback_configs)
     if was_modprobed:
-      self.EnableAudioDriver()
+      self.EnableDriver()
 
   def SetDriverCaptureConfigs(self, capture_configs):
     """Sets capture-related configs in _driver_configs_to_set.
@@ -333,15 +408,7 @@ class USBController(object):
       capture_configs: An AudioDataFormat object with capture configurations.
     """
     was_modprobed = self._is_modprobed
-    self.DisableAudioDriver()
+    self.DisableDriver()
     self._driver_configs_to_set.SetCaptureConfigs(capture_configs)
     if was_modprobed:
-      self.EnableAudioDriver()
-
-  def EnableUSBOTGDriver(self):
-    """Enables dwc2 driver so USB port can be controlled by Chameleon."""
-    system_tools.SystemTools.Call('modprobe', 'dwc2')
-
-  def DisableUSBOTGDriver(self):
-    """Disables dwc2 driver so USB port does not get controlled by Chameleon."""
-    system_tools.SystemTools.Call('modprobe', '-r', 'dwc2')
+      self.EnableDriver()

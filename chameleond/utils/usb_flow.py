@@ -20,7 +20,7 @@ class USBFlow(object):
 
   Properties:
     _port_id: The ID of the input/output connector. Check the value in ids.py.
-    _usb_ctrl: An USBController object.
+    _usb_ctrl: An USBAudioController object.
     _subprocess: The subprocess spawned for audio events.
     _supported_data_format: An AudioDataFormat object storing data format
                             supported by the USB driver when it's enabled.
@@ -33,7 +33,8 @@ class USBFlow(object):
 
     Args:
       port_id: port id that represents the type of port used.
-      usb_ctrl: a USBController object that USBFlow objects keep reference to.
+      usb_ctrl: a USBAudioController object that USBFlow objects keep reference
+          to.
     """
     self._port_id = port_id
     self._usb_ctrl = usb_ctrl
@@ -78,14 +79,14 @@ class USBFlow(object):
     The dwc2 USB driver module and audio gadget driver module is enabled.
     """
     self._usb_ctrl.EnableUSBOTGDriver()
-    self._usb_ctrl.EnableAudioDriver()
+    self._usb_ctrl.EnableDriver()
 
   def Unplug(self):
     """Emulates unplug for USB audio gadget.
 
     The dwc2 USB driver module and audio gadget driver module is disabled.
     """
-    self._usb_ctrl.DisableAudioDriver()
+    self._usb_ctrl.DisableDriver()
     self._usb_ctrl.DisableUSBOTGDriver()
 
   def Do_FSM(self):
@@ -159,7 +160,7 @@ class InputUSBFlow(USBFlow):
     raised.
 
     Capture configs can still be set even when the flow is plugged in. See
-    docstring of USBController.SetDriverCaptureConfigs for more details.
+    docstring of USBAudioController.SetDriverCaptureConfigs for more details.
 
     Args:
       capture_data_format: The dict form of an AudioDataFormat object.
@@ -249,7 +250,7 @@ class OutputUSBFlow(USBFlow):
     """Sets USB driver playback configurations in AudioDataFormat form.
 
     Playback configs can still be set even when the flow is plugged in. See
-    docstring of USBController.SetDriverPlaybackConfigs for more details.
+    docstring of USBAudioController.SetDriverPlaybackConfigs for more details.
 
     The 'file_type' field in the playback_data_format passed in is ignored. Only
     the 'file_type' in the playback file data format passed into
