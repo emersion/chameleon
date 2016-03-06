@@ -104,6 +104,7 @@ class RN42(object):
   # UART input modes
   # raw mode
   UART_INPUT_RAW_MODE = 0xFD
+  # Length of report format for keyboard
   RAW_REPORT_FORMAT_KEYBOARD_LENGTH = 9
   RAW_REPORT_FORMAT_KEYBOARD_DESCRIPTOR = 1
   RAW_REPORT_FORMAT_KEYBOARD_LEN_SCAN_CODES = 6
@@ -111,6 +112,9 @@ class RN42(object):
   # shorthand mode
   UART_INPUT_SHORTHAND_MODE = 0xFE
   SHORTHAND_REPORT_FORMAT_KEYBOARD_MAX_LEN_SCAN_CODES = 6
+  # Length of report format for mouse
+  RAW_REPORT_FORMAT_MOUSE_LENGTH = 5
+  RAW_REPORT_FORMAT_MOUSE_DESCRIPTOR = 2
 
   # modifiers
   LEFT_CTRL = 0x01
@@ -814,6 +818,56 @@ class RN42(object):
             chr(0x0) +
             ''.join(real_scan_codes) +
             padding_0s)
+
+  def RawMouseCodes(self, buttons=0, x_stop=0, y_stop=0, wheel=0):
+    """Generate the codes in mouse raw report format.
+
+    This method sends data in the raw report mode. The first start
+    byte chr(UART_INPUT_RAW_MODE) is stripped and the following bytes
+    are sent without interpretation.
+
+    For example, generate the codes of moving cursor 100 pixels left
+    and 50 pixels down:
+      codes = RawMouseCodes(x_stop=-100, y_stop=50)
+
+    Args:
+      buttons: the buttons to press and release
+      x_stop: the pixels to move horizontally
+      y_stop: the pixels to move vertically
+      wheel: the steps to scroll
+
+    Returns:
+      a raw code string.
+    """
+    def SignedChar(value):
+      """Converted the value to a legitimate signed character value.
+
+      Args:
+        value: a signed integer
+
+      Returns:
+        a signed character value
+      """
+      if value <= -127:
+        # If the negative value is too small, limit it to -127.
+        # Then perform two's complement: -127 + 256 = 129
+        return 129
+      elif value < 0:
+        # Perform two's complement.
+        return value + 256
+      elif value > 127:
+        # If the positive value is too large, limit it to 127
+        # to prevent it from becoming negative.
+        return 127
+      return value
+
+    return (chr(self.UART_INPUT_RAW_MODE) +
+            chr(self.RAW_REPORT_FORMAT_MOUSE_LENGTH) +
+            chr(self.RAW_REPORT_FORMAT_MOUSE_DESCRIPTOR) +
+            chr(SignedChar(buttons)) +
+            chr(SignedChar(x_stop)) +
+            chr(SignedChar(y_stop)) +
+            chr(SignedChar(wheel)))
 
   def PressShorthandCodes(self, modifiers=None, keys=None):
     """Generate key press codes in shorthand report format.

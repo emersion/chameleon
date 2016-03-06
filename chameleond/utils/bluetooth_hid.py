@@ -4,11 +4,12 @@
 
 """This module provides emulation of bluetooth HID devices."""
 
+import argparse
 import logging
 import sys
 import time
 
-from bluetooth_rn42 import RN42
+from bluetooth_rn42 import RN42, RN42Exception
 
 
 class BluetoothHIDException(Exception):
@@ -89,14 +90,6 @@ class BluetoothHID(RN42):
     elif device_type == self.JOYSTICK:
       self.SetHIDJoystick()
 
-  def Send(self, data):
-    """Send HID reports to the remote host.
-
-    Args:
-      data: the data to send
-    """
-    raise NotImplementedError('An HID subclass must override this method')
-
 
 class BluetoothHIDKeyboard(BluetoothHID):
   """A bluetooth HID keyboard emulator class."""
@@ -122,8 +115,6 @@ class BluetoothHIDKeyboard(BluetoothHID):
     # Currently, once RN-42 is connected to a remote host, all characters
     # except chr(0) transmitted through the serial port are interpreted
     # as characters to send to the remote host.
-    # TODO(josephsih): Will support special keys and modifier keys soon.
-    # Currently, only printable ASCII characters are supported.
     logging.debug('HID device sending %r...', data)
     self.SerialSendReceive(data, msg='BluetoothHID.Send')
     time.sleep(self.send_delay)
@@ -145,12 +136,105 @@ class BluetoothHIDKeyboard(BluetoothHID):
       return None
 
 
-def _UsageAndExit():
-  """The usage of this module."""
-  print 'Usage: python bluetooth_hid.py remote_address text_to_send'
-  print 'Example:'
-  print '       python bluetooth_hid.py 6C:29:95:1A:D4:6F "echo hello world"'
-  exit(1)
+class BluetoothHIDMouse(BluetoothHID):
+  """A bluetooth HID mouse emulator class."""
+
+  # Definitions of buttons
+  BUTTONS_RELEASED = 0x0
+  LEFT_BUTTON = 0x01
+  RIGHT_BUTTON = 0x02
+
+  def __init__(self, authentication_mode):
+    """Initialization of BluetoothHIDMouse
+
+    Args:
+      authentication_mode: the authentication mode
+    """
+    super(BluetoothHIDMouse, self).__init__(BluetoothHID.MOUSE,
+                                            authentication_mode)
+
+  def Move(self, delta_x=0, delta_y=0):
+    """Move the mouse (delta_x, delta_y) pixels.
+
+    Args:
+      delta_x: the pixels to move horizontally
+               positive values: moving right; max value = 127.
+               negative values: moving left; max value = -127.
+      delta_y: the pixels to move vertically
+               positive values: moving down; max value = 127.
+               negative values: moving up; max value = -127.
+    """
+    if delta_x or delta_y:
+      mouse_codes = self.RawMouseCodes(x_stop=delta_x, y_stop=delta_y)
+      self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse.Move')
+      time.sleep(self.send_delay)
+
+  def _PressButtons(self, buttons):
+    """Press down the specified buttons
+
+    Args:
+      buttons: the buttons to press
+    """
+    if buttons:
+      mouse_codes = self.RawMouseCodes(buttons=buttons)
+      self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse._PressButtons')
+      time.sleep(self.send_delay)
+
+  def _ReleaseButtons(self):
+    """Release buttons."""
+    mouse_codes = self.RawMouseCodes(buttons=self.BUTTONS_RELEASED)
+    self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse._ReleaseButtons')
+    time.sleep(self.send_delay)
+
+  def PressLeftButton(self):
+    """Press the left button."""
+    self._PressButtons(self.LEFT_BUTTON)
+
+  def ReleaseLeftButton(self):
+    """Release the left button."""
+    self._ReleaseButtons()
+
+  def PressRightButton(self):
+    """Press the right button."""
+    self._PressButtons(self.RIGHT_BUTTON)
+
+  def ReleaseRightButton(self):
+    """Release the right button."""
+    self._ReleaseButtons()
+
+  def LeftClick(self):
+    """Make a left click."""
+    self.PressLeftButton()
+    self.ReleaseLeftButton()
+
+  def RightClick(self):
+    """Make a right click."""
+    self.PressRightButton()
+    self.ReleaseRightButton()
+
+  def ClickAndDrag(self, delta_x=0, delta_y=0):
+    """Click and drag (delta_x, delta_y)
+
+    Args:
+      delta_x: the pixels to move horizontally
+      delta_y: the pixels to move vertically
+    """
+    self.PressLeftButton()
+    self.Move(delta_x, delta_y)
+    self.ReleaseLeftButton()
+
+  def Scroll(self, wheel):
+    """Scroll the wheel.
+
+    Args:
+      wheel: the steps to scroll
+             The scroll direction depends on which scroll method is employed,
+             traditional scrolling or Australian scrolling.
+    """
+    if wheel:
+      mouse_codes = self.RawMouseCodes(wheel=wheel)
+      self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse.Scroll')
+      time.sleep(self.send_delay)
 
 
 def DemoBluetoothHIDKeyboard(remote_address, chars):
@@ -212,15 +296,105 @@ def DemoBluetoothHIDKeyboard(remote_address, chars):
   keyboard.Close()
 
 
+def DemoBluetoothHIDMouse(remote_address):
+  """A simple demo of acting as a HID mouse.
+
+  Args:
+    remote_address: the bluetooth address of the target remote device
+  """
+  print 'Creating an emulated bluetooth mouse...'
+  mouse = BluetoothHIDMouse(BluetoothHID.PIN_CODE_MODE)
+
+  print 'Connecting to the remote address %s...' % remote_address
+  try:
+    if mouse.ConnectToRemoteAddress(remote_address):
+      print 'Click and drag horizontally.'
+      mouse.ClickAndDrag(delta_x=100)
+      time.sleep(1)
+
+      print 'Make a right click.'
+      mouse.RightClick()
+      time.sleep(1)
+
+      print 'Move the cursor upper left.'
+      mouse.Move(delta_x=-30, delta_y=-40)
+      time.sleep(1)
+
+      print 'Make a left click.'
+      mouse.LeftClick()
+      time.sleep(1)
+
+      print 'Move the cursor left.'
+      mouse.Move(delta_x=-100)
+      time.sleep(1)
+
+      print 'Move the cursor up.'
+      mouse.Move(delta_y=-90)
+      time.sleep(1)
+
+      print 'Move the cursor down right.'
+      mouse.Move(delta_x=100, delta_y=90)
+      time.sleep(1)
+
+      print 'Scroll in one direction.'
+      mouse.Scroll(-80)
+      time.sleep(1)
+
+      print 'Scroll in the opposite direction.'
+      mouse.Scroll(100)
+    else:
+      print 'Something is wrong. Not able to connect to the remote address.'
+  finally:
+    print 'Disconnecting...'
+    try:
+      mouse.Disconnect()
+    except RN42Exception:
+      # RN-42 may have already disconnected.
+      pass
+
+  print 'Closing the mouse...'
+  mouse.Close()
+
+
+def _Parse():
+  """Parse the command line options."""
+  prog = sys.argv[0]
+  example_usage = ('Example:\n' +
+                   '  python %s keyboard 00:11:22:33:44:55\n' % prog +
+                   '  python %s mouse 00:11:22:33:44:55\n'% prog)
+  parser = argparse.ArgumentParser(
+      description='Emulate a HID device.\n' + example_usage,
+      formatter_class=argparse.RawTextHelpFormatter)
+  parser.add_argument('device',
+                      choices=['keyboard', 'mouse'],
+                      help='the device type to emulate')
+  parser.add_argument('remote_host_address',
+                      help='the remote host address')
+  parser.add_argument('-c', '--chars_to_send',
+                      default='echo hello world',
+                      help='characters to send to the remote host')
+  args = parser.parse_args()
+
+  if len(args.remote_host_address.replace(':', '')) != 12:
+    print '"%s" is not a valid bluetooth address.' % args.remote_host_address
+    exit(1)
+
+  print ('Emulate a %s and connect to remote host at %s' %
+         (args.device, args.remote_host_address))
+  return args
+
+
+def Demo():
+  """Make demonstrations about how to use the HID emulation classes."""
+  args = _Parse()
+  device = args.device.lower()
+  if device == 'keyboard':
+    DemoBluetoothHIDKeyboard(args.remote_host_address, args.chars_to_send)
+  elif device == 'mouse':
+    DemoBluetoothHIDMouse(args.remote_host_address)
+  else:
+    args.print_help()
+
+
 if __name__ == '__main__':
-  if len(sys.argv) != 3:
-    _UsageAndExit()
-
-  remote_host_address = sys.argv[1]
-  chars_to_send = sys.argv[2]
-
-  if len(remote_host_address.replace(':', '')) != 12:
-    print '"%s" is not a valid bluetooth address.' % remote_host_address
-    _UsageAndExit()
-
-  DemoBluetoothHIDKeyboard(remote_host_address, chars_to_send)
+  Demo()
