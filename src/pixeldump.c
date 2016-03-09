@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 
   page_aligned_size = screen_size + (-screen_size % getpagesize());
   for (i = 0; i < num_buffer; i++) {
-    src[i] = mmap(0, page_aligned_size, PROT_READ | PROT_WRITE,
+    src[i] = mmap(0, page_aligned_size, PROT_READ,
                   MAP_SHARED, ifd, fb_start[i]);
     if (src[i] == MAP_FAILED) {
       perror("cannot mmap src\n");
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
   }
 
   ftruncate(ofd, area_size);
-  dst = mmap(0, area_size, PROT_READ | PROT_WRITE, MAP_SHARED, ofd, 0);
+  dst = mmap(0, area_size, PROT_WRITE, MAP_SHARED, ofd, 0);
   if (dst == MAP_FAILED) {
     perror("cannot mmap dst\n");
     exit(1);
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
     free(src_buf[0]);
     free(src_buf[1]);
   } else {
-    memcpy(dst_buf, src[0], area_size);
+    memcpy(dst_buf, src[0], screen_size);
   }
 
   if (region_dump) {
