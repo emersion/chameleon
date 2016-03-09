@@ -120,6 +120,18 @@ class InputFlow(object):
     """
     return self._frame_manager.GetFrameHashes(start, stop)
 
+  def GetHistograms(self, start, stop):
+    """Returns the list of the frame histograms.
+
+    Args:
+      start: The index of the start field.
+      stop: The index of the stop field (excluded).
+
+    Returns:
+      A list of frame histograms.
+    """
+    return self._frame_manager.GetHistograms(start, stop)
+
   def DumpFramesToLimit(self, frame_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.
 

@@ -28,7 +28,7 @@ def WaitForCondition(func, value, delay, timeout):
   while end_time - start_time < timeout:
     if func() == value:
       break
-    logging.info('Waiting for condition %s == %s', func.__name__, str(value))
+    logging.debug('Waiting for condition %s == %s', func.__name__, str(value))
     time.sleep(delay)
     end_time = time.time()
   else:

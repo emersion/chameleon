@@ -66,6 +66,18 @@ class FrameManager(object):
     else:
       return self._field_manager.GetFieldHashes(start, stop)
 
+  def GetHistograms(self, start, stop):
+    """Returns the saved list of the histograms.
+
+    Args:
+      start: The index of the start field.
+      stop: The index of the stop field (excluded).
+
+    Returns:
+      A list of histograms.
+    """
+    return self._field_manager.GetHistograms(start, stop)
+
   def GetDumpedDimension(self):
     """Gets the dimension of the dumped frames."""
     field_per_frame = 2 if self._is_interlaced else 1

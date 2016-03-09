@@ -23,6 +23,7 @@ class _SystemTools(object):
       'memtool': '/usr/bin/memtool',
       'modprobe':'/sbin/modprobe',
       'reboot': '/sbin/reboot',
+      'histogram': '/usr/bin/histogram',
       'pixeldump': '/usr/bin/pixeldump',
   }
 

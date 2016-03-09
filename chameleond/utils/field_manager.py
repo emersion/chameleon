@@ -27,6 +27,12 @@ class FieldManager(object):
 
   _HASH_SIZE = 4
 
+  # TODO: Make the grid and sample numbers user-configurable.
+  _GRID_NUM = 3
+  _GRID_SAMPLE_NUM = 10
+
+  _HISTOGRAM_SIZE = _GRID_NUM * _GRID_NUM * 3 * 4  # RGB * 4 buckets
+
   # Delay in second to check the field count, using 120-fps.
   _DELAY_VIDEO_DUMP_PROBE = 1.0 / 120
 
@@ -43,6 +49,7 @@ class FieldManager(object):
     self._vdumps = vdumps
     self._is_dual = len(vdumps) == 2
     self._saved_hashes = None
+    self._saved_histograms = None
     self._last_field = Value('i', -1)
     self._timeout_in_field = None
     self._process = None
@@ -161,6 +168,59 @@ class FieldManager(object):
     """Returns the current number of field dumped."""
     return min(vdump.GetFieldCount() for vdump in self._vdumps)
 
+  def _ComputeHistograms(self, start, stop):
+    """Computes the histograms of the dumped fields from the buffer.
+
+    Args:
+      start: The index of the start field.
+      stop: The index of the stop field (excluded).
+
+    Returns:
+      A list of normalized histograms.
+    """
+    if stop <= start:
+      return []
+
+    (width, height) = self._dimension
+    if self._is_dual:
+      width = width / 2
+
+    # Modify the memory offset to match the field.
+    PAGE_SIZE = 4096
+    PIXEL_LEN = 3
+    field_size = width * height * PIXEL_LEN
+    field_size = ((field_size - 1) / PAGE_SIZE + 1) * PAGE_SIZE
+    offset_args = ['-g', self._GRID_NUM, '-s', self._GRID_SAMPLE_NUM]
+    # The histogram is computed by sampled pixels. Getting one band is enough
+    # even if it is in dual pixel mode.
+    offset_addr = fpga.VideoDumper.GetPixelDumpArgs(self._input_id, False)[1]
+
+    max_limit = fpga.VideoDumper.GetMaxFieldLimit(width, height)
+    for i in xrange(start, stop):
+      offset_args += ['-a', offset_addr + field_size * (i % max_limit)]
+
+    result = system_tools.SystemTools.Output(
+        'histogram', width, height, *offset_args)
+    # Normalize the histogram by dividing the maximum.
+    return [[float(v) / self._GRID_SAMPLE_NUM / self._GRID_SAMPLE_NUM
+             for v in l.split()]
+            for l in result.splitlines()]
+
+  def GetHistograms(self, start, stop):
+    """Returns the saved list of the histograms.
+
+    Args:
+      start: The index of the start field.
+      stop: The index of the stop field (excluded).
+
+    Returns:
+      A list of histograms.
+    """
+    return [self._saved_histograms[i : i + self._HISTOGRAM_SIZE]
+            for i in xrange(start * self._HISTOGRAM_SIZE,
+                            stop * self._HISTOGRAM_SIZE,
+                            self._HISTOGRAM_SIZE)]
+
   def ReadDumpedField(self, field_index):
     """Reads the content of the dumped field from the buffer."""
     (width, height) = self._dimension
@@ -193,13 +253,24 @@ class FieldManager(object):
     """
     current_field = self._ComputeFieldCount()
     if current_field > self._last_field.value:
-      for i in xrange(self._last_field.value, current_field):
+      start = self._last_field.value
+      stop = current_field
+      for i in xrange(start, stop):
         hash64 = self._ComputeFieldHash(i)
         for j in xrange(self._HASH_SIZE):
           self._saved_hashes[i * self._HASH_SIZE + j] = hash64[j]
-        logging.info(
+        logging.debug(
             'Saved field hash #%d: %r', i,
             self._saved_hashes[i * self._HASH_SIZE : (i + 1) * self._HASH_SIZE])
+
+      histograms = self._ComputeHistograms(start, stop)
+      for i, h in enumerate(histograms):
+        self._saved_histograms[
+            (start + i) * self._HISTOGRAM_SIZE :
+            (start + i + 1) * self._HISTOGRAM_SIZE] = h
+        logging.debug('Saved histogram #%d: %s', start + i,
+                      ', '.join(['%.02f' % v for v in h]))
+
       self._last_field.value = current_field
     return current_field >= field_count
 
@@ -221,8 +292,11 @@ class FieldManager(object):
     # Store the hashes in a flat array, limitation of the shared variable.
     if self._saved_hashes:
       del self._saved_hashes
+      del self._saved_histograms
     array_size = field_count * self._HASH_SIZE
     self._saved_hashes = Array('H', array_size)
+    array_size = field_count * self._HISTOGRAM_SIZE
+    self._saved_histograms = Array('f', array_size)
 
   def _StartMonitoringFields(self, hash_buffer_limit):
     """Starts a process to monitor fields."""

@@ -739,16 +739,18 @@ class ChameleondDriver(ChameleondInterface):
     screen = self._flows[port_id].ReadCapturedFrame(frame_index)
     return xmlrpclib.Binary(screen)
 
-  def GetCapturedChecksums(self, start_index=0, stop_index=None):
-    """Gets the list of checksums of the captured frames.
+  def _GetCapturedSignals(self, signal_func_name, start_index=0,
+                          stop_index=None):
+    """Gets the list of signals of the captured frames.
 
     Args:
+      signal_func_name: The name of the signal function, e.g. 'GetFrameHashes'.
       start_index: The index of the start frame. Default is 0.
       stop_index: The index of the stop frame (excluded). Default is the
                   value of GetCapturedFrameCount.
 
     Returns:
-      The list of checksums of frames.
+      The list of signals.
     """
     port_id = self._captured_params['port_id']
     total_frame = self.GetCapturedFrameCount()
@@ -760,7 +762,34 @@ class ChameleondDriver(ChameleondInterface):
     if not 0 < stop_index <= total_frame:
       raise DriverError('The stop index is out-of-range: %d not in (0, %d]' %
                         (stop_index, total_frame))
-    return self._flows[port_id].GetFrameHashes(start_index, stop_index)
+    signal_func = getattr(self._flows[port_id], signal_func_name)
+    return signal_func(start_index, stop_index)
+
+  def GetCapturedChecksums(self, start_index=0, stop_index=None):
+    """Gets the list of checksums of the captured frames.
+
+    Args:
+      start_index: The index of the start frame. Default is 0.
+      stop_index: The index of the stop frame (excluded). Default is the
+                  value of GetCapturedFrameCount.
+
+    Returns:
+      The list of checksums of frames.
+    """
+    return self._GetCapturedSignals('GetFrameHashes', start_index, stop_index)
+
+  def GetCapturedHistograms(self, start_index=0, stop_index=None):
+    """Gets the list of histograms of the captured frames.
+
+    Args:
+      start_index: The index of the start frame. Default is 0.
+      stop_index: The index of the stop frame (excluded). Default is the
+                  value of GetCapturedFrameCount.
+
+    Returns:
+      The list of checksums of frames.
+    """
+    return self._GetCapturedSignals('GetHistograms', start_index, stop_index)
 
   @_VideoMethod
   def ComputePixelChecksum(

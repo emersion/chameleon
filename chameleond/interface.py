@@ -434,6 +434,19 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetCapturedChecksums')
 
+  def GetCapturedHistograms(self, start_index=0, stop_index=None):
+    """Gets the list of histograms of the captured frames.
+
+    Args:
+      start_index: The index of the start frame. Default is 0.
+      stop_index: The index of the stop frame (excluded). Default is the
+                  value of GetCapturedFrameCount.
+
+    Returns:
+      The list of checksums of frames.
+    """
+    raise NotImplementedError('GetCapturedHistograms')
+
   def ComputePixelChecksum(
       self, port_id, x=None, y=None, width=None, height=None):
     """Computes the checksum of pixels in the selected area.
