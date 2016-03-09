@@ -1,7 +1,6 @@
 include Makefile
 include *.txt
-include bin/hpd_control
-include bin/pixeldump
+include bin/*
 include deploy/deploy
 include deploy/init.d/chameleond
 include deploy/init.d/chameleon-updater
