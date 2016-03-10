@@ -13,6 +13,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
 from chameleond.utils import audio_board
+from chameleond.utils import caching_server
 from chameleond.utils import codec_flow
 from chameleond.utils import fpga
 from chameleond.utils import i2c
@@ -166,6 +167,7 @@ class ChameleondDriver(ChameleondInterface):
       self._audio_board.Reset()
 
     self._ClearAudioFiles()
+    caching_server.ClearCachedDir()
 
     # Set all ports unplugged on initialization.
     for port_id in self.GetSupportedPorts():
@@ -613,6 +615,7 @@ class ChameleondDriver(ChameleondInterface):
       width: The width of the area of crop.
       height: The height of the area of crop.
     """
+    caching_server.ClearCachedDir()
     self._SelectInput(port_id)
     if not self.IsPlugged(port_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
@@ -756,6 +759,18 @@ class ChameleondDriver(ChameleondInterface):
     frame_index = frame_index % max_frame_limit
     screen = self._flows[port_id].ReadCapturedFrame(frame_index)
     return xmlrpclib.Binary(screen)
+
+  def CacheFrameThumbnail(self, frame_index):
+    """Caches the thumbnail of the dumped field to a temp file.
+
+    Args:
+      frame_index: The index of the frame to cache.
+
+    Returns:
+      An ID to identify the cached thumbnail.
+    """
+    port_id = self._captured_params['port_id']
+    return self._flows[port_id].CacheFrameThumbnail(frame_index)
 
   def _GetCapturedSignals(self, signal_func_name, start_index=0,
                           stop_index=None):

@@ -421,6 +421,17 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('ReadCapturedFrame')
 
+  def CacheFrameThumbnail(self, frame_index):
+    """Caches the thumbnail of the dumped field to a temp file.
+
+    Args:
+      frame_index: The index of the frame to cache.
+
+    Returns:
+      An ID to identify the cached thumbnail.
+    """
+    raise NotImplementedError('CacheFrameThumbnail')
+
   def GetCapturedChecksums(self, start_index=0, stop_index=None):
     """Gets the list of checksums of the captured frames.
 

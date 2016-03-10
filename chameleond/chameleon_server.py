@@ -4,8 +4,15 @@
 """Chameleon Server."""
 
 import logging
+import signal
+import sys
+
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 from SimpleXMLRPCServer import SimpleXMLRPCRequestHandler
+
+import chameleon_common  # pylint: disable=W0611
+from chameleond.utils.caching_server import CachingServer
+
 
 class ChameleonXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
   """XMLRPC request handler for Chameleon server.
@@ -63,11 +70,24 @@ class ChameleonServer(object):
       host: host address to serve the service.
       port: port number of RPC server.
     """
-    # Launch the XMLRPC server to serve Chameleond APIs.
+    caching = CachingServer(port + 1)
     server = SimpleXMLRPCServer((host, port), allow_none=True,
                                 requestHandler=ChameleonXMLRPCRequestHandler,
                                 logRequests=True)
     server.register_introspection_functions()
     server.register_instance(self._driver)
-    logging.info('Listening on %s port %d...', host, port)
-    server.serve_forever()
+
+    signal_handler = lambda signum, frame: sys.exit(0)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    try:
+      # Launch the caching server on the next port, serving cached files.
+      logging.info('Start the caching server process.')
+      caching.start()
+
+      # Launch the XMLRPC server to serve Chameleond APIs.
+      logging.info('Listening on %s port %d...', host, port)
+      server.serve_forever()
+    finally:
+      logging.info('Terminate the caching server process.')
+      caching.terminate()

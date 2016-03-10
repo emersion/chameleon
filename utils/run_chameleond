@@ -48,12 +48,8 @@ def main():
     log_config.update({'filename': options.log})
   logging.basicConfig(**log_config)
 
-  try:
-    ChameleonServer(options.driver, *args, **kwargs).RunServer(
-        options.host, options.port)
-  except:  # pylint: disable=W0702
-    logging.exception('Failed to start Chameleon server.')
-    exit(1)
+  ChameleonServer(options.driver, *args, **kwargs).RunServer(
+      options.host, options.port)
 
 if __name__ == '__main__':
   main()

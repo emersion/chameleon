@@ -104,6 +104,21 @@ class FrameManager(object):
     else:
       return self._field_manager.ReadDumpedField(frame_index)
 
+  def CacheFrameThumbnail(self, frame_index):
+    """Caches the thumbnail of the dumped field to a temp file.
+
+    Args:
+      frame_index: The index of the frame to cache.
+
+    Returns:
+      An ID to identify the cached thumbnail.
+    """
+    if self._is_interlaced:
+      raise FrameManagerError('Caching thumbnail not supported in '
+                              'the interlaced mode.')
+    else:
+      return self._field_manager.CacheFieldThumbnail(frame_index)
+
   def DumpFramesToLimit(self, frame_buffer_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.
 
