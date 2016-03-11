@@ -52,7 +52,7 @@ int main(int argc, char **argv)
   unsigned long area_x, area_y, area_width = 0, area_height = 0;
   unsigned long screen_size, page_aligned_size, area_size;
   int ifd, ofd;
-  char *src[2], *src_buf[2], *dst, *dst_buf;
+  char *src[2], *dst, *dst_buf;
   int src_offset, dst_offset;
   int region_dump = 0;
   int num_buffer = 1;
@@ -134,19 +134,13 @@ int main(int argc, char **argv)
   }
 
   if (num_buffer == 2) {
-    src_buf[0] = malloc(screen_size);
-    src_buf[1] = malloc(screen_size);
-    memcpy(src_buf[0], src[0], screen_size);
-    memcpy(src_buf[1], src[1], screen_size);
     /* Copy 2 RGB pixels each loop */
     for (i = 0; i < screen_size; i += byte_per_pixel) {
       for (j = 0; j < byte_per_pixel; j++) {
-        dst_buf[2 * i + j] = src_buf[0][i + j];
-        dst_buf[2 * i + byte_per_pixel + j] = src_buf[1][i + j];
+        dst_buf[2 * i + j] = src[0][i + j];
+        dst_buf[2 * i + byte_per_pixel + j] = src[1][i + j];
       }
     }
-    free(src_buf[0]);
-    free(src_buf[1]);
   } else {
     memcpy(dst_buf, src[0], screen_size);
   }
