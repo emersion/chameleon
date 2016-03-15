@@ -190,16 +190,17 @@ class InputFlow(object):
     """Reads the content of the captured frame from the buffer."""
     return self._frame_manager.ReadDumpedFrame(frame_index)
 
-  def CacheFrameThumbnail(self, frame_index):
+  def CacheFrameThumbnail(self, frame_index, ratio):
     """Caches the thumbnail of the dumped field to a temp file.
 
     Args:
       frame_index: The index of the frame to cache.
+      ratio: The ratio to scale down the image.
 
     Returns:
       An ID to identify the cached thumbnail.
     """
-    return self._frame_manager.CacheFrameThumbnail(frame_index)
+    return self._frame_manager.CacheFrameThumbnail(frame_index, ratio)
 
   def Do_FSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.

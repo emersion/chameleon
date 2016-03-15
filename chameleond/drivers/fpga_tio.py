@@ -760,17 +760,18 @@ class ChameleondDriver(ChameleondInterface):
     screen = self._flows[port_id].ReadCapturedFrame(frame_index)
     return xmlrpclib.Binary(screen)
 
-  def CacheFrameThumbnail(self, frame_index):
+  def CacheFrameThumbnail(self, frame_index, ratio=2):
     """Caches the thumbnail of the dumped field to a temp file.
 
     Args:
       frame_index: The index of the frame to cache.
+      ratio: The ratio to scale down the image.
 
     Returns:
       An ID to identify the cached thumbnail.
     """
     port_id = self._captured_params['port_id']
-    return self._flows[port_id].CacheFrameThumbnail(frame_index)
+    return self._flows[port_id].CacheFrameThumbnail(frame_index, ratio)
 
   def _GetCapturedSignals(self, signal_func_name, start_index=0,
                           stop_index=None):

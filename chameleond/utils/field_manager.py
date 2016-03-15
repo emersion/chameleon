@@ -248,15 +248,23 @@ class FieldManager(object):
           'pixeldump', f.name, width, height, PIXEL_LEN, *offset_args)
       return f.read()
 
-  def CacheFieldThumbnail(self, field_index):
+  def CacheFieldThumbnail(self, field_index, ratio):
     """Caches the thumbnail of the dumped field to a temp file.
 
     Args:
       field_index: The index of the field to cache.
+      ratio: The ratio to scale down the image (the width/height is resized
+             to 1/ratio of the original width/height).
 
     Returns:
       An ID to identify the cached thumbnail.
     """
+    if not ratio >= 2:
+      raise FieldManagerError('Thumbnail ratio should be >= 2.')
+
+    if ratio & 1:
+      raise FieldManagerError('Thumbnail ratio should be a multiple of 2.')
+
     (original_width, original_height) = self._dimension
     # Raise error
     if self._is_dual:
@@ -280,16 +288,15 @@ class FieldManager(object):
     file_name = 'tn_%05d' % field_index
     file_path = os.path.join(caching_server.CACHED_DIR, file_name)
 
-    # It only supports scaling down the image to 1/2 the original width and
-    # height. Halfing the width is done by only dumping the odd pixel band.
-    # Halfing the height is done by skipping every other line, which tells
-    # pixeldump it is an image with doubled width but only crop the left half.
-    thumbnail_width = original_width / 2
-    thumbnail_height = original_height / 2
+    # Divide 2 because it is in double pixel mode.
+    skip_pixel_num = (ratio / 2) - 1
+    # Don't divide 2 for lines.
+    skip_line_num = ratio - 1
+
     system_tools.SystemTools.Call(
-        'pixeldump', file_path, thumbnail_width * 2, thumbnail_height,
-        PIXEL_LEN, 0, 0, thumbnail_width, thumbnail_height,
-        '-a', offset_addr)
+        'pixeldump', file_path, single_band_width, original_height,
+        PIXEL_LEN, 0, 0, single_band_width, original_height,
+        skip_pixel_num, skip_line_num, '-a', offset_addr)
     # Use the file name as an ID as a temporary solution.
     return file_name
 

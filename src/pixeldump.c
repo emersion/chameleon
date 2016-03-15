@@ -23,7 +23,8 @@ void usage_exit()
 {
   fprintf(stderr,
           "Usage:\t%s filename screen_width screen_height byte_per_pixel \\\n"
-          "\t[area_x area_y area_width area_height] \\\n"
+          "\t[area_x area_y area_width area_height]\\\n"
+          "\t[area_skip_pixel area_skip_line]\\\n"
           "\t[-a start_addr_a] [-b start_addr_b]\n"
           "Dump the pixels of a selected area from the screen to a file.\n",
           prog);
@@ -34,9 +35,11 @@ void usage_exit()
 unsigned int read_uint(char *s)
 {
   char *endptr;
-  unsigned int v = strtoul(s, &endptr, 0);
+  unsigned int v;
 
   errno = 0;
+  v = strtoul(s, &endptr, 0);
+
   if (errno || *endptr != '\0') {
     fprintf(stderr, "failed to parse argument: '%s'\n", s);
     usage_exit();
@@ -51,14 +54,17 @@ int main(int argc, char **argv)
   unsigned long screen_width, screen_height, byte_per_pixel;
   unsigned long area_x, area_y, area_width = 0, area_height = 0;
   unsigned long screen_size, page_aligned_size, area_size;
+  unsigned long area_skip_pixel, area_skip_line;
   int ifd, ofd;
   char *src[2], *dst, *dst_buf;
-  int src_offset, dst_offset;
+  char *src_ptr, *dst_ptr;
+  int src_offset;
   int region_dump = 0;
   int num_buffer = 1;
   char *filename;
   int opt;
-  int i, j;
+  int i;
+  int dummy __attribute__((unused));  // ignore a compile warning of ftruncate()
 
   prog = argv[0];
   while ((opt = getopt(argc, argv, "a:b:")) != -1) {
@@ -75,7 +81,7 @@ int main(int argc, char **argv)
     }
   }
 
-  if (optind + 4 != argc && optind + 8 != argc) {
+  if (optind + 4 != argc && optind + 8 != argc && optind + 10 != argc) {
     usage_exit();
   }
 
@@ -86,6 +92,8 @@ int main(int argc, char **argv)
   screen_height = read_uint(argv[optind + 2]);
   screen_size = screen_width * screen_height;
   area_size = screen_size * num_buffer;
+  area_skip_pixel = 0;
+  area_skip_line = 0;
 
   if (optind + 4 < argc) {
     region_dump = 1;
@@ -94,6 +102,18 @@ int main(int argc, char **argv)
     area_width = read_uint(argv[optind + 6]) * byte_per_pixel;
     area_height = read_uint(argv[optind + 7]);
     area_size = area_width * area_height;
+  }
+
+  if (optind + 8 < argc) {
+    area_skip_pixel = read_uint(argv[optind + 8]);
+    area_skip_line = read_uint(argv[optind + 9]);
+    area_size = 1 + (area_width - 1) / (1 + area_skip_pixel);  // ceiling
+    area_size *= 1 + (area_height - 1) / (1 + area_skip_line);  // ceiling
+  }
+
+  if (num_buffer == 2 && byte_per_pixel != 3) {
+    perror("unsupported byte_per_pixel\n");
+    exit(1);
   }
 
   ifd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -118,7 +138,7 @@ int main(int argc, char **argv)
     }
   }
 
-  ftruncate(ofd, area_size);
+  dummy = ftruncate(ofd, area_size);
   dst = mmap(0, area_size, PROT_WRITE, MAP_SHARED, ofd, 0);
   if (dst == MAP_FAILED) {
     perror("cannot mmap dst\n");
@@ -134,12 +154,19 @@ int main(int argc, char **argv)
   }
 
   if (num_buffer == 2) {
-    /* Copy 2 RGB pixels each loop */
-    for (i = 0; i < screen_size; i += byte_per_pixel) {
-      for (j = 0; j < byte_per_pixel; j++) {
-        dst_buf[2 * i + j] = src[0][i + j];
-        dst_buf[2 * i + byte_per_pixel + j] = src[1][i + j];
-      }
+    for (dst_ptr = dst_buf, src_ptr = src[0];
+         dst_ptr < dst_buf + screen_size * 2;) {
+      *dst_ptr++ = *src_ptr++;
+      *dst_ptr++ = *src_ptr++;
+      *dst_ptr++ = *src_ptr++;
+      dst_ptr += 3;
+    }
+    for (dst_ptr = dst_buf + 3, src_ptr = src[1];
+         dst_ptr < dst_buf + screen_size * 2;) {
+      *dst_ptr++ = *src_ptr++;
+      *dst_ptr++ = *src_ptr++;
+      *dst_ptr++ = *src_ptr++;
+      dst_ptr += 3;
     }
   } else {
     memcpy(dst_buf, src[0], screen_size);
@@ -147,11 +174,15 @@ int main(int argc, char **argv)
 
   if (region_dump) {
     src_offset = area_y * screen_width + area_x;
-    dst_offset = 0;
-    for (i = 0; i < area_height; i++) {
-      memcpy(dst + dst_offset, dst_buf + src_offset, area_width);
-      src_offset += screen_width;
-      dst_offset += area_width;
+    for (dst_ptr = dst; dst_ptr < dst + area_size;) {
+      for (src_ptr = dst_buf + src_offset;
+           src_ptr < dst_buf + src_offset + area_width;) {
+        *dst_ptr++ = *src_ptr++;
+        *dst_ptr++ = *src_ptr++;
+        *dst_ptr++ = *src_ptr++;
+        src_ptr += area_skip_pixel * byte_per_pixel;
+      }
+      src_offset += screen_width * (1 + area_skip_line);
     }
   }
   for (i = 0; i < num_buffer; i++)

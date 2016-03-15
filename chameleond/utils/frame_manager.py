@@ -104,11 +104,12 @@ class FrameManager(object):
     else:
       return self._field_manager.ReadDumpedField(frame_index)
 
-  def CacheFrameThumbnail(self, frame_index):
+  def CacheFrameThumbnail(self, frame_index, ratio):
     """Caches the thumbnail of the dumped field to a temp file.
 
     Args:
       frame_index: The index of the frame to cache.
+      ratio: The ratio to scale down the image.
 
     Returns:
       An ID to identify the cached thumbnail.
@@ -117,7 +118,7 @@ class FrameManager(object):
       raise FrameManagerError('Caching thumbnail not supported in '
                               'the interlaced mode.')
     else:
-      return self._field_manager.CacheFieldThumbnail(frame_index)
+      return self._field_manager.CacheFieldThumbnail(frame_index, ratio)
 
   def DumpFramesToLimit(self, frame_buffer_limit, x, y, width, height, timeout):
     """Dumps frames and waits for the given limit being reached or timeout.
