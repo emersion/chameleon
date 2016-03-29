@@ -19,7 +19,7 @@ from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import input_flow
 from chameleond.utils import usb
-from chameleond.utils import usb_flow
+from chameleond.utils import usb_audio_flow
 
 
 class DriverError(Exception):
@@ -111,8 +111,10 @@ class ChameleondDriver(ChameleondInterface):
                                               fpga_ctrl),
         ids.LINEOUT: codec_flow.OutputCodecFlow(
             ids.LINEOUT, audio_codec_bus, fpga_ctrl),
-        ids.USBIN: usb_flow.InputUSBFlow(ids.USBIN, usb_audio_ctrl),
-        ids.USBOUT: usb_flow.OutputUSBFlow(ids.USBOUT, usb_audio_ctrl),
+        ids.USB_AUDIO_IN: usb_audio_flow.InputUSBAudioFlow(
+            ids.USB_AUDIO_IN, usb_audio_ctrl),
+        ids.USB_AUDIO_OUT: usb_audio_flow.OutputUSBAudioFlow(
+            ids.USB_AUDIO_OUT, usb_audio_ctrl),
     }
 
     for flow in self._flows.itervalues():
@@ -1106,12 +1108,14 @@ class ChameleondDriver(ChameleondInterface):
     Raises:
       DriverError if any of the USB Flows is playing or capturing audio.
     """
-    if (self._flows[ids.USBIN].is_capturing_audio or
-        self._flows[ids.USBOUT].is_playing_audio):
-      error_message = ('Configuration changes not allowed when USB driver is '
-                       'still performing playback/capture in one of the flows.')
+    if (self._flows[ids.USB_AUDIO_IN].is_capturing_audio or
+        self._flows[ids.USB_AUDIO_OUT].is_playing_audio):
+      error_message = ('Configuration changes not allowed when USB audio '
+                       'driver is still performing playback/capture in one of '
+                       'the flows.')
       raise DriverError(error_message)
-    self._flows[ids.USBOUT].SetDriverPlaybackConfigs(playback_data_format)
+    self._flows[ids.USB_AUDIO_OUT].SetDriverPlaybackConfigs(
+        playback_data_format)
 
   def SetUSBDriverCaptureConfigs(self, capture_data_format):
     """Updates the corresponding capture configurations to argument values.
@@ -1121,18 +1125,20 @@ class ChameleondDriver(ChameleondInterface):
 
     Args:
       capture_data_format: The dict form of an AudioDataFormat object. The
-        'file_type' field will be saved by InputUSBFlow as the file type for
-        captured data. Other fields are used to set USB driver configurations.
+        'file_type' field will be saved by InputUSBAudioFlow as the file type
+        for captured data. Other fields are used to set USB driver
+        configurations.
 
     Raises:
-      DriverError if any of the USB Flows is playing or capturing audio.
+      DriverError if any of the USB audio Flows is playing or capturing audio.
     """
-    if (self._flows[ids.USBIN].is_capturing_audio or
-        self._flows[ids.USBOUT].is_playing_audio):
-      error_message = ('Configuration changes not allowed when USB driver is '
-                       'still performing playback/capture in one of the flows.')
+    if (self._flows[ids.USB_AUDIO_IN].is_capturing_audio or
+        self._flows[ids.USB_AUDIO_OUT].is_playing_audio):
+      error_message = ('Configuration changes not allowed when USB audio '
+                       'driver is still performing playback/capture in one of '
+                       'the flows.')
       raise DriverError(error_message)
-    self._flows[ids.USBIN].SetDriverCaptureConfigs(capture_data_format)
+    self._flows[ids.USB_AUDIO_IN].SetDriverCaptureConfigs(capture_data_format)
 
   def GetMacAddress(self):
     """Gets the MAC address of this Chameleon.

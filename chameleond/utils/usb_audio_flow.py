@@ -1,7 +1,7 @@
 # Copyright 2015 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""This module specifies the interface for usb flows."""
+"""This module specifies the interface for usb audio flows."""
 
 import logging
 import tempfile
@@ -10,13 +10,13 @@ import chameleon_common #pylint: disable=W0611
 from chameleond.utils import audio
 from chameleond.utils import system_tools
 
-class USBFlowError(Exception):
-  """Exception raised when there is any error in USBFlow."""
+class USBAudioFlowError(Exception):
+  """Exception raised when there is any error in USBAudioFlow."""
   pass
 
 
-class USBFlow(object):
-  """An abstraction for the entire USB flow.
+class USBAudioFlow(object):
+  """An abstraction for the entire USB Audio flow.
 
   Properties:
     _port_id: The ID of the input/output connector. Check the value in ids.py.
@@ -29,12 +29,12 @@ class USBFlow(object):
   _VALID_AUDIO_FILE_TYPES = ['wav', 'raw']
 
   def __init__(self, port_id, usb_ctrl):
-    """Initializes USBFlow object with two properties.
+    """Initializes USBAudioFlow object with two properties.
 
     Args:
       port_id: port id that represents the type of port used.
-      usb_ctrl: a USBAudioController object that USBFlow objects keep reference
-          to.
+      usb_ctrl: a USBAudioController object that USBAudioFlow objects keep
+          reference to.
     """
     self._port_id = port_id
     self._usb_ctrl = usb_ctrl
@@ -48,10 +48,10 @@ class USBFlow(object):
     not get confused when trying to enumerate this USB device.
     """
     self._usb_ctrl.EnableUSBOTGDriver()
-    logging.info('Initialized USB flow #%d.', self._port_id)
+    logging.info('Initialized USB Audio flow #%d.', self._port_id)
 
   def Select(self):
-    """Selects the USB flow."""
+    """Selects the USB Audio flow."""
     raise NotImplementedError('Select')
 
   def GetConnectorType(self):
@@ -60,13 +60,14 @@ class USBFlow(object):
 
   def ResetRoute(self):
     """Resets the audio route."""
-    logging.warning('ResetRoute for USBFlow is not implemented. Do nothing.')
+    logging.warning(
+        'ResetRoute for USBAudioFlow is not implemented. Do nothing.')
 
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
     # TODO
     logging.warning(
-        'IsPhysicalPlugged on USBFlow is not implemented.'
+        'IsPhysicalPlugged on USBAudioFlow is not implemented.'
         ' Always returns True')
     return True
 
@@ -93,7 +94,7 @@ class USBFlow(object):
     self._usb_ctrl.DisableDriver()
 
   def Do_FSM(self):
-    """Do nothing for USBFlow.
+    """Do nothing for USBAudioFlow.
 
     fpga_tio calls Do_FSM after a flow is selected.
     """
@@ -137,8 +138,8 @@ class USBFlow(object):
       return False
 
 
-class InputUSBFlow(USBFlow):
-  """Subclass of USBFlow that handles input audio data.
+class InputUSBAudioFlow(USBAudioFlow):
+  """Subclass of USBAudioFlow that handles input audio data.
 
   Properties:
     _file_path: The file path that captured data will be saved at.
@@ -148,8 +149,8 @@ class InputUSBFlow(USBFlow):
   _DEFAULT_FILE_TYPE = 'raw'
 
   def __init__(self, *args):
-    """Constructs an InputUSBFlow object."""
-    super(InputUSBFlow, self).__init__(*args)
+    """Constructs an InputUSBAudioFlow object."""
+    super(InputUSBAudioFlow, self).__init__(*args)
     self._file_path = None
     self._captured_file_type = self._DEFAULT_FILE_TYPE
 
@@ -159,7 +160,7 @@ class InputUSBFlow(USBFlow):
     The 'file_type' field in the capture_data_format is not relevant to USB
     driver configurations, but is used by InputUSBFlow as _captured_file_type
     for saving captured data. This field is checked against a list of valid file
-    types accepted by USBFlow. If file_type is not valid, an exception is
+    types accepted by USBAudioFlow. If file_type is not valid, an exception is
     raised.
 
     Capture configs can still be set even when the flow is plugged in. See
@@ -169,18 +170,18 @@ class InputUSBFlow(USBFlow):
       capture_data_format: The dict form of an AudioDataFormat object.
 
     Raises:
-      USBFlowError if this InputUSBFlow is still capturing audio when this
-        method is called, or if file_type specified in capture_data_format is
-        not valid.
+      USBAudioFlowError if this InputUSBAudioFlow is still capturing audio when
+        this method is called, or if file_type specified in capture_data_format
+        is not valid.
     """
     if self.is_capturing_audio:
-      error_message = ('Driver configs should remain unchanged while USB '
+      error_message = ('Driver configs should remain unchanged while USB Audio'
                        'Flow is capturing audio.')
-      raise USBFlowError(error_message)
+      raise USBAudioFlowError(error_message)
     capture_configs = audio.CreateAudioDataFormatFromDict(capture_data_format)
     if capture_configs.file_type not in self._VALID_AUDIO_FILE_TYPES:
       error_message = 'file_type passed in is not valid.'
-      raise USBFlowError(error_message)
+      raise USBAudioFlowError(error_message)
     self._captured_file_type = capture_configs.file_type
     self._usb_ctrl.SetDriverCaptureConfigs(capture_configs)
 
@@ -210,10 +211,11 @@ class InputUSBFlow(USBFlow):
         of utils.audio.AudioDataFormat for detail.
 
     Raises:
-      USBFlowError if this is called before StartCapturingAudio() is called.
+      USBAudioFlowError if this is called before StartCapturingAudio() is
+        called.
     """
     if self._subprocess is None:
-      raise USBFlowError('Stop capturing audio before start.')
+      raise USBAudioFlowError('Stop capturing audio before start.')
 
     elif self._subprocess.poll() is None:
       self._subprocess.terminate()
@@ -223,31 +225,31 @@ class InputUSBFlow(USBFlow):
 
   @property
   def is_capturing_audio(self):
-    """InputUSBFlow is capturing audio.
+    """InputUSBAudioFlow is capturing audio.
 
     Returns:
-      True if InputUSBFlow is capturing audio.
+      True if InputUSBAudioFlow is capturing audio.
     """
     return self._subprocess_is_running
 
   def Select(self):
-    """Selects the USB flow.
+    """Selects the USB Audio flow.
 
-    This is a dummy method because USBInputFlow is selected by default.
+    This is a dummy method because InputUSBAudioFlow is selected by default.
     """
-    logging.info('Select InputUSBFlow for input id #%d.', self._port_id)
+    logging.info('Select InputUSBAudioFlow for input id #%d.', self._port_id)
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
     return 'USBIn'
 
 
-class OutputUSBFlow(USBFlow):
-  """Subclass of USBFlow that handles output audio data."""
+class OutputUSBAudioFlow(USBAudioFlow):
+  """Subclass of USBAudioFlow that handles output audio data."""
 
   def __init__(self, *args):
-    """Constructs an OutputUSBFlow object."""
-    super(OutputUSBFlow, self).__init__(*args)
+    """Constructs an OutputUSBAudioFlow object."""
+    super(OutputUSBAudioFlow, self).__init__(*args)
 
   def SetDriverPlaybackConfigs(self, playback_data_format):
     """Sets USB driver playback configurations in AudioDataFormat form.
@@ -263,13 +265,13 @@ class OutputUSBFlow(USBFlow):
       playback_data_format: The dict form of an AudioDataFormat object.
 
     Raises:
-      USBFlowError if this InputUSBFlow is still capturing audio when this
-        method is called.
+      USBAudioFlowError if this InputUSBAudioFlow is still capturing audio when
+        this method is called.
     """
     if self.is_playing_audio:
-      error_message = ('Driver configs should remain unchanged while USB '
+      error_message = ('Driver configs should remain unchanged while USB Audio'
                        'Flow is playing audio.')
-      raise USBFlowError(error_message)
+      raise USBAudioFlowError(error_message)
     playback_configs = audio.CreateAudioDataFormatFromDict(playback_data_format)
     self._usb_ctrl.SetDriverPlaybackConfigs(playback_configs)
 
@@ -282,8 +284,8 @@ class OutputUSBFlow(USBFlow):
         docstring of utils.audio.AudioDataFormat for detail.
 
     Raises:
-      USBFlowError if data format of the file at path does not comply with the
-        configurations of the USB driver.
+      USBAudioFlowError if data format of the file at path does not comply with
+        the configurations of the USB driver.
     """
     self._supported_data_format = \
         self._usb_ctrl.GetSupportedPlaybackDataFormat()
@@ -296,7 +298,8 @@ class OutputUSBFlow(USBFlow):
       logging.info('Started playing audio using aplay %s',
                    ' '.join(params_list))
     else:
-      raise USBFlowError('Data format incompatible with driver configurations')
+      raise USBAudioFlowError(
+          'Data format incompatible with driver configurations')
 
   def _InputDataFormatIsCompatible(self, data_format_dict):
     """Checks whether data_format_dict passed in matches supported data format.
@@ -330,10 +333,10 @@ class OutputUSBFlow(USBFlow):
     """Stops playing audio data.
 
     Raises:
-      USBFlowError if this is called before StartPlayingAudio() is called.
+      USBAudioFlowError if this is called before StartPlayingAudio() is called.
     """
     if self._subprocess is None:
-      raise USBFlowError('Stop playing audio before Start')
+      raise USBAudioFlowError('Stop playing audio before Start')
 
     elif self._subprocess.poll() is None:
       self._subprocess.terminate()
@@ -341,19 +344,19 @@ class OutputUSBFlow(USBFlow):
 
   @property
   def is_playing_audio(self):
-    """OutputUSBFlow is playing audio.
+    """OutputUSBAudioFlow is playing audio.
 
     Returns:
-      True if OutputUSBFlow is playing audio.
+      True if OutputUSBAudioFlow is playing audio.
     """
     return self._subprocess_is_running
 
   def Select(self):
-    """Selects the USB flow.
+    """Selects the USB Audio flow.
 
-    This is a dummy method because USBOutputFlow is selected by default.
+    This is a dummy method because OutputUSBAudioFlow is selected by default.
     """
-    logging.info('Select OutputUSBFlow for input id #%d.', self._port_id)
+    logging.info('Select OutputUSBAudioFlow for input id #%d.', self._port_id)
 
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
