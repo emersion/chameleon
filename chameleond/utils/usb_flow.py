@@ -42,7 +42,12 @@ class USBFlow(object):
     self._supported_data_format = None
 
   def Initialize(self):
-    """Do nothing here."""
+    """Enables USB port controller.
+
+    Enables USB port device mode controller so USB host on the other side will
+    not get confused when trying to enumerate this USB device.
+    """
+    self._usb_ctrl.EnableUSBOTGDriver()
     logging.info('Initialized USB flow #%d.', self._port_id)
 
   def Select(self):
@@ -76,18 +81,16 @@ class USBFlow(object):
   def Plug(self):
     """Emulates plug for USB audio gadget.
 
-    The dwc2 USB driver module and audio gadget driver module is enabled.
+    Enables audio gadget driver.
     """
-    self._usb_ctrl.EnableUSBOTGDriver()
     self._usb_ctrl.EnableDriver()
 
   def Unplug(self):
     """Emulates unplug for USB audio gadget.
 
-    The dwc2 USB driver module and audio gadget driver module is disabled.
+    Disables audio gadget driver.
     """
     self._usb_ctrl.DisableDriver()
-    self._usb_ctrl.DisableUSBOTGDriver()
 
   def Do_FSM(self):
     """Do nothing for USBFlow.
