@@ -20,6 +20,7 @@ from chameleond.utils import ids
 from chameleond.utils import input_flow
 from chameleond.utils import usb
 from chameleond.utils import usb_audio_flow
+from chameleond.utils import usb_hid_flow
 
 
 class DriverError(Exception):
@@ -71,6 +72,16 @@ def _AudioBoardMethod(func):
   return wrapper
 
 
+def _USBHIDMethod(func):
+  """Decorator that checks the port_id argument is a USB HID port."""
+  @functools.wraps(func)
+  def wrapper(instance, port_id, *args, **kwargs):
+    if not ids.IsUSBHIDPort(port_id):
+      raise DriverError('Not a valid port_id for HID operation: %d' % port_id)
+    return func(instance, port_id, *args, **kwargs)
+  return wrapper
+
+
 class ChameleondDriver(ChameleondInterface):
   """Chameleond Driver for FPGA customized platform."""
 
@@ -100,6 +111,7 @@ class ChameleondDriver(ChameleondInterface):
     audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
     fpga_ctrl = fpga.FpgaController()
     usb_audio_ctrl = usb.USBAudioController()
+    usb_hid_ctrl = usb.USBController('g_hid')
 
     self._flows = {
         ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
@@ -115,6 +127,10 @@ class ChameleondDriver(ChameleondInterface):
             ids.USB_AUDIO_IN, usb_audio_ctrl),
         ids.USB_AUDIO_OUT: usb_audio_flow.OutputUSBAudioFlow(
             ids.USB_AUDIO_OUT, usb_audio_ctrl),
+        ids.USB_KEYBOARD: usb_hid_flow.KeyboardUSBHIDFlow(
+            ids.USB_KEYBOARD, usb_hid_ctrl),
+        ids.USB_TOUCH: usb_hid_flow.TouchUSBHIDFlow(
+            ids.USB_TOUCH, usb_hid_ctrl),
     }
 
     for flow in self._flows.itervalues():
@@ -1147,3 +1163,16 @@ class ChameleondDriver(ChameleondInterface):
       A string for MAC address.
     """
     return open('/sys/class/net/eth0/address').read().strip()
+
+  @_USBHIDMethod
+  def SendHIDEvent(self, port_id, event_type, *args, **kwargs):
+    """Sends HID event with event_type and arguments for HID port #port_id.
+
+    Args:
+      port_id: The ID of the HID port.
+      event_type: Supported event type of string for HID port #port_id.
+
+    Returns:
+      Returns as event function if applicable.
+    """
+    return self._flows[port_id].Send(event_type, *args, **kwargs)

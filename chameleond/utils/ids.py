@@ -13,17 +13,22 @@ LINEIN = 6
 LINEOUT = 7
 USB_AUDIO_IN = 8
 USB_AUDIO_OUT = 9
+USB_KEYBOARD = 10
+USB_TOUCH = 11
 
 # Input/output ports
 INPUT_PORTS = [DP1, DP2, HDMI, VGA, MIC, LINEIN, USB_AUDIO_IN]
 OUTPUT_PORTS = [LINEOUT, USB_AUDIO_OUT]
 
-# Ports that support audio/video.
+# Ports that support audio/video
 AUDIO_PORTS = [HDMI, MIC, LINEIN, LINEOUT, USB_AUDIO_IN, USB_AUDIO_OUT]
 VIDEO_PORTS = [DP1, DP2, HDMI, VGA]
 
 # Ports that support USB audio
 USB_AUDIO_PORTS = [USB_AUDIO_IN, USB_AUDIO_OUT]
+
+# Ports that support USB HID
+USB_HID_PORTS = [USB_KEYBOARD, USB_TOUCH]
 
 # Convenience methods
 IsInputPort = lambda port_id: port_id in INPUT_PORTS
@@ -31,6 +36,7 @@ IsOutputPort = lambda port_id: port_id in OUTPUT_PORTS
 IsAudioPort = lambda port_id: port_id in AUDIO_PORTS
 IsVideoPort = lambda port_id: port_id in VIDEO_PORTS
 IsUSBAudioPort = lambda port_id: port_id in USB_AUDIO_PORTS
+IsUSBHIDPort = lambda port_id: port_id in USB_HID_PORTS
 
 # IDs of EDIDs
 EDID_ID_DEFAULT = 0

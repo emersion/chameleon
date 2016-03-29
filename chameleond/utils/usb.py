@@ -181,7 +181,11 @@ class USBController(object):
 
   def EnableUSBOTGDriver(self):
     """Enables dwc2 driver so USB port can be controlled by Chameleon."""
-    system_tools.SystemTools.Call('modprobe', 'dwc2')
+    output = system_tools.SystemTools.Output('lsmod').splitlines()
+    if any(line.startswith('dwc2') for line in output):
+      logging.warning('Skip modprobe dwc2 because it has already enabled.')
+    else:
+      system_tools.SystemTools.Call('modprobe', 'dwc2')
 
   def DisableUSBOTGDriver(self):
     """Disables dwc2 driver so USB port does not get controlled by Chameleon."""
