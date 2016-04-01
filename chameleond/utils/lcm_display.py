@@ -183,6 +183,10 @@ class LcmDisplay(object):
     object, after then you need to call RefreshDisplay to output them on LCM
     display.
     """
+    # Sometimes common output mode is changed accidentally and display will be
+    # upside down, set mode to normal while display refresh every time.
+    self._SetCommonOutputModeSelect(is_normal=True)
+
     bitmap = self._canvas.bitmap
     for page in xrange(self._canvas.pages):
       self._SetPageAddress(page)
