@@ -48,7 +48,7 @@ class LcmDisplay(object):
   _RESET_PULSE = 1.0 / 16
 
   _BOOTSCREEN_BITMAP = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                    'lcm_chameleon.bitmap')
+                                    '..', 'data', 'lcm_chameleon.bitmap')
 
   # LCM instructions
   _INST_SET_DISPLAY_ADDR = 0xae

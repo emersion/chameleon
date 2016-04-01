@@ -6,31 +6,43 @@
 SCRIPT="$(readlink -f $0)"
 SCRIPT_DIR="$(dirname ${SCRIPT})/init.d"
 
-DAEMON_NAME='chameleond'
-UPDATER_NAME='chameleon-updater'
 INITD_DIR='/etc/init.d'
-CONFIG_FILE="/etc/default/${DAEMON_NAME}"
 CHAMELEOND_DIR='/usr/bin'
-DAEMON="${CHAMELEOND_DIR}/run_chameleond"
+CHAMELEOND_NAME='chameleond'
+DISPLAYD_NAME='displayd'
+UPDATER_NAME='chameleon-updater'
 
-if [[ ! -x ${DAEMON} ]]; then
-    echo "Executable ${DAEMON} not existed. Install it first." 1>&2
-    exit 1
-fi
-
-update-rc.d -f ${DAEMON_NAME} remove
 update-rc.d -f ${UPDATER_NAME} remove
 
-CONFIG_TMP="$(mktemp /tmp/${DAEMON_NAME}.XXXXXX)"
-cat <<END >${CONFIG_TMP}
+install_daemon_and_config () {
+    DAEMON_NAME=$1
+    CONFIG_FILE="/etc/default/${DAEMON_NAME}"
+    DAEMON="${CHAMELEOND_DIR}/run_${DAEMON_NAME}"
+
+    if [[ ! -x ${DAEMON} ]]; then
+        echo "Executable ${DAEMON} not existed. Install it first." 1>&2
+        exit 1
+    fi
+
+    update-rc.d -f ${DAEMON_NAME} remove
+
+    CONFIG_TMP="$(mktemp /tmp/${DAEMON_NAME}.XXXXXX)"
+    cat <<END >${CONFIG_TMP}
 CHAMELEOND_DIR="${CHAMELEOND_DIR}"
 BUNDLE_VERSION="${BUNDLE_VERSION}"
 CHAMELEON_BOARD="${CHAMELEON_BOARD}"
 END
-mv -f "${CONFIG_TMP}" "${CONFIG_FILE}"
+    mv -f "${CONFIG_TMP}" "${CONFIG_FILE}"
+}
 
-cp -f "${SCRIPT_DIR}/${DAEMON_NAME}" "${INITD_DIR}"
-update-rc.d "${DAEMON_NAME}" defaults 92 8
+install_daemon_and_config "${CHAMELEOND_NAME}"
+install_daemon_and_config "${DISPLAYD_NAME}"
+
+cp -f "${SCRIPT_DIR}/${CHAMELEOND_NAME}" "${INITD_DIR}"
+update-rc.d "${CHAMELEOND_NAME}" defaults 92 8
+
+cp -f "${SCRIPT_DIR}/${DISPLAYD_NAME}" "${INITD_DIR}"
+update-rc.d "${DISPLAYD_NAME}" defaults 94 6
 
 cp -f "${SCRIPT_DIR}/${UPDATER_NAME}" "${INITD_DIR}"
 update-rc.d "${UPDATER_NAME}" defaults 90 10
@@ -81,5 +93,6 @@ if [[ -n "${need_reboot}" ]]; then
     echo 'Reboot the board to validate the FPGA configuration...'
     reboot
 else
-    "${INITD_DIR}/${DAEMON_NAME}" restart
+    "${INITD_DIR}/${CHAMELEOND_NAME}" restart
+    "${INITD_DIR}/${DISPLAYD_NAME}" restart
 fi
