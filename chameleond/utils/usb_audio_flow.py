@@ -191,7 +191,7 @@ class InputUSBAudioFlow(USBAudioFlow):
     self._supported_data_format.file_type = self._captured_file_type
     params_list = self._GetAlsaUtilCommandArgs(self._supported_data_format)
     file_suffix = '.' + self._captured_file_type
-    recorded_file = tempfile.NamedTemporaryFile(prefix='recorded',
+    recorded_file = tempfile.NamedTemporaryFile(prefix='audio_',
                                                 suffix=file_suffix,
                                                 delete=False)
     self._file_path = recorded_file.name
