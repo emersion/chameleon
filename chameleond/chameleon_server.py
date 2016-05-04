@@ -75,7 +75,11 @@ class ChameleonServer(object):
                                 requestHandler=ChameleonXMLRPCRequestHandler,
                                 logRequests=True)
     server.register_introspection_functions()
-    server.register_instance(self._driver)
+    # Setting allow_dotted_names=True allows a client to access the object
+    # members of self._driver. This is useful to group methods into
+    # different objects, e.g., audio, video, bluetooth hid, etc., in addition
+    # to some generic methods.
+    server.register_instance(self._driver, allow_dotted_names=True)
 
     signal_handler = lambda signum, frame: sys.exit(0)
     signal.signal(signal.SIGTERM, signal_handler)

@@ -13,6 +13,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
 from chameleond.utils import audio_board
+from chameleond.utils import bluetooth_hid_flow
 from chameleond.utils import caching_server
 from chameleond.utils import codec_flow
 from chameleond.utils import fpga
@@ -22,7 +23,6 @@ from chameleond.utils import input_flow
 from chameleond.utils import usb
 from chameleond.utils import usb_audio_flow
 from chameleond.utils import usb_hid_flow
-
 
 class DriverError(Exception):
   """Exception raised when any error on FPGA driver."""
@@ -113,6 +113,7 @@ class ChameleondDriver(ChameleondInterface):
     fpga_ctrl = fpga.FpgaController()
     usb_audio_ctrl = usb.USBAudioController()
     usb_hid_ctrl = usb.USBController('g_hid')
+    bluetooth_hid_ctrl = usb.USBController('ftdi_sio')
 
     self._flows = {
         ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
@@ -132,7 +133,13 @@ class ChameleondDriver(ChameleondInterface):
             ids.USB_KEYBOARD, usb_hid_ctrl),
         ids.USB_TOUCH: usb_hid_flow.TouchUSBHIDFlow(
             ids.USB_TOUCH, usb_hid_ctrl),
+        ids.BLUETOOTH_HID_MOUSE: bluetooth_hid_flow.BluetoothHIDMouseFlow(
+            ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
     }
+
+    # Allow to accees the mouse methods through bluetooth_mouse member object.
+    # Hence, there is no need to export the mouse methods in ChameleondDriver.
+    self.bluetooth_mouse = self._flows[ids.BLUETOOTH_HID_MOUSE]
 
     for flow in self._flows.itervalues():
       if flow:
