@@ -246,11 +246,13 @@ class LcmInterface(object):
 
     Because there are only a few lines can be shown on LCM once, we need to
     find the suitable window of current position to show the content of menu.
+    The last line of menu state is reserved for showing IP address.
     """
     self._display.CanvasClear()
-    window_head = self._cursor[-1] / self._display_lines * self._display_lines
+    menu_display_lines = self._display_lines - 1
+    window_head = self._cursor[-1] / menu_display_lines * menu_display_lines
     # Prints the menu items inside the window.
-    for line in xrange(self._display_lines):
+    for line in xrange(menu_display_lines):
       menu_line = window_head + line
       if menu_line >= len(self._menu):
         break
@@ -258,6 +260,32 @@ class LcmInterface(object):
           self._menu.keys()[menu_line], self._MenuIsLeafNode(menu_line), line)
     # Prints the moving cursor.
     self._display.CanvasPrintCursor(self._cursor[-1] - window_head, 0)
+    # Prints the last line (IP address and key instruction).
+    self._MenuPrintIPAddress(self._display_lines - 1)
+
+  def _MenuPrintIPAddress(self, line):
+    """Prints IP address and key instruction on a display line.
+
+    The line content includes:
+      - Chameleon IP address (12-char long) (max_char_length = 16).
+      - key instruction (4-char long) for the direction hints of four keys.
+    And will be displayed with highlight.
+
+    Args:
+      line: The line index.
+    """
+    ip_addr = FuncPool.GetIpAndMacAddress(self._chameleond).splitlines()[0]
+    ip_max_length = self._display.GetMaxCharLength() - 4
+    if len(ip_addr) < ip_max_length:
+      # Pads ip_addr with blank space to ip_max_length
+      display_line = ip_addr + ' ' * (ip_max_length - len(ip_addr))
+    else:
+      # Crops ip_addr if it is too long.
+      display_line = ip_addr[:ip_max_length]
+    # Appends key instruction.
+    display_line += (lcm_font.ARROW_LEFT + lcm_font.ARROW_UP +
+                     lcm_font.ARROW_DOWN + lcm_font.ARROW_RIGHT)
+    self._display.CanvasPrintLine(display_line, line, highlight=True)
 
   def _PageCursorUp(self):
     """Handles key up event in page state."""
@@ -284,7 +312,7 @@ class LcmInterface(object):
     self._MenuRender()
     self._state = self._STATE_MENU
 
-  def _PageRender(self):
+  def _PageRender(self, print_prompt_line=True):
     """Renders the display image of LCM UI in page state.
 
     Because there are only a few lines can be shown on LCM once, we need to
@@ -307,6 +335,9 @@ class LcmInterface(object):
         Line#1: amazing, isn't it
         Line#2: ?
         Line#3: <Exit   ^ Move    (highlighted)
+
+    Args:
+      print_prompt_line: Whether to print prompt line on the last line.
     """
     self._display.CanvasClear()
     # Print the content lines.
@@ -315,6 +346,10 @@ class LcmInterface(object):
       if current_line < len(self._page_contents):
         self._display.CanvasPrintLine(self._page_contents[current_line], line)
 
+    if not print_prompt_line:
+      self._display.CanvasPrintLine(' ' * self._display.GetMaxCharLength(),
+                                    self._display_lines - 1, highlight=True)
+      return
     # Print the prompt line (last line)
     prompt_exit = lcm_font.ARROW_LEFT + 'Exit   '
     if len(self._page_contents) <= self._display_lines - 1:
@@ -333,8 +368,10 @@ class LcmInterface(object):
     """Enters the page state from the menu state."""
     logging.info('Entering page: cursor = %s', str(self._cursor))
     self._page_index = 0
+    # Displays a page to tell user to wait for the function execution.
     self._page_contents = ['Please wait...']
-    self._PageRender()
+    self._PageRender(print_prompt_line=False)
+    self._display.RefreshDisplay()
     self._ExecuteFunction()  # execute correspondent function of the item.
     self._PageRender()
 
