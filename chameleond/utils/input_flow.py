@@ -16,7 +16,7 @@ from chameleond.utils import edid
 from chameleond.utils import fpga
 from chameleond.utils import frame_manager
 from chameleond.utils import ids
-from chameleond.utils import io
+from chameleond.utils import chameleon_io as io
 from chameleond.utils import rx
 
 
