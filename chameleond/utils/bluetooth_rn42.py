@@ -556,11 +556,22 @@ class RN42(object):
   def GetLocalBluetoothAddress(self):
     """Get the local RN-42 bluetooth mac address.
 
+    The RN-42 kit returns a raw address like '00066675A96F'.
+    It is converted to something like '00:06:66:75:A9:6F'.
+
     Returns:
       the bluetooth mac address of the kit
     """
-    return self.SerialSendReceive(self.CMD_GET_RN42_BLUETOOTH_MAC,
-                                  msg='getting local bluetooth address')
+    raw_address = self.SerialSendReceive(self.CMD_GET_RN42_BLUETOOTH_MAC,
+                                         msg='getting local bluetooth address')
+    if len(raw_address) == 12:
+      return ':'.join([raw_address[i:i+2]
+                       for i in range(0, len(raw_address), 2)])
+    else:
+      # It is the caller's responsibility to check if the address format
+      # is correct.
+      logging.error('RN42 bluetooth address is invalid: %s', raw_address)
+      return raw_address
 
   def GetConnectionStatus(self):
     """Get the connection status.
