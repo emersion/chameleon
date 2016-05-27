@@ -310,9 +310,12 @@ def DemoBluetoothHIDMouse(remote_address):
   mouse = BluetoothHIDMouse(BluetoothHID.PIN_CODE_MODE)
   mouse.Init()
 
+  connected = False
   print 'Connecting to the remote address %s...' % remote_address
   try:
     if mouse.ConnectToRemoteAddress(remote_address):
+      connected = True
+
       print 'Click and drag horizontally.'
       mouse.ClickAndDrag(delta_x=100)
       time.sleep(1)
@@ -350,12 +353,13 @@ def DemoBluetoothHIDMouse(remote_address):
     else:
       print 'Something is wrong. Not able to connect to the remote address.'
   finally:
-    print 'Disconnecting...'
-    try:
-      mouse.Disconnect()
-    except RN42Exception:
-      # RN-42 may have already disconnected.
-      pass
+    if connected:
+      print 'Disconnecting...'
+      try:
+        mouse.Disconnect()
+      except RN42Exception:
+        # RN-42 may have already disconnected.
+        pass
 
   print 'Closing the mouse...'
   mouse.Close()
