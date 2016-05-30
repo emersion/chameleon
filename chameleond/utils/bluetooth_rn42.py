@@ -39,12 +39,15 @@ class RN42(object):
 
   DRIVER = 'ftdi_sio'
   CHIP_NAME = 'RNBT'
+  MAX_PIN_LEN = 16
+  DEFAULT_PIN_CODE = '1234'     # The default factory pin code.
   RETRY = 2                     # Try (RETRY + 1) times in total.
-  RETRY_INTERVAL_SECS = 0.1     # the time interval between retries in seconds
+  RETRY_INTERVAL_SECS = 0.1     # time interval between retries in seconds
   CONNECTION_TIMEOUT_SECS = 10  # the connection timeout in seconds
-  POST_CONNECTION_WAIT_SECS = 1 # waiting time in seconds for a connection
-                                # to become stable
-  REBOOT_SLEEP_SECS = 0.5       # the time to sleep after reboot.
+  POST_CONNECTION_WAIT_SECS = 1 # waiting time for a connection to become stable
+  REBOOT_SLEEP_SECS = 3         # the time to sleep after reboot.
+  RESET_SLEEP_SECS = 1          # the time to sleep after reboot.
+  SET_PIN_CODE_SLEEP_SECS = 0.5 # the time to sleep after setting pin code.
   CREATE_SERIAL_DEVICE_SLEEP_SECS = 1
                                 # waiting time after creating a serial device
 
@@ -59,6 +62,7 @@ class RN42(object):
   CMD_ENTER_COMMAND_MODE = '$$$'
   CMD_LEAVE_COMMAND_MODE = '---'
   CMD_REBOOT = 'R,1'
+  CMD_FACTORY_RESET = 'SF,1'
 
   # chip basic information
   CMD_GET_CHIP_NAME = 'GN'
@@ -72,6 +76,10 @@ class RN42(object):
   # authentication mode
   CMD_GET_AUTHENTICATION_MODE = 'GA'
   CMD_SET_AUTHENTICATION_MODE = 'SA,'
+
+  # pin code
+  CMD_GET_PIN_CODE = 'GP'
+  CMD_SET_PIN_CODE = 'SP,'
 
   # bluetooth service profiles
   PROFILE_SPP = '0'
@@ -94,6 +102,12 @@ class RN42(object):
   CMD_SET_HID_MOUSE = 'SH,0020'
   CMD_SET_HID_COMBO = 'SH,0030'
   CMD_SET_HID_JOYSTICK = 'SH,0040'
+
+  # Class of Service/Device
+  CMD_GET_CLASS_OF_SERVICE = 'GC'
+  CMD_GET_CLASS_OF_DEVICE = 'GD'
+  CMD_SET_CLASS_OF_SERVICE = 'SC,'
+  CMD_SET_CLASS_OF_DEVICE = 'SD,'
 
   # Set remote bluetooth address
   CMD_SET_REMOTE_ADDRESS = 'SR,'
@@ -262,13 +276,33 @@ class RN42(object):
       '5': 'APL',
       '6': 'HID'}
 
+  # Suppoerted device types
+  KEYBOARD = 'KEYBOARD'
+  GAMEPAD = 'GAMEPAD'
+  MOUSE = 'MOUSE'
+  COMBO = 'COMBO'
+  JOYSTICK = 'JOYSTICK'
+
+  DEFAULT_CLASS_OF_SERVICE = 0
+
+  # Class of Device
+  CLASS_OF_DEVICE = {
+      KEYBOARD: 0x540,
+      GAMEPAD: 0x508,
+      MOUSE: 0x580,
+      COMBO: 0x5C0,
+      JOYSTICK: 0x504}
+
+  # The mask of Class of Device
+  CLASS_OF_DEVICE_MASK = 0x1FFF
+
   # HID device types
   HID_DEVICE_TYPE = {
-      '0000': 'KEYBOARD',
-      '0001': 'GAMEPAD',
-      '0010': 'MOUSE',
-      '0011': 'COMBO',
-      '0100': 'JOYSTICK'}
+      '0000': KEYBOARD,
+      '0010': GAMEPAD,
+      '0020': MOUSE,
+      '0030': COMBO,
+      '0040': JOYSTICK}
 
   def __init__(self):
     self._command_mode = False
@@ -276,8 +310,11 @@ class RN42(object):
     self._serial = None
     self._port = None
 
+  def __del__(self):
+    self.Close()
+
   def CreateSerialDevice(self):
-    """Create the serial device."""
+    """Create a serial device."""
     try:
       self._serial = serial_utils.SerialDevice()
     except Exception as e:
@@ -297,10 +334,8 @@ class RN42(object):
       error_msg = 'Fail to connect to the serial device: %s' % e
       logging.error(error_msg)
       raise RN42Exception(error_msg)
-    time.sleep(self.CREATE_SERIAL_DEVICE_SLEEP_SECS)
 
-  def __del__(self):
-    self.Close()
+    time.sleep(self.CREATE_SERIAL_DEVICE_SLEEP_SECS)
 
   def Close(self):
     """Close the device gracefully."""
@@ -382,6 +417,13 @@ class RN42(object):
       # If the chip is already in command mode, this would cause timeout
       # and returns an empty string. So let's check if we could get the
       # chip name to make sure that it is indeed in command mode.
+      # For some unkowns reason, the first time always failed if the chip
+      # has already been in the command mode. Let's just ignore the exception.
+      try:
+        chip_name = self.GetChipName()
+      except Exception as e:
+        logging.warn('Not able to get the chip name. Ignore it.')
+
       try:
         chip_name = self.GetChipName()
         if chip_name.startswith(self.CHIP_NAME):
@@ -391,12 +433,15 @@ class RN42(object):
           return True
         else:
           msg = 'Incorrect chip name when entering command mode: %s'
+          logging.error(msg, chip_name)
           raise RN42Exception(msg % chip_name)
-      except:
-        msg = 'Failure to get chip name in entering command mode.'
+      except Exception as e:
+        msg = 'Failure to get chip name in entering command mode: %s.' % e
+        logging.error(msg)
         raise RN42Exception(msg)
     else:
       msg = 'Incorrect response in entering command mode: %s'
+      logging.error(msg, result)
       raise RN42Exception(msg % result)
 
   def LeaveCommandMode(self, expect_in='END'):
@@ -431,6 +476,27 @@ class RN42(object):
                            expect_in='Reboot',
                            msg='rebooting RN-42')
     time.sleep(self.REBOOT_SLEEP_SECS)
+    return True
+
+  def GetPort(self):
+    """Get the serial port.
+
+    Returns:
+      a string representing the serial port.
+    """
+    return self._port
+
+  def FactoryReset(self):
+    """Factory reset the chip.
+
+    Reset the chip to the factory defaults.
+
+    Returns:
+      True if the kit is reset successfully.
+    """
+    self.SerialSendReceive(self.CMD_FACTORY_RESET,
+                           msg='factory reset RN-42')
+    time.sleep(self.RESET_SLEEP_SECS)
     return True
 
   def GetChipName(self):
@@ -520,6 +586,39 @@ class RN42(object):
                            expect=self.AOK,
                            msg='setting authentication mode "%s"' % mode)
     return True
+
+  def GetPinCode(self):
+    """Get the pin code.
+
+    Returns:
+      a string representing the pin code.
+    """
+    result = self.SerialSendReceive(self.CMD_GET_PIN_CODE,
+                                    msg='getting pin code')
+    return result
+
+  def SetPinCode(self, pin):
+    """Set the pin code.
+
+    Returns:
+      True if the pin code is set successfully.
+    """
+    if len(pin) > self.MAX_PIN_LEN:
+      raise RN42Exception('The pin code "%s" is longer than max length (%d).' %
+                          (pin, self.MAX_PIN_LEN))
+
+    result = self.SerialSendReceive(self.CMD_SET_PIN_CODE + pin,
+                                    msg='setting pin code')
+    time.sleep(self.SET_PIN_CODE_SLEEP_SECS)
+    return result
+
+  def SetDefaultPinCode(self):
+    """Set the default pin code.
+
+    Returns:
+      True if the pin code is set to the default value successfully.
+    """
+    return self.SetPinCode(self.DEFAULT_PIN_CODE)
 
   def GetServiceProfile(self):
     """Get the service profile.
@@ -694,6 +793,87 @@ class RN42(object):
                            expect=self.AOK,
                            msg='setting joystick as HID device')
     return True
+
+  def GetClassOfService(self):
+    """Get the class of service.
+
+    The chip uses a hexadeciaml string to represent the class of service.
+    It is converted to a decimal number as the return value.
+
+    Returns:
+      a decimal integer representing the class of service
+    """
+    result = self.SerialSendReceive(self.CMD_GET_CLASS_OF_SERVICE,
+                                    msg='getting class of service')
+    return int(result, 16)
+
+  def _To4DigitHex(self, value):
+    """Convert the value to a 4-digit hexadecimal string.
+
+    For example, the decimal value 42 is converted to '002A'
+
+    Args:
+      value: the value to convert
+
+    Returns:
+      a 4-digit hexadecimal string of the value
+    """
+    return '%04X' % value
+
+  def SetClassOfService(self, class_of_service):
+    """Set the class of service.
+
+    Returns:
+      True if setting the class of service successfully.
+    """
+    result = self.SerialSendReceive(
+        self.CMD_SET_CLASS_OF_SERVICE + self._To4DigitHex(class_of_service),
+        msg='setting class of service')
+    return result
+
+  def SetDefaultClassOfService(self):
+    """Set the default class of service.
+
+    Returns:
+      True if setting the default class of service successfully.
+    """
+    return self.SetClassOfService(self.DEFAULT_CLASS_OF_SERVICE)
+
+  def GetClassOfDevice(self):
+    """Get the class of device.
+
+    The chip uses a hexadeciaml string to represent the class of device.
+    It is converted to a decimal number as the return value.
+
+    Returns:
+      a decimal integer representing the class of device
+    """
+    result = self.SerialSendReceive(self.CMD_GET_CLASS_OF_DEVICE,
+                                    msg='getting class of device')
+    return int(result, 16)
+
+  def _SetClassOfDevice(self, class_of_device):
+    """Set the class of device.
+
+    Returns:
+      True if setting the class of device successfully.
+    """
+    result = self.SerialSendReceive(
+        self.CMD_SET_CLASS_OF_DEVICE + self._To4DigitHex(class_of_device),
+        msg='setting class of device')
+    return result
+
+  def SetClassOfDevice(self, device_type):
+    """Set the class of device as keyboard.
+
+    Returns:
+      True if setting the class of device successfully.
+    """
+    if device_type in self.CLASS_OF_DEVICE:
+      return self._SetClassOfDevice(self.CLASS_OF_DEVICE.get(device_type))
+    else:
+      logging.error('device type is not supported: %s', device_type)
+      return False
 
   def SetRemoteAddress(self, remote_address):
     """Set the remote bluetooth address.
@@ -943,7 +1123,7 @@ class RN42(object):
 def GetRN42Info():
   """A simple demo of getting RN-42 information."""
   rn42 = RN42()
-  print 'enter:', rn42.EnterCommandMode()
+  print 'enter command mode:', rn42.EnterCommandMode()
   print 'chip name:', rn42.GetChipName()
   print 'firmware version:', rn42.GetFirmwareVersion()
   print 'operation mode:', rn42.GetOperationMode()
@@ -953,7 +1133,9 @@ def GetRN42Info():
   print 'connection status:', rn42.GetConnectionStatus()
   print 'remote bluetooth address:', rn42.GetRemoteConnectedBluetoothAddress()
   print 'HID device type:', rn42.GetHIDDeviceType()
-  print 'leave:', rn42.LeaveCommandMode()
+  print 'Class of service:', hex(rn42.GetClassOfService())
+  print 'Class of device:', hex(rn42.GetClassOfDevice())
+  print 'leave command mode:', rn42.LeaveCommandMode()
 
 
 if __name__ == '__main__':

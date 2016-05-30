@@ -20,15 +20,11 @@ class BluetoothHIDException(Exception):
 class BluetoothHID(RN42):
   """A base bluetooth HID emulator class using RN-42 evaluation kit."""
 
-  # Suppoerted device types
-  KEYBOARD = 'KEYBOARD'
-  GAMEPAD = 'GAMEPAD'
-  MOUSE = 'MOUSE'
-  COMBO = 'COMBO'
-  JOYSTICK = 'JOYSTICK'
+  TMP_PIN_CODE = '0000'     # A temporary pin code
 
   SEND_DELAY_SECS = 0.2     # Need to sleep for a short while otherwise
                             # the bits may get lost during transmission.
+  INIT_SLEEP_SECS = 5       # Sleep after initialization for stabilization.
 
   def __init__(self, device_type, authentication_mode,
                send_delay=SEND_DELAY_SECS):
@@ -44,34 +40,61 @@ class BluetoothHID(RN42):
     self.authentication_mode = authentication_mode
     self.send_delay = send_delay
 
-  def Init(self):
-    """Initialize the emulated device."""
-    # Enter command mode for configuration.
-    self.EnterCommandMode()
+  def Init(self, factory_reset=True):
+    """Initialize the chip correctly.
 
-    # Set HID as the service profile.
-    self.SetServiceProfileHID()
+    Initialize the chip with proper HID register values.
 
-    # Set the HID device type.
-    self.SetHIDDevice(self.device_type)
+    Args:
+      factory_reset: True if a factory reset is needed.
+                     False if we only want to reconnect the serial device.
+    """
+    # Create a new serial device every time since the serial driver
+    # on chameleon board is not very stable.
+    self.CreateSerialDevice()
 
-    # Set authentication to the specified mode.
-    self.SetAuthenticationMode(self.authentication_mode)
+    if factory_reset:
+      # Do a factory reset to make sure it is in a known initial state.
+      # Do the factory reset before proceeding to set parameters below.
+      self.FactoryReset()
 
-    # Set RN-42 to work as a slave.
-    self.SetSlaveMode()
+      # Enter command mode to issue commands.
+      self.EnterCommandMode()
 
-    # Enable the connection status message so that we could get the message
-    # of connection/disconnection status.
-    self.EnableConnectionStatusMessage()
+      # Set HID as the service profile.
+      self.SetServiceProfileHID()
 
-    # Reboot so that the configurations above take in effect.
-    self.Reboot()
+      # Set the HID device type.
+      self.SetHIDDevice(self.device_type)
 
-    # Should enter command mode again after reboot.
-    self.EnterCommandMode()
+      # Set the default class of service.
+      self.SetDefaultClassOfService()
 
-    logging.info('A HID "%s" device is created successfully.', self.device_type)
+      # Set the class of device (CoD) according to the hid device type.
+      self.SetClassOfDevice(self.device_type)
+
+      # Set authentication to the specified mode.
+      self.SetAuthenticationMode(self.authentication_mode)
+
+      # Set RN-42 to work as a slave.
+      self.SetSlaveMode()
+
+      # Enable the connection status message so that we could get the message
+      # of connection/disconnection status.
+      self.EnableConnectionStatusMessage()
+
+      # Set a temporary pin code for testing purpose.
+      self.SetPinCode(self.TMP_PIN_CODE)
+
+      # Reboot so that the configurations above take effect.
+      self.Reboot()
+
+      # Enter command mode again after reboot.
+      self.EnterCommandMode()
+
+      time.sleep(self.INIT_SLEEP_SECS)
+
+    logging.info('A bluetooth HID "%s" device is connected.', self.device_type)
 
   def __del__(self):
     self.Close()
