@@ -259,10 +259,10 @@ class FieldManager(object):
     Returns:
       An ID to identify the cached thumbnail.
     """
-    if not ratio >= 2:
+    if self._is_dual and not ratio >= 2:
       raise FieldManagerError('Thumbnail ratio should be >= 2.')
 
-    if ratio & 1:
+    if self._is_dual and ratio & 1:
       raise FieldManagerError('Thumbnail ratio should be a multiple of 2.')
 
     (original_width, original_height) = self._dimension
@@ -270,9 +270,7 @@ class FieldManager(object):
     if self._is_dual:
       single_band_width = original_width / 2
     else:
-      # TODO: Add support for single pixel mode.
-      raise FieldManagerError('Caching thumbnail not supported in '
-                              'the single pixel mode.')
+      single_band_width = original_width
 
     # Modify the memory offset to match the field.
     PAGE_SIZE = 4096
@@ -288,9 +286,13 @@ class FieldManager(object):
     file_name = 'tn_%05d' % field_index
     file_path = os.path.join(caching_server.CACHED_DIR, file_name)
 
-    # Divide 2 because it is in double pixel mode.
-    skip_pixel_num = (ratio / 2) - 1
-    # Don't divide 2 for lines.
+    if self._is_dual:
+      # Divide 2 because it is in double pixel mode.
+      skip_pixel_num = (ratio / 2) - 1
+    else:
+      # Read 1 pixel and skip the rest.
+      skip_pixel_num = ratio - 1
+    # Read 1 line and skip the rest.
     skip_line_num = ratio - 1
 
     system_tools.SystemTools.Call(
