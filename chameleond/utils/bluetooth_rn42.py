@@ -346,6 +346,12 @@ class RN42(object):
       self._serial.Disconnect()
       self._closed = True
 
+  def CheckSerialConnection(self):
+    """Check the USB serial connection between RN-42 and the chameleon board."""
+    port = serial_utils.FindTtyByDriver(self.DRIVER)
+    logging.info('CheckSerialConnection: port is %s', port)
+    return bool(port)
+
   def SerialSendReceive(self, command, expect='', expect_in='',
                         msg='serial SendReceive()'):
     """A wrapper of SerialDevice.SendReceive().
