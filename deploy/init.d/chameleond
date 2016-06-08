@@ -22,6 +22,7 @@ DAEMON="${CHAMELEOND_DIR}/run_chameleond"
 DAEMON_ARGS="--driver ${CHAMELEON_BOARD}"
 DAEMON_USER='root'
 PIDFILE="/var/run/${DAEMON_NAME}.pid"
+LOGFILE="/var/log/${DAEMON_NAME}_init"
 
 is_already_running () {
     start-stop-daemon --stop --test --quiet --pidfile "${PIDFILE}"
@@ -40,7 +41,8 @@ do_start () {
     if ! is_already_running; then
         start-stop-daemon --start --background --pidfile "${PIDFILE}" \
             --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \
-            --startas "${DAEMON}" -- ${DAEMON_ARGS}
+            --startas /bin/bash -- \
+            -c "exec ${DAEMON} ${DAEMON_ARGS} >> ${LOGFILE} 2>&1"
         do_status
     else
         echo "${DAEMON_NAME} is already running."
