@@ -20,9 +20,11 @@ from chameleond.utils import fpga
 from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import input_flow
+from chameleond.utils import system_tools
 from chameleond.utils import usb
 from chameleond.utils import usb_audio_flow
 from chameleond.utils import usb_hid_flow
+
 
 class DriverError(Exception):
   """Exception raised when any error on FPGA driver."""
@@ -183,6 +185,11 @@ class ChameleondDriver(ChameleondInterface):
     # Set all ports unplugged on initialization.
     for port_id in self.GetSupportedPorts():
       self.Unplug(port_id)
+
+  def Reboot(self):
+    """Reboots Chameleon board."""
+    logging.info('The chameleon board is going to reboot.')
+    system_tools.SystemTools.Call('reboot')
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
