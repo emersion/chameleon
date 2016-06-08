@@ -32,9 +32,7 @@ class BluetoothHIDFlow(object):
     self._port_id = port_id
     self._connector_type = connector_type
     self._usb_ctrl = usb_ctrl
-    # Connect to the device by enabling the driver in order to find tty.
-    self.Connect()
-    self._tty = serial_utils.FindTtyByDriver(self.SERIAL_DRIVER)
+    self._tty = None
     super(BluetoothHIDFlow, self).__init__()
 
   def Initialize(self):
@@ -43,6 +41,8 @@ class BluetoothHIDFlow(object):
     Enables USB port device mode controller so USB host on the other side will
     not get confused when trying to enumerate this USB device.
     """
+    self._usb_ctrl.EnableDriver()
+    self._usb_ctrl.EnableUSBOTGDriver()
     logging.debug('Initialized Bluetooth HID flow #%d.', self._port_id)
 
   def Select(self):
@@ -69,6 +69,7 @@ class BluetoothHIDFlow(object):
       True if Bluetooth hid serial driver is enabled and the tty is found.
       False otherwise.
     """
+    self._tty = serial_utils.FindTtyByDriver(self.SERIAL_DRIVER)
     return self._usb_ctrl.DriverIsEnabled() and bool(self._tty)
 
   def Plug(self):
@@ -81,10 +82,6 @@ class BluetoothHIDFlow(object):
     Do nothing for BlueoothHIDFlow.
     """
     logging.debug('Bluetooth HID flow #%d: Unplug() called.', self._port_id)
-
-  def Connect(self):
-    """Connect to the device by enabling the serial driver."""
-    self._usb_ctrl.EnableDriver()
 
   def Disconnect(self):
     """Disconnect to the device by removing the serial driver."""

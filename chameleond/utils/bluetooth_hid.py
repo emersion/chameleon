@@ -41,8 +41,11 @@ class BluetoothHID(RN42):
     """
     super(BluetoothHID, self).__init__()
     self.device_type = device_type
+    self.authentication_mode = authentication_mode
     self.send_delay = send_delay
 
+  def Init(self):
+    """Initialize the emulated device."""
     # Enter command mode for configuration.
     self.EnterCommandMode()
 
@@ -50,10 +53,10 @@ class BluetoothHID(RN42):
     self.SetServiceProfileHID()
 
     # Set the HID device type.
-    self.SetHIDDevice(device_type)
+    self.SetHIDDevice(self.device_type)
 
     # Set authentication to the specified mode.
-    self.SetAuthenticationMode(authentication_mode)
+    self.SetAuthenticationMode(self.authentication_mode)
 
     # Set RN-42 to work as a slave.
     self.SetSlaveMode()
@@ -68,7 +71,7 @@ class BluetoothHID(RN42):
     # Should enter command mode again after reboot.
     self.EnterCommandMode()
 
-    logging.info('A HID "%s" device is created successfully.', device_type)
+    logging.info('A HID "%s" device is created successfully.', self.device_type)
 
   def __del__(self):
     self.Close()
@@ -256,6 +259,7 @@ def DemoBluetoothHIDKeyboard(remote_address, chars):
   """
   print 'Creating an emulated bluetooth keyboard...'
   keyboard = BluetoothHIDKeyboard(BluetoothHID.PIN_CODE_MODE)
+  keyboard.Init()
 
   print 'Connecting to the remote address %s...' % remote_address
   try:
@@ -304,6 +308,7 @@ def DemoBluetoothHIDMouse(remote_address):
   """
   print 'Creating an emulated bluetooth mouse...'
   mouse = BluetoothHIDMouse(BluetoothHID.PIN_CODE_MODE)
+  mouse.Init()
 
   print 'Connecting to the remote address %s...' % remote_address
   try:

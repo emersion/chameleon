@@ -45,6 +45,8 @@ class RN42(object):
   POST_CONNECTION_WAIT_SECS = 1 # waiting time in seconds for a connection
                                 # to become stable
   REBOOT_SLEEP_SECS = 0.5       # the time to sleep after reboot.
+  CREATE_SERIAL_DEVICE_SLEEP_SECS = 1
+                                # waiting time after creating a serial device
 
   # A newline is a carriage return '\r' followed by line feed '\n'.
   NEWLINE = '\r\n'
@@ -271,11 +273,17 @@ class RN42(object):
   def __init__(self):
     self._command_mode = False
     self._closed = False
+    self._serial = None
+    self._port = None
 
+  def CreateSerialDevice(self):
+    """Create the serial device."""
     try:
       self._serial = serial_utils.SerialDevice()
-    except:
-      raise RN42Exception('Fail to create a serial device.')
+    except Exception as e:
+      error_msg = 'Fail to create a serial device: %s' % e
+      logging.error(error_msg)
+      raise RN42Exception(error_msg)
 
     try:
       self._serial.Connect(driver=self.DRIVER,
@@ -283,9 +291,13 @@ class RN42(object):
                            bytesize=self.BYTESIZE,
                            parity=self.PARITY,
                            stopbits=self.STOPBITS)
-      logging.info('Connect to the serial port successfully.')
-    except:
-      raise RN42Exception('Fail to connect to the serial device.')
+      self._port = self._serial.port
+      logging.info('Connect to the serial port successfully: %s', self._port)
+    except Exception as e:
+      error_msg = 'Fail to connect to the serial device: %s' % e
+      logging.error(error_msg)
+      raise RN42Exception(error_msg)
+    time.sleep(self.CREATE_SERIAL_DEVICE_SLEEP_SECS)
 
   def __del__(self):
     self.Close()
@@ -347,6 +359,10 @@ class RN42(object):
       RN42Exception if there is an error in serial communication or
       if the response is not expected.
     """
+    # Create a serial device if not yet.
+    if not self._serial:
+      self.CreateSerialDevice()
+
     try:
       # The command to enter command mode is special. It does not end
       # with a newline.

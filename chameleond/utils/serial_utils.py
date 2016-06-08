@@ -173,7 +173,7 @@ class SerialDevice(object):
       log: True to enable logging.
     """
     self._serial = None
-    self._port = ''
+    self.port = ''
     self.send_receive_interval_secs = send_receive_interval_secs
     self.retry_interval_secs = retry_interval_secs
     self.log = log
@@ -208,7 +208,7 @@ class SerialDevice(object):
       raise serial.SerialException(
           'Serial device with driver %r not found' % driver)
 
-    self._port = port
+    self.port = port
 
     self._serial = OpenSerial(
         port=port, baudrate=baudrate, bytesize=bytesize, parity=parity,
