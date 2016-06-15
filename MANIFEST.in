@@ -2,7 +2,10 @@ include Makefile
 include *.txt
 include bin/*
 include deploy/deploy
+include deploy/deploy_pip
 include deploy/init.d/chameleond
 include deploy/init.d/displayd
 include deploy/init.d/chameleon-updater
+include updatable/python2.7/*.py
+include updatable/pip/*
 recursive-include updatable boot-partition.img fpga.rbf socfpga.dtb zImage modules.tgz

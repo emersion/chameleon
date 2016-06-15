@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 """Setup script to distribute and install Chameleond library and scripts."""
 
-from distutils.core import setup
+# Needs to import setup from setuptools instead of distutils.core
+# in order to use the install_requires argument.
+from setuptools import setup
 
 setup(
     name='chameleond',
@@ -16,5 +18,8 @@ setup(
     license='Chromium',
     description='Server to communicate and control Chameleon board.',
     long_description='Server to communicate and control Chameleon board.',
+    # Uses pyserial version 2.7. The newer 3.x version is not compatible
+    # with chameleond/utils/serial_utils.py
+    install_requires=['pyserial==2.7',],
     scripts=['utils/run_chameleond', 'utils/run_displayd']
 )

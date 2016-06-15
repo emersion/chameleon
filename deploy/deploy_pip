@@ -1,0 +1,25 @@
+#!/bin/sh
+# Copyright 2016 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+SCRIPT="$(readlink -f $0)"
+UPDATABLE_DIR="$(realpath $(dirname ${SCRIPT})/../updatable)"
+SRC_PYTHON_DIR="${UPDATABLE_DIR}/python2.7"
+PIP_DIR="${UPDATABLE_DIR}/pip"
+DST_PYTHON_DIR="/usr/lib/python2.7"
+PIP_BOOTSTRAP="get-pip.py"
+
+install_standard_python_modules() {
+    for file in "${SRC_PYTHON_DIR}"/*; do
+        cp -f "${file}" "${DST_PYTHON_DIR}"
+    done
+}
+
+install_pip() {
+    python "${PIP_DIR}/${PIP_BOOTSTRAP}"
+}
+
+# Install the missing standard python modules needed to install pip.
+install_standard_python_modules
+install_pip

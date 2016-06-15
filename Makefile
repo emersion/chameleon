@@ -43,6 +43,7 @@ CHAMELEON_BOARD ?= 'fpga_tio'
 install:
 	@mkdir -p $(DESTDIR)
 	@cp -f $(BINARIES) "$(DESTDIR)"
+	@deploy/deploy_pip
 	@python setup.py install -f
 	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \
 	    deploy/deploy
