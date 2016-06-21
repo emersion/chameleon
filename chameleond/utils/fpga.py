@@ -593,7 +593,6 @@ class AudioDumper(object):
 
   def StartDumpingToMemory(self):
     """Starts dumping to memory."""
-    #TODO(cychiang) Implement rotation dumping for long recording.
     self._Stop()
 
     start_address = self._DEFAULT_START_ADDRESS
@@ -627,6 +626,14 @@ class AudioDumper(object):
     self._Stop()
     return AudioDumper._GetMappedAddress(start_address), page_count
 
+  def GetCurrentPageCount(self):
+    """Reads current page count.
+
+    Returns:
+      The current page count read from page count register.
+    """
+    return self._memory.Read(self._REGS_BASE + self._REG_PAGE_COUNT)
+
   @classmethod
   def _GetMappedAddress(cls, address):
     """Gets mapped address in ARM's address space.
@@ -652,6 +659,12 @@ class AudioDumper(object):
       AUDIO_DATA_FORMAT. Refer to audio.AudioDataFormat docstring for details.
     """
     return self.AUDIO_DATA_FORMAT.AsDict()
+
+  @property
+  def start_address(self):
+    """The mapped start address."""
+    start_address = self._memory.Read(self._REGS_BASE + self._REG_START_ADDR)
+    return AudioDumper._GetMappedAddress(start_address)
 
 
 class AudioSource(object):
