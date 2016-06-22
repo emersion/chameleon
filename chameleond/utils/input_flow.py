@@ -395,6 +395,7 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
         self._fpga.adump)
     self._audio_route_manager = audio_utils.AudioRouteManager(
         self._fpga.aroute)
+    self._audio_recorded_file = None
 
   @property
   def is_capturing_audio(self):
@@ -404,7 +405,11 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
   def StartCapturingAudio(self):
     """Starts capturing audio."""
     self._audio_route_manager.SetupRouteFromInputToDumper(self._input_id)
-    self._audio_capture_manager.StartCapturingAudio()
+    self._audio_recorded_file = tempfile.NamedTemporaryFile(
+        prefix='audio_', suffix='.raw', delete=False)
+    logging.info('Save captured audio to %s', self._audio_recorded_file.name)
+    self._audio_capture_manager.StartCapturingAudio(
+        self._audio_recorded_file.name)
 
   def StopCapturingAudio(self):
     """Stops capturing audio.
@@ -419,14 +424,9 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    data, data_format = self._audio_capture_manager.StopCapturingAudio()
+    data_format = self._audio_capture_manager.StopCapturingAudio()
     self.ResetRoute()
-    with tempfile.NamedTemporaryFile(
-        prefix='audio_', suffix='.raw', delete=False) as recorded_file:
-      recorded_file.write(data)
-      recorded_file.flush()
-      logging.info('Saved captured audio to %s', recorded_file.name)
-      return recorded_file.name, data_format
+    return self._audio_recorded_file.name, data_format
 
   def ResetRoute(self):
     """Resets the audio route."""

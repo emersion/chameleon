@@ -114,6 +114,7 @@ class InputCodecFlow(CodecFlow):
   def __init__(self, *args):
     """Constructs an InputCodecFlow object."""
     super(InputCodecFlow, self).__init__(*args)
+    self._recorded_file = None
     self._audio_capture_manager = audio_utils.AudioCaptureManager(
         self._fpga.adump)
 
@@ -143,7 +144,10 @@ class InputCodecFlow(CodecFlow):
     """Starts capturing audio."""
     self._audio_codec.SelectInput(self._CODEC_INPUTS[self._port_id])
     self._audio_route_manager.SetupRouteFromInputToDumper(self._port_id)
-    self._audio_capture_manager.StartCapturingAudio()
+    self._recorded_file = tempfile.NamedTemporaryFile(
+        prefix='audio_', suffix='.raw', delete=False)
+    logging.info('Save captured audio to %s', self._recorded_file.name)
+    self._audio_capture_manager.StartCapturingAudio(self._recorded_file.name)
 
   def StopCapturingAudio(self):
     """Stops capturing audio.
@@ -158,15 +162,10 @@ class InputCodecFlow(CodecFlow):
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    data, data_format = self._audio_capture_manager.StopCapturingAudio()
+    data_format = self._audio_capture_manager.StopCapturingAudio()
     self._audio_codec.SelectInput(codec.CodecInput.NONE)
     self.ResetRoute()
-    with tempfile.NamedTemporaryFile(
-        prefix='audio_', suffix='.raw', delete=False) as recorded_file:
-      recorded_file.write(data)
-      recorded_file.flush()
-      logging.info('Saved captured audio to %s', recorded_file.name)
-      return recorded_file.name, data_format
+    return self._recorded_file.name, data_format
 
   def ResetRoute(self):
     """Resets the audio route."""

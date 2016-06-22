@@ -168,6 +168,10 @@ class ChameleondDriver(ChameleondInterface):
         self.SetDdcState(port_id, enabled=True)
     for port_id in self.GetSupportedPorts():
       if self.HasAudioSupport(port_id):
+        # Stops all audio capturing.
+        if ids.IsInputPort(port_id) and self._flows[port_id].is_capturing_audio:
+          self._flows[port_id].StopCapturingAudio()
+
         self._flows[port_id].ResetRoute()
 
     if self.HasAudioBoard():

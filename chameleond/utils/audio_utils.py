@@ -13,6 +13,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import fpga
 from chameleond.utils import ids
 from chameleond.utils import mem
+from chameleond.utils import memory_dumper
 from chameleond.utils import system_tools
 
 
@@ -35,7 +36,8 @@ class AudioCaptureManager(object):
       audio_dumper: An AudioDumper object.
     """
     self._adump = audio_dumper
-    self._capture_audio_start_time = None
+    self._mem_dumper = None
+    self._file_path = None
 
   @property
   def is_capturing(self):
@@ -46,71 +48,67 @@ class AudioCaptureManager(object):
     """
     return self._adump.is_dumping
 
-  def StartCapturingAudio(self):
-    """Starts capturing audio."""
-    self._capture_audio_start_time = time.time()
+  def StartCapturingAudio(self, file_path):
+    """Starts capturing audio.
+
+    Args:
+      file_path: The target file for audio capturing.
+    """
+    self._file_path = file_path
     self._adump.StartDumpingToMemory()
+    self._mem_dumper = memory_dumper.MemoryDumper(file_path, self._adump)
+    self._mem_dumper.start()
     logging.info('Started capturing audio.')
 
   def StopCapturingAudio(self):
     """Stops capturing audio.
 
     Returns:
-      A tuple (data, format).
-      data: The captured audio data.
-      format: The dict representation of AudioDataFormat. Refer to docstring
+      The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
 
     Raises:
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    if not self._capture_audio_start_time:
+    if not self.is_capturing:
       raise AudioCaptureManagerError('Stop Capturing audio before Start')
 
-    captured_time_secs = time.time() - self._capture_audio_start_time
-    self._capture_audio_start_time = None
-
+    self._mem_dumper.Stop()
+    self._mem_dumper.join()
     start_address, page_count = self._adump.StopDumpingToMemory()
+    logging.info('Stopped capturing audio.')
 
-    if page_count > self._adump.MAX_DUMP_PAGES:
+    if self._mem_dumper.exitcode:
       raise AudioCaptureManagerError(
-          'Dumped number of pages %d exceeds the limit %d',
-          page_count, self._adump.MAX_DUMP_PAGES)
+          'MemoryDumper was terminated unexpectedly.')
 
-    if captured_time_secs > self._adump.MAX_DUMP_TIME_SECS:
-      raise AudioCaptureManagerError(
-          'Capture time %f seconds exceeds time limit %f secs' % (
-              captured_time_secs, self._adump.MAX_DUMP_TIME_SECS))
-
-    logging.info(
-        'Stopped capturing audio. Captured duration: %f seconds; '
-        '4K page count: %d', captured_time_secs, page_count)
-
-    # The page count should increase even if there is no audio data
-    # sent to this input.
     if page_count == 0:
       raise AudioCaptureManagerError(
           'No audio data was captured. Perhaps this input is not plugged ?')
 
     # Workaround for issue crbug.com/574683 where the last two pages should
     # be neglected.
-    if page_count < 2:
-      raise AudioCaptureManagerError(
-          'Not enough audio data was captured.')
-    page_count = page_count - 2
+    self._TruncateFile(2)
 
-    # Use pixeldump to dump a range of memory into file.
-    # Originally, the area size is
-    # screen_width * screen_height * byte_per_pixel.
-    # In our use case, the area size is page_size * page_count * 1.
-    with tempfile.NamedTemporaryFile() as f:
-      system_tools.SystemTools.Call(
-          'pixeldump', '-a', start_address, f.name, self._adump.PAGE_SIZE,
-          page_count, 1)
-      logging.info('Captured audio data size: %f MBytes',
-                   os.path.getsize(f.name) / 1024.0 / 1024.0)
-      return f.read(), self._adump.audio_data_format_as_dict
+    return self._adump.audio_data_format_as_dict
+
+  def _TruncateFile(self, pages):
+    """Truncates some pages from the end of recorded file.
+
+    Args:
+      pages: Number of pages to be truncated from the end of file.
+
+    Raises:
+      AudioCaptureManagerError if not enough data was captured.
+    """
+    file_size = os.path.getsize(self._file_path)
+    new_file_size = file_size - self._adump.PAGE_SIZE * pages
+    if new_file_size <= 0:
+     raise AudioCaptureManagerError('Not enough audio data was captured.')
+
+    with open(self._file_path, 'r+') as f:
+      f.truncate(new_file_size)
 
 
 class AudioStreamManagerError(Exception):
