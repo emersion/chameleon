@@ -24,6 +24,10 @@ class RN42(object):
   configure it to use the HID protocol to emulate a keyboard, a mouse,
   or a combo of both.
 
+  Note: every public member method should
+        return True or a non-None object if successful;
+        return False or Raise an exception otherwise.
+
   For user guide about serial control of the kit, refer to
   http://ww1.microchip.com/downloads/en/DeviceDoc/50002325A.pdf
 
@@ -335,16 +339,22 @@ class RN42(object):
       logging.error(error_msg)
       raise RN42Exception(error_msg)
 
+    self._closed = False
     time.sleep(self.CREATE_SERIAL_DEVICE_SLEEP_SECS)
+    return True
 
   def Close(self):
     """Close the device gracefully."""
     if not self._closed:
-      # It is possible that RN-42 has left command mode. In that case, do not
-      # expect any response from the kit.
-      self.LeaveCommandMode(expect_in='')
-      self._serial.Disconnect()
+      try:
+        # It is possible that RN-42 has left command mode. In that case, do not
+        # expect any response from the kit.
+        self.LeaveCommandMode(expect_in='')
+        self._serial.Disconnect()
+      except Exception as e:
+        logging.warn('The serial device was probably already closed: %s', e)
       self._closed = True
+    return True
 
   def CheckSerialConnection(self):
     """Check the USB serial connection between RN-42 and the chameleon board."""

@@ -18,7 +18,12 @@ class BluetoothHIDException(Exception):
 
 
 class BluetoothHID(RN42):
-  """A base bluetooth HID emulator class using RN-42 evaluation kit."""
+  """A base bluetooth HID emulator class using RN-42 evaluation kit.
+
+  Note: every public member method should
+        return True or a non-None object if successful;
+        return False or Raise an exception otherwise.
+  """
 
   TMP_PIN_CODE = '0000'     # A temporary pin code
 
@@ -95,6 +100,7 @@ class BluetoothHID(RN42):
       time.sleep(self.INIT_SLEEP_SECS)
 
     logging.info('A bluetooth HID "%s" device is connected.', self.device_type)
+    return True
 
   def __del__(self):
     self.Close()
