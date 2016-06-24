@@ -12,6 +12,8 @@ BINDIR := ./bin
 SRCDIR := ./src
 DISTDIR := ./dist
 EGGDIR := ./chameleond.egg-info
+STREAM_SRCS = $(wildcard $(SRCDIR)/stream_server/*.c)
+STREAM_OBJS = $(patsubst $(SRCDIR)/stream_server/*.c,$(BINDIR)/%.o,$(STREAM_SRCS))
 
 TARGETS = directories chameleond
 
@@ -23,7 +25,7 @@ directories:
 	@mkdir -p $(BINDIR)
 
 BINARIES = $(BINDIR)/histogram $(BINDIR)/hpd_control $(BINDIR)/pixeldump \
-	  $(BINDIR)/avsync
+	  $(BINDIR)/avsync $(BINDIR)/stream_server
 
 .PHONY: binaries
 binaries: $(BINARIES)
@@ -37,6 +39,13 @@ $(BINDIR)/%.o: $(SRCDIR)/%.c
 
 $(BINDIR)/%: $(BINDIR)/%.o
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
+
+$(BINDIR)/stream_server.o: $(SRCDIR)/stream_server/%.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BINDIR)/stream_server: $(STREAM_OBJS)
+	$(CC) $(CFLAGS) -lpthread $(INCLUDES) -o $@ $^
+
 
 BUNDLE_VERSION ?= '9999'
 CHAMELEON_BOARD ?= 'fpga_tio'
