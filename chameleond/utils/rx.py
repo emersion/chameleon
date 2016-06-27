@@ -144,12 +144,17 @@ class HdmiRx(i2c.I2cSlave):
 
   SLAVE_ADDRESSES = (0x48, )
 
+  _AUDIO_RESET_DELAY = 0.001
+
   _REG_P0_INTERRUPT = 0x05
   _BIT_P0_RX_CLK_STABLE_CHG = 1 << 2
   _BIT_P0_RX_CLK_ON_CHG = 1 << 1
 
   _REG_INTERNAL_STATUS = 0x0a
   _BIT_P0_PWR5V_DET = 1 << 0
+
+  _REG_AUDIO_VIDEO_RESET = 0x10
+  _BIT_REG_AUDIO_RESET = 1 << 1
 
   _REG_P0_RESET = 0x11
   _BIT_P0_SWRST = 1 << 0
@@ -397,6 +402,17 @@ class HdmiRx(i2c.I2cSlave):
       True if the video input is encrypted; otherwise, False.
     """
     return bool(self.Get(self._REG_HDCP_STATUS) & self._BIT_P0_HDCP_ON)
+
+  def ResetAudioLogic(self):
+    """Resets audio logic.
+
+    For some ChromeOS boards, receiver judges HDMI audio data stop as an error.
+    In error state, receiver does not dump data anymore. Reset audio logic so
+    receiver can dump new data.
+    """
+    self.SetMask(self._REG_AUDIO_VIDEO_RESET, self._BIT_REG_AUDIO_RESET)
+    time.sleep(self._AUDIO_RESET_DELAY)
+    self.ClearMask(self._REG_AUDIO_VIDEO_RESET, self._BIT_REG_AUDIO_RESET)
 
 
 class VgaRx(i2c.I2cSlave):

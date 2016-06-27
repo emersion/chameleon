@@ -408,6 +408,8 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
     self._audio_recorded_file = tempfile.NamedTemporaryFile(
         prefix='audio_', suffix='.raw', delete=False)
     logging.info('Save captured audio to %s', self._audio_recorded_file.name)
+    # Resets audio logic for issue crbug.com/623466.
+    self._ResetAudioLogic()
     self._audio_capture_manager.StartCapturingAudio(
         self._audio_recorded_file.name)
 
@@ -658,6 +660,10 @@ class DpInputFlow(InputFlow):
     """
     raise NotImplementedError('IsVideoInputEncrypted')
 
+  def _ResetAudioLogic(self):
+    """Resets audio logic."""
+    raise NotImplementedError('_ResetAudioLogic')
+
 
 class HdmiInputFlow(InputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
@@ -869,6 +875,10 @@ class HdmiInputFlow(InputFlowWithAudio):
     """
     return self._rx.IsVideoInputEncrypted()
 
+  def _ResetAudioLogic(self):
+    """Reset audio logic so receiver can resume from error state."""
+    self._rx.ResetAudioLogic()
+
 
 class VgaInputFlow(InputFlow):
   """An abstraction of the entire flow for VGA."""
@@ -1072,3 +1082,7 @@ class VgaInputFlow(InputFlow):
     """
     # VGA not support content protection.
     return False
+
+  def _ResetAudioLogic(self):
+    """Resets audio logic."""
+    raise NotImplementedError('_ResetAudioLogic')
