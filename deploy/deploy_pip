@@ -10,6 +10,10 @@ PIP_DIR="${UPDATABLE_DIR}/pip"
 DST_PYTHON_DIR="/usr/lib/python2.7"
 PIP_BOOTSTRAP="get-pip.py"
 
+set_time() {
+    echo Current chameleon time: $(date --set="$NOW")
+}
+
 install_standard_python_modules() {
     for file in "${SRC_PYTHON_DIR}"/*; do
         cp -f "${file}" "${DST_PYTHON_DIR}"
@@ -19,6 +23,10 @@ install_standard_python_modules() {
 install_pip() {
     python "${PIP_DIR}/${PIP_BOOTSTRAP}"
 }
+
+
+# Set the correct time. Otherwise, installation of pip may fail.
+set_time
 
 # Install the missing standard python modules needed to install pip.
 install_standard_python_modules

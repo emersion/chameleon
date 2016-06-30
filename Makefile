@@ -38,12 +38,13 @@ $(BINDIR)/%: $(BINDIR)/%.o
 
 BUNDLE_VERSION ?= '9999'
 CHAMELEON_BOARD ?= 'fpga_tio'
+NOW := `date "+%Y-%m-%d %H:%M:%S"`
 
 .PHONY: install
 install:
 	@mkdir -p $(DESTDIR)
 	@cp -f $(BINARIES) "$(DESTDIR)"
-	@deploy/deploy_pip
+	@NOW="$(NOW)" deploy/deploy_pip
 	@python setup.py install -f
 	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \
 	    deploy/deploy
@@ -56,14 +57,16 @@ BUNDLEDIR = chameleond-$(VERSION)
 remote-install:
 	@echo "Set bundle version to $(BUNDLE_VERSION)"
 	@echo "Set board to $(CHAMELEON_BOARD)"
+	@echo "Current host time: $(NOW)"
 ifdef CHAMELEON_HOST
 	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
 	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
 	    "cd /tmp && rm -rf $(BUNDLEDIR) && tar zxf $(BUNDLE) &&" \
 	    "cd $(BUNDLEDIR) && find -exec touch -c {} \; &&" \
 	    "make install " \
-                "BUNDLE_VERSION=$(BUNDLE_VERSION) " \
-                "CHAMELEON_BOARD=$(CHAMELEON_BOARD)"
+	        "NOW=\"$(NOW)\" " \
+	        "BUNDLE_VERSION=$(BUNDLE_VERSION) " \
+	        "CHAMELEON_BOARD=$(CHAMELEON_BOARD)"
 else
 	$(error CHAMELEON_HOST is undefined)
 endif
