@@ -38,13 +38,22 @@ $(BINDIR)/%: $(BINDIR)/%.o
 
 BUNDLE_VERSION ?= '9999'
 CHAMELEON_BOARD ?= 'fpga_tio'
-NOW := `date "+%Y-%m-%d %H:%M:%S"`
+# Get current time from the host.
+HOST_NOW := `date "+%Y-%m-%d %H:%M:%S"`
+# Get current time from the chameleon mirror server.
+SERVER_NOW := `find /usr/lib -name sync_time.py -exec python {} \;`
 
 .PHONY: install
 install:
 	@mkdir -p $(DESTDIR)
 	@cp -f $(BINARIES) "$(DESTDIR)"
-	@NOW="$(NOW)" deploy/deploy_pip
+ifeq ($(REMOTE_INSTALL), TRUE)
+	@echo sync time with host...
+	@NOW="$(HOST_NOW)" deploy/deploy_pip
+else
+	@echo sync time with the chameleon mirror server...
+	@NOW="$(SERVER_NOW)" deploy/deploy_pip
+endif
 	@python setup.py install -f
 	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \
 	    deploy/deploy
@@ -57,14 +66,14 @@ BUNDLEDIR = chameleond-$(VERSION)
 remote-install:
 	@echo "Set bundle version to $(BUNDLE_VERSION)"
 	@echo "Set board to $(CHAMELEON_BOARD)"
-	@echo "Current host time: $(NOW)"
+	@echo "Current host time: $(HOST_NOW)"
 ifdef CHAMELEON_HOST
 	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
 	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
 	    "cd /tmp && rm -rf $(BUNDLEDIR) && tar zxf $(BUNDLE) &&" \
 	    "cd $(BUNDLEDIR) && find -exec touch -c {} \; &&" \
 	    "make install " \
-	        "NOW=\"$(NOW)\" " \
+	        "REMOTE_INSTALL=TRUE" \
 	        "BUNDLE_VERSION=$(BUNDLE_VERSION) " \
 	        "CHAMELEON_BOARD=$(CHAMELEON_BOARD)"
 else

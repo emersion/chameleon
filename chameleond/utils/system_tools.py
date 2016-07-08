@@ -15,6 +15,7 @@ class _SystemTools(object):
       'aplay': '/usr/bin/aplay',
       'arecord': '/usr/bin/arecord',
       'chameleond': '/etc/init.d/chameleond',
+      'date': '/bin/date',
       'i2cdump': '/usr/local/sbin/i2cdump',
       'i2cget': '/usr/local/sbin/i2cget',
       'i2cset': '/usr/local/sbin/i2cset',
@@ -25,6 +26,7 @@ class _SystemTools(object):
       'reboot': '/sbin/reboot',
       'histogram': '/usr/bin/histogram',
       'pixeldump': '/usr/bin/pixeldump',
+      'wget': '/usr/bin/wget',
   }
 
   def __init__(self):
