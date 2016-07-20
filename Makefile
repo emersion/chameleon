@@ -40,8 +40,6 @@ BUNDLE_VERSION ?= '9999'
 CHAMELEON_BOARD ?= 'fpga_tio'
 # Get current time from the host.
 HOST_NOW := `date "+%Y-%m-%d %H:%M:%S"`
-# Get current time from the chameleon mirror server.
-SERVER_NOW := `find /usr/lib -name sync_time.py -exec python {} \;`
 
 .PHONY: install
 install:
@@ -52,7 +50,7 @@ ifeq ($(REMOTE_INSTALL), TRUE)
 	@NOW="$(HOST_NOW)" deploy/deploy_pip
 else
 	@echo sync time with the chameleon mirror server...
-	@NOW="$(SERVER_NOW)" deploy/deploy_pip
+	@NOW="`chameleond/utils/server_time`" deploy/deploy_pip
 endif
 	@python setup.py install -f
 	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \

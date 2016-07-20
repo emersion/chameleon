@@ -21,5 +21,6 @@ setup(
     # Uses pyserial version 2.7. The newer 3.x version is not compatible
     # with chameleond/utils/serial_utils.py
     install_requires=['pyserial==2.7',],
-    scripts=['utils/run_chameleond', 'utils/run_displayd']
+    scripts=['utils/run_chameleond', 'utils/run_displayd',
+             'chameleond/utils/server_time']
 )
