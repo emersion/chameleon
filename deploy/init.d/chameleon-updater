@@ -66,7 +66,10 @@ do_start () {
     echo "Update Chameleon daemon:" \
             "${current_ver}-r${current_rev} -> ${latest_ver}-r${latest_rev}"
     pushd /tmp > /dev/null
-    wget -q "${BUNDLE_URL}/${latest_bundle}"
+    # Specifying "-O" in wget would overwrite the same bundle on the chameleon.
+    # Otherwise, ".1", ".2", would be appended to the same bundle name
+    # which is not desired.
+    wget -q "${BUNDLE_URL}/${latest_bundle}" -O "${latest_bundle}"
     tar zxf ${latest_bundle}
     cd ${bundle_dir}
     make install \
