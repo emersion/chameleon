@@ -11,6 +11,7 @@ DESTDIR := /usr/bin
 BINDIR := ./bin
 SRCDIR := ./src
 DISTDIR := ./dist
+EGGDIR := ./chameleond.egg-info
 
 TARGETS = directories chameleond
 
@@ -72,6 +73,7 @@ ifdef CHAMELEON_HOST
 	    "cd $(BUNDLEDIR) && find -exec touch -c {} \; &&" \
 	    "make install " \
 	        "REMOTE_INSTALL=TRUE" \
+	        "HOST_NOW=\"$(HOST_NOW)\"" \
 	        "BUNDLE_VERSION=$(BUNDLE_VERSION) " \
 	        "CHAMELEON_BOARD=$(CHAMELEON_BOARD)"
 else
@@ -80,7 +82,7 @@ endif
 
 .PHONY: clean
 clean:
-	@rm -rf $(BINDIR) $(DISTDIR)
+	@rm -rf $(BINDIR) $(DISTDIR) $(EGGDIR)
 
 PYLINTRC = $(CROS_WORKON_SRCROOT)/chromite/pylintrc
 PYLINT_OPTIONS = \
