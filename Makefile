@@ -22,7 +22,8 @@ all: $(TARGETS)
 directories:
 	@mkdir -p $(BINDIR)
 
-BINARIES = $(BINDIR)/histogram $(BINDIR)/hpd_control $(BINDIR)/pixeldump
+BINARIES = $(BINDIR)/histogram $(BINDIR)/hpd_control $(BINDIR)/pixeldump \
+	  $(BINDIR)/avsync
 
 .PHONY: binaries
 binaries: $(BINARIES)

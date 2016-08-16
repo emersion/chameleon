@@ -107,6 +107,7 @@ class ChameleondDriver(ChameleondInterface):
     self._selected_input = None
     self._selected_output = None
     self._captured_params = {}
+    self._process = None
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
 
@@ -556,6 +557,47 @@ class ChameleondDriver(ChameleondInterface):
       self._selected_output = port_id
     self._flows[port_id].Do_FSM()
 
+  def StartMonitoringAudioVideoCapturingDelay(self):
+    """Starts an audio/video synchronization utility
+
+    The example of usage:
+      chameleon.StartMonitoringAudioVideoCapturingDelay()
+      chameleon.StartCapturingVideo(hdmi_input)
+      chameleon.StartCapturingAudio(hdmi_input)
+      time.sleep(2)
+      chameleon.StopCapturingVideo()
+      chameleon.StopCapturingAudio(hdmi_input)
+      delay = chameleon.GetAudioVideoCapturingDelay()
+    """
+    self._process = system_tools.SystemTools.RunInSubprocess('avsync')
+
+  def GetAudioVideoCapturingDelay(self):
+    """Get the time interval between the first audio/video cpatured data
+
+    Returns:
+      A floating points indicating the time interval between the first
+      audio/video data captured. If the result is negative, then the first
+      video data is earlier, otherwise the first audio data is earlier.
+
+    Raises:
+      DriverError if there is no output from the monitoring process.
+    """
+
+    if self._process.poll() == None:
+      self._process.terminate()
+      raise DriverError('The monitoring process has not finished.')
+
+    return_code, out, err = system_tools.SystemTools.GetSubprocessOutput(
+        self._process)
+
+    if return_code != 0 or err:
+      raise DriverError('Runtime error in the monitoring process')
+
+    if not out:
+      raise DriverError('No output from the monitoring process.')
+
+    return float(out)
+
   @_VideoMethod
   def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
@@ -839,7 +881,7 @@ class ChameleondDriver(ChameleondInterface):
                   value of GetCapturedFrameCount.
 
     Returns:
-      The list of checksums of frames.
+      The list of histograms of frames.
     """
     return self._GetCapturedSignals('GetHistograms', start_index, stop_index)
 

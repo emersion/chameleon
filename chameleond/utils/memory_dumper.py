@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2016 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -6,11 +5,7 @@
 
 import logging
 import multiprocessing
-import subprocess
-import sys
-import time
 
-from chameleond.utils import mem
 from chameleond.utils import system_tools
 
 
@@ -35,6 +30,7 @@ class MemoryDumper(multiprocessing.Process):
     self._last_page_count = None
     self._last_last_page_count = None
     self._current_page_count = None
+    self._page_count_in_this_period = None
     self._file_path = file_path
     self._adump = adump
     self._stop_event = multiprocessing.Event()
@@ -45,8 +41,13 @@ class MemoryDumper(multiprocessing.Process):
     self._stop_event.set()
 
   def run(self):
-    """Runs the periodic dumping process."""
-    self._last_page_count = self._adump.GetCurrentPageCount()
+    """Runs the periodic dumping process.
+
+    Note that the audio page count should really start from 0, and this
+    should not be called too lately, or the page count in the first period
+    may be greater than MAX_DUMP_PAGES.
+    """
+    self._last_page_count = 0
     while True:
       self._stop_event.wait(self._DUMP_PERIOD_SECS)
       if self._stop_event.is_set():
@@ -177,7 +178,7 @@ class MemoryDumper(multiprocessing.Process):
     start_address = (self._adump.start_address +
                      start_page_index * self._adump.PAGE_SIZE)
 
-    command = ['pixeldump', '-a', start_address, '-' , self._adump.PAGE_SIZE,
+    command = ['pixeldump', '-a', start_address, '-', self._adump.PAGE_SIZE,
                page_count, 1]
     logging.info('Dump: %s', command)
     p = system_tools.SystemTools.RunInSubprocess(*command)

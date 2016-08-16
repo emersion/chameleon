@@ -14,6 +14,7 @@ class _SystemTools(object):
   _TOOL_PATHS = {
       'aplay': '/usr/bin/aplay',
       'arecord': '/usr/bin/arecord',
+      'avsync': '/usr/bin/avsync',
       'chameleond': '/etc/init.d/chameleond',
       'date': '/bin/date',
       'i2cdump': '/usr/local/sbin/i2cdump',
