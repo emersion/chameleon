@@ -185,10 +185,11 @@ class BluetoothHIDMouse(BluetoothHID):
     super(BluetoothHIDMouse, self).__init__(BluetoothHID.MOUSE,
                                             authentication_mode)
 
-  def Move(self, delta_x=0, delta_y=0):
-    """Move the mouse (delta_x, delta_y) pixels.
+  def _Move(self, buttons=0, delta_x=0, delta_y=0):
+    """Move the mouse (delta_x, delta_y) pixels with buttons status.
 
     Args:
+      buttons: the press/release status of buttons
       delta_x: the pixels to move horizontally
                positive values: moving right; max value = 127.
                negative values: moving left; max value = -127.
@@ -197,9 +198,21 @@ class BluetoothHIDMouse(BluetoothHID):
                negative values: moving up; max value = -127.
     """
     if delta_x or delta_y:
-      mouse_codes = self.RawMouseCodes(x_stop=delta_x, y_stop=delta_y)
+      mouse_codes = self.RawMouseCodes(buttons=buttons,
+                                       x_stop=delta_x, y_stop=delta_y)
       self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse.Move')
       time.sleep(self.send_delay)
+
+  def Move(self, delta_x=0, delta_y=0):
+    """Move the mouse (delta_x, delta_y) pixels.
+
+    Pure cursor movement without changing any button status.
+
+    Args:
+      delta_x: the pixels to move horizontally
+      delta_y: the pixels to move vertically
+    """
+    self._Move(delta_x=delta_x, delta_y=delta_y)
 
   def _PressButtons(self, buttons):
     """Press down the specified buttons
@@ -252,7 +265,8 @@ class BluetoothHIDMouse(BluetoothHID):
       delta_y: the pixels to move vertically
     """
     self.PressLeftButton()
-    self.Move(delta_x, delta_y)
+    # Keep the left button pressed while moving.
+    self._Move(buttons=self.LEFT_BUTTON, delta_x=delta_x, delta_y=delta_y)
     self.ReleaseLeftButton()
 
   def Scroll(self, wheel):
