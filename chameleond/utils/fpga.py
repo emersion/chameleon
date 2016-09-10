@@ -534,6 +534,10 @@ class AudioDumper(object):
   # Page size is 4K bytes. Address should be 4K-aligned.
   PAGE_SIZE = 0x1000
 
+  # Page count wraps after 0xffff. That actually means, physical 0x0 might be
+  # logical 0x10000.
+  PAGE_COUNT_WRAP_SIZE = 0x10000
+
   # The rate of audio data is
   # 8 channel * 4 bytes/sample * 48000 samples/sec = 1500 KBytes/sec.
   # So default area which contains 0x2000 4K pages can dump

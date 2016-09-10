@@ -27,9 +27,12 @@ class MemoryDumper(multiprocessing.Process):
       adump: an AudioDump object for dumper control on FPGA.
     """
     super(MemoryDumper, self).__init__()
+
+    # These page count variables all refer to logical page count.
     self._last_page_count = None
     self._last_last_page_count = None
     self._current_page_count = None
+
     self._page_count_in_this_period = None
     self._file_path = file_path
     self._adump = adump
@@ -54,21 +57,57 @@ class MemoryDumper(multiprocessing.Process):
         return
       self._HandleOnePeriod()
 
+  def _GetPageCountInThisPeriod(self, current_physical_page_count):
+    """Handles page count wrapping to get page count in this period.
+
+    The physical page count read from adump register wraps around
+    adump.PAGE_COUNT_WRAP_SIZE. This function uses
+    self._last_page_count (logical count) and current_physical_page_count
+    (physical count) to get the logical difference of them.
+
+    For example, if last logical page count is 0x1f000, current physical
+    page count read from register is 0x0010, wrap size is 0x10000, then
+    logical difference of page count is
+    (0x0010 + 0x10000) - (0x1f000 % 0x10000) = 0x10010 - 0xf000 = 0x1010.
+
+    Raises:
+      MemoryDumperError: If this function fails to handle wrapping.
+    """
+    difference = (current_physical_page_count -
+                  (self._last_page_count % self._adump.PAGE_COUNT_WRAP_SIZE))
+    if difference < 0:
+        logging.info('Handle page count wrapping for physical current page '
+                     'count 0x%x, logical last page count 0x%x',
+                     current_physical_page_count, self._last_page_count)
+
+        difference += self._adump.PAGE_COUNT_WRAP_SIZE
+
+    if difference < 0:
+      raise MemoryDumperError('Failed to handle wrapping. Difference = 0x%x' %
+                              difference)
+
+    self._page_count_in_this_period = difference
+
   def _HandleOnePeriod(self):
     """Handles the work to be done in a period.
 
     The work includes:
-    1. Gets the page count from dumper.
-    2. Checks if there is overflow, that is, too many pages to be dumped.
-    3. Append the data from memory dump area to the end of the target file.
-    4. Updates the variables for last and last last page count.
-
-    Raises:
-      MemoryDumperError if page count in a period is invalid.
+    1. Gets the physical page count from dumper.
+    2. Handles page count wrapping to get page count in this period.
+    3. Updates current page count to be logical current page count.
+    4. Checks if there is overflow, that is, too many pages to be dumped.
+    5. Appends the data from memory dump area to the end of the target file.
+    6. Updates the variables for last and last last page count.
     """
-    self._current_page_count = self._adump.GetCurrentPageCount()
-    self._page_count_in_this_period = (
-        self._current_page_count - self._last_page_count)
+    # Gets current physical page count from dumper.
+    current_physical_page_count = self._adump.GetCurrentPageCount()
+
+    # Gets the page count difference in this period. Possibly handles wrapping.
+    self._GetPageCountInThisPeriod(current_physical_page_count)
+
+    # Gets current logical page count.
+    self._current_page_count = (self._last_page_count +
+                                self._page_count_in_this_period)
 
     logging.info(
         'Current page count: 0x%x. Last page count: 0x%x. '
@@ -79,9 +118,6 @@ class MemoryDumper(multiprocessing.Process):
     # No data received in this period.
     if self._page_count_in_this_period == 0:
       return
-    elif self._page_count_in_this_period < 0:
-      raise MemoryDumperError('page count in this period: %d is invalid',
-                              self._page_count_in_this_period)
 
     self._CheckOverlap()
     self._DumpPages()
