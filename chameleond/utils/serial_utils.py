@@ -299,6 +299,16 @@ class SerialDevice(object):
         logging.warning(error_message)
       raise serial.SerialTimeoutException(error_message)
 
+  def ReceiveLine(self):
+    """Receives one line.
+
+    It blocks at most timeout seconds.
+
+    Returns:
+      Received data of one line.
+    """
+    return self._serial.readline()
+
   def FlushBuffer(self):
     """Flushes input/output buffer."""
     self._serial.flushInput()

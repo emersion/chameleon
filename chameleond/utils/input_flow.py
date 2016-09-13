@@ -21,7 +21,7 @@ from chameleond.utils import rx
 
 
 class InputFlowError(Exception):
-  """Exception raised when any error on InputFlow."""
+  """Exception raised when any error on FpgaInputFlow."""
   pass
 
 
@@ -32,9 +32,45 @@ class InputFlow(object):
   Using this abstraction, each flow can have its own behavior. No need to
   share the same Chameleond driver code.
   """
-  __metaclass__ = ABCMeta
-
   _CONNECTOR_TYPE = 'Unknown'  # A subclass should override it.
+
+  def Initialize(self):
+    """Initializes the input flow."""
+    raise NotImplementedError('IsDualPixelMode')
+
+  @classmethod
+  def GetConnectorType(cls):
+    """Returns the human readable string for the connector type."""
+    return cls._CONNECTOR_TYPE
+
+  def Select(self):
+    """Selects the flow."""
+    raise NotImplementedError('Select')
+
+  def IsPhysicalPlugged(self):
+    """Returns if the physical cable is plugged."""
+    raise NotImplementedError('IsPhysicalPlugged')
+
+  def IsPlugged(self):
+    """Returns if the flow is plugged."""
+    raise NotImplementedError('IsPlugged')
+
+  def Plug(self):
+    """Emulates plug."""
+    raise NotImplementedError('Plug')
+
+  def Unplug(self):
+    """Emulates unplug."""
+    raise NotImplementedError('Unplug')
+
+  def Do_FSM(self):
+    """Does the Finite-State-Machine to ensure the input flow ready."""
+    pass
+
+
+class FpgaInputFlow(InputFlow):
+  """An abstraction of the entire flow for InputFlow on FPGA."""
+  __metaclass__ = ABCMeta
 
   __PULSE_RETRY_COUNT = 3
 
@@ -54,7 +90,7 @@ class InputFlow(object):
   }
 
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
-    """Constructs a InputFlow object.
+    """Constructs a FpgaInputFlow object.
 
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
@@ -87,22 +123,17 @@ class InputFlow(object):
 
   def Initialize(self):
     """Initializes the input flow."""
-    logging.info('Initialize InputFlow #%d.', self._input_id)
+    logging.info('Initialize FpgaInputFlow #%d.', self._input_id)
     self._power_io.ResetReceiver(self._input_id)
     self._rx.Initialize(self.IsDualPixelMode())
 
   def Select(self):
     """Selects the input flow to set the proper muxes and FPGA paths."""
-    logging.info('Select InputFlow #%d.', self._input_id)
+    logging.info('Select FpgaInputFlow #%d.', self._input_id)
     self._mux_io.SetConfig(self._MUX_CONFIGS[self._input_id])
     self._fpga.vpass.Select(self._input_id)
     self._fpga.vdump0.Select(self._input_id, self.IsDualPixelMode())
     self._fpga.vdump1.Select(self._input_id, self.IsDualPixelMode())
-
-  @classmethod
-  def GetConnectorType(cls):
-    """Returns the human readable string for the connector type."""
-    return cls._CONNECTOR_TYPE
 
   def GetMaxFrameLimit(self, width, height):
     """Returns of the maximal number of frames which can be dumped."""
@@ -228,22 +259,6 @@ class InputFlow(object):
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
     raise NotImplementedError('IsDualPixelMode')
-
-  def IsPhysicalPlugged(self):
-    """Returns if the physical cable is plugged."""
-    raise NotImplementedError('IsPhysicalPlugged')
-
-  def IsPlugged(self):
-    """Returns if the HPD line is plugged."""
-    raise NotImplementedError('IsPlugged')
-
-  def Plug(self):
-    """Asserts HPD line to high, emulating plug."""
-    raise NotImplementedError('Plug')
-
-  def Unplug(self):
-    """Deasserts HPD line to low, emulating unplug."""
-    raise NotImplementedError('Unplug')
 
   def SetEdidState(self, enabled):
     """Sets the enabled/disabled state of EDID.
@@ -379,18 +394,19 @@ class InputFlow(object):
     raise NotImplementedError('IsVideoInputEncrypted')
 
 
-class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
+class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
   """An abstraction of an input flow which supports audio."""
 
   def __init__(self, input_id, main_i2c_bus, fpga_ctrl):
-    """Constructs a InputFlowWithAudio object.
+    """Constructs a FpgaInputFlowWithAudio object.
 
     Args:
       input_id: The ID of the input connector. Check the value in ids.py.
       main_i2c_bus: The main I2cBus object.
       fpga_ctrl: The FpgaController object.
     """
-    super(InputFlowWithAudio, self).__init__(input_id, main_i2c_bus, fpga_ctrl)
+    super(FpgaInputFlowWithAudio, self).__init__(input_id, main_i2c_bus,
+                                                 fpga_ctrl)
     self._audio_capture_manager = audio_utils.AudioCaptureManager(
         self._fpga.adump)
     self._audio_route_manager = audio_utils.AudioRouteManager(
@@ -435,7 +451,7 @@ class InputFlowWithAudio(InputFlow):  # pylint: disable=W0223
     self._audio_route_manager.ResetRouteToDumper()
 
 
-class DpInputFlow(InputFlow):
+class DpInputFlow(FpgaInputFlow):
   """An abstraction of the entire flow for DisplayPort."""
 
   _CONNECTOR_TYPE = 'DP'
@@ -624,7 +640,7 @@ class DpInputFlow(InputFlow):
 
       if video_input_stable:
         self._SetPixelMode()
-        self.Select()  # to make sure mux is properly set for this InputFlow
+        self.Select()  # to make sure mux is properly set for this FpgaInputFlow
         if self.WaitVideoOutputStable():
           logging.info('DP FSM done')
           return
@@ -665,7 +681,7 @@ class DpInputFlow(InputFlow):
     raise NotImplementedError('_ResetAudioLogic')
 
 
-class HdmiInputFlow(InputFlowWithAudio):
+class HdmiInputFlow(FpgaInputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
 
   _CONNECTOR_TYPE = 'HDMI'
@@ -880,7 +896,7 @@ class HdmiInputFlow(InputFlowWithAudio):
     self._rx.ResetAudioLogic()
 
 
-class VgaInputFlow(InputFlow):
+class VgaInputFlow(FpgaInputFlow):
   """An abstraction of the entire flow for VGA."""
 
   _CONNECTOR_TYPE = 'VGA'

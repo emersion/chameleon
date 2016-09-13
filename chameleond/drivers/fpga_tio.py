@@ -13,6 +13,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
 from chameleond.utils import audio_board
+from chameleond.utils import avsync_probe_flow
 from chameleond.utils import bluetooth_hid_flow
 from chameleond.utils import caching_server
 from chameleond.utils import codec_flow
@@ -138,11 +139,13 @@ class ChameleondDriver(ChameleondInterface):
             ids.USB_TOUCH, usb_hid_ctrl),
         ids.BLUETOOTH_HID_MOUSE: bluetooth_hid_flow.BluetoothHIDMouseFlow(
             ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
+        ids.AVSYNC_PROBE: avsync_probe_flow.AVSyncProbeFlow(ids.AVSYNC_PROBE),
     }
 
     # Allow to accees the mouse methods through bluetooth_mouse member object.
     # Hence, there is no need to export the mouse methods in ChameleondDriver.
     self.bluetooth_mouse = self._flows[ids.BLUETOOTH_HID_MOUSE]
+    self.avsync_probe = self._flows[ids.AVSYNC_PROBE]
 
     for flow in self._flows.itervalues():
       if flow:

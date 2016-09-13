@@ -5,6 +5,7 @@
 
 from abc import ABCMeta
 
+
 class ChameleondInterface(object):
   """Abstract class of Chameleond interface."""
   __metaclass__ = ABCMeta
