@@ -43,7 +43,7 @@ static const char *kSessionLogfilePattern_ = "session_%d.log";
 
 static const int kRetOK_ = 0;
 static const int kRetFail_ = -1;
-static const int kHW_CountWrap_ = 0xFFFF;
+static const int kHW_CountWrap_ = 0x10000;
 static const int kBytePerPixel_ = 3;
 static const int kAudioPageSize_ = 4096;
 
@@ -566,8 +566,8 @@ int _PrepareDumpBuffer(Session *p_session)
  * @param p_session Session instance.
  * @param p_stream_head The video stream head to be inited.
  */
-void _InitDumpVideoHead(Session *p_session,
-                        VideoDataStreamHead *p_stream_head)
+static void _InitDumpVideoHead(Session *p_session,
+                               VideoDataStreamHead *p_stream_head)
 {
   PacketHead *p_head = &p_stream_head->head;
   VideoDataStream *p_data_head = &p_stream_head->data_head;
@@ -596,8 +596,8 @@ void _InitDumpVideoHead(Session *p_session,
  * @param p_session Session instance.
  * @param p_stream_head The audio stream head to be inited.
  */
-void _InitDumpAudioHead(Session *p_session,
-                        AudioDataStreamHead *p_stream_head)
+static void _InitDumpAudioHead(Session *p_session,
+                               AudioDataStreamHead *p_stream_head)
 {
   PacketHead *p_head = &p_stream_head->head;
 
@@ -616,8 +616,9 @@ void _InitDumpAudioHead(Session *p_session,
  *
  * @return kRetFail_, kRetOK_
  */
-int _DumpAllChannelVideoFrame(Session *p_session,
-                              VideoDataStreamHead *p_stream_head, int offset)
+static int _DumpAllChannelVideoFrame(Session *p_session,
+                                     VideoDataStreamHead *p_stream_head,
+                                     int offset)
 {
   int i;
   char *p_source;
@@ -654,7 +655,7 @@ int _DumpAllChannelVideoFrame(Session *p_session,
  *
  * @return kRetFail_, kRetOK_
  */
-int _DoDumpVideoFrame(Session *p_session, int number_of_frames)
+static int _DoDumpVideoFrame(Session *p_session, int number_of_frames)
 {
   VideoDataStreamHead head;
   VideoDataStream *p_data_head = &head.data_head;
@@ -886,11 +887,11 @@ static int _CheckRequestRealtimeMode(Session *p_session, RealtimeMode mode)
  *
  * @return Difference between hardware count and software count.
  */
-int _GetCountDifference(int hw_count, int count)
+static int _GetCountDifference(int hw_count, int count)
 {
   int difference;
 
-  difference = hw_count - (count & kHW_CountWrap_);
+  difference = hw_count - (count % kHW_CountWrap_);
   if (difference < 0) {
     difference += kHW_CountWrap_;
   }
@@ -911,8 +912,8 @@ int _GetCountDifference(int hw_count, int count)
  * @return Next count, kRetFail_
  *         If next count is 0, means we will stop dumping process.
  */
-uint32_t _GetNextDumpCount(Session *p_session, uint32_t current_count,
-                           uint32_t hw_count)
+static uint32_t _GetNextDumpCount(Session *p_session, uint32_t current_count,
+                                  uint32_t hw_count)
 {
   int difference;
   char buffer[128];
@@ -972,7 +973,7 @@ uint32_t _GetNextDumpCount(Session *p_session, uint32_t current_count,
  *
  * @return kRetFail_, kRetOK_
  */
-int _DoDumpRealtimeVideoFrame(Session *p_session)
+static int _DoDumpRealtimeVideoFrame(Session *p_session)
 {
   /*
    * Use dedicated stack memory for the head.
@@ -1054,7 +1055,7 @@ int _DoDumpRealtimeVideoFrame(Session *p_session)
  *
  * @return kRetFail_, kRetOK_
  */
-int _DoDumpRealtimeAudioPage(Session *p_session)
+static int _DoDumpRealtimeAudioPage(Session *p_session)
 {
   /*
    * Use dedicated stack memory for the head.
