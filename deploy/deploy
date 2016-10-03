@@ -11,6 +11,7 @@ CHAMELEOND_DIR='/usr/bin'
 CHAMELEOND_NAME='chameleond'
 DISPLAYD_NAME='displayd'
 STREAM_SERVER_NAME='stream_server'
+SCHEDULER_NAME='scheduler'
 UPDATER_NAME='chameleon-updater'
 
 update-rc.d -f ${UPDATER_NAME} remove
@@ -39,6 +40,7 @@ END
 install_daemon_and_config "${CHAMELEOND_NAME}"
 install_daemon_and_config "${DISPLAYD_NAME}"
 install_daemon_and_config "${STREAM_SERVER_NAME}"
+install_daemon_and_config "${SCHEDULER_NAME}"
 
 cp -f "${SCRIPT_DIR}/${CHAMELEOND_NAME}" "${INITD_DIR}"
 update-rc.d "${CHAMELEOND_NAME}" defaults 92 8
@@ -48,6 +50,9 @@ update-rc.d "${DISPLAYD_NAME}" defaults 94 6
 
 cp -f "${SCRIPT_DIR}/${STREAM_SERVER_NAME}" "${INITD_DIR}"
 update-rc.d "${STREAM_SERVER_NAME}" defaults 96 4
+
+cp -f "${SCRIPT_DIR}/${SCHEDULER_NAME}" "${INITD_DIR}"
+update-rc.d "${SCHEDULER_NAME}" defaults 98 4
 
 cp -f "${SCRIPT_DIR}/${UPDATER_NAME}" "${INITD_DIR}"
 update-rc.d "${UPDATER_NAME}" defaults 90 10
@@ -101,4 +106,5 @@ else
     "${INITD_DIR}/${CHAMELEOND_NAME}" restart
     "${INITD_DIR}/${DISPLAYD_NAME}" restart
     "${INITD_DIR}/${STREAM_SERVER_NAME}" restart
+    "${INITD_DIR}/${SCHEDULER_NAME}" restart
 fi

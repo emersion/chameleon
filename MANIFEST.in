@@ -5,6 +5,7 @@ include deploy/deploy
 include deploy/deploy_pip
 include deploy/init.d/chameleond
 include deploy/init.d/displayd
+include deploy/init.d/scheduler
 include deploy/init.d/stream_server
 include deploy/init.d/chameleon-updater
 include updatable/python2.7/*.py
