@@ -8,8 +8,10 @@
 import argparse
 import code
 import logging
+import os
 import readline
 import rlcompleter
+import subprocess
 import xmlrpclib
 
 
@@ -43,11 +45,13 @@ def ShowMessages(proxy):
       hdmi_port, hdmi_port)
 
 
-def StartInteractiveShell(p):
+def StartInteractiveShell(p, options):
   """Starts an interactive shell.
 
   Args:
     p: The xmlrpclib.ServerProxy to chameleond.
+    options: The namespace from argparse.
+
   """
   vars = globals()
   vars.update(locals())
@@ -73,6 +77,40 @@ def ParseArgs():
   return parser.parse_args()
 
 
+def GetAndConvertRecordedFile(remote_path):
+  """Gets recorded file and converts it into a wav file.
+
+  A helper function to get recorded file from Chameleon host and do
+  file format conversion from 32 bit, 48000 rate, 8 channel raw file
+  to 2 channel wav file.
+
+  E.g.
+  >>> p.StartCapturingAudio(6)
+  >>> s = p.StopCapturingAudio(6)
+  >>> GetAndConvertRecordedFile(s[0])
+
+  The recorded raw file and converted wav file will be in current
+  directory.
+
+  Args:
+    remote_path: The file to copy from Chameleon host.
+
+  """
+  basename = os.path.basename(remote_path)
+  # options is already in the namespace.
+  subprocess.check_call(
+      ['scp', 'root@%s:%s' % (options.host, remote_path), basename])
+  subprocess.check_call(
+      ['sox', '-b', '32', '-r', '48000', '-c', '8', '-e', 'signed',
+       basename, '-c', '2', basename + '.wav'])
+
+
+def ConnectCrosToLineIn():
+  """Connects a audio bus path from Cros headphone to Chameleon LineIn."""
+  p.AudioBoardConnect(1, 'Cros device headphone')
+  p.AudioBoardConnect(1, 'Chameleon FPGA line-in')
+
+
 def Main():
   """The Main program."""
   logging.basicConfig(
@@ -85,7 +123,7 @@ def Main():
   logging.info('Connected to %s with MAC address %s',
                address, proxy.GetMacAddress())
   ShowMessages(proxy)
-  StartInteractiveShell(proxy)
+  StartInteractiveShell(proxy, options)
 
 
 if __name__ == '__main__':
