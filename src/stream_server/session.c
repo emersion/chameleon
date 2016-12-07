@@ -1034,13 +1034,13 @@ static int _DoDumpRealtimeVideoFrame(Session *p_session)
       return next_frame_number;
     }
 
-    frame_number = next_frame_number;
-
     p_data_head->frame_number = htonl(frame_number);
     i = frame_number % p_session->dump_limit;
     if (_DumpAllChannelVideoFrame(p_session, &head, i * unit_aligned_size)) {
       return kRetFail_;
     }
+
+    frame_number = next_frame_number;
   }
 
   return kRetOK_;
@@ -1109,8 +1109,6 @@ static int _DoDumpRealtimeAudioPage(Session *p_session)
       return next_page_count;
     }
 
-    page_count = next_page_count;
-
     p_data_head->page_count = htonl(page_count);
     i = page_count % p_session->dump_limit;
     if (_SendToSocket(p_session, (char *)&head, sizeof(AudioDataStreamHead))) {
@@ -1120,6 +1118,7 @@ static int _DoDumpRealtimeAudioPage(Session *p_session)
     if (_SendToSocket(p_session, p_dump_buffer, kAudioPageSize_)) {
       return kRetFail_;
     }
+    page_count = next_page_count;
   }
 
   return kRetOK_;

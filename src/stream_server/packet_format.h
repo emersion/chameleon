@@ -89,6 +89,9 @@ typedef struct {
   uint16_t width;
   uint16_t height;
   uint8_t channel;
+  /* indicate padding explicitly.*/
+  uint8_t padding[3];
+
   uint8_t rawdata[];
 } VideoDataStream;
 
