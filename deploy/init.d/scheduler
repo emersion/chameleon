@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 ### BEGIN INIT INFO
-# Provides:          stream_server
+# Provides:          scheduler
 # Required-Start:    $network $remote_fs
 # Required-Stop:     $network $remote_fs
 # Default-Start:     2 3 4 5
