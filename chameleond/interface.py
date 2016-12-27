@@ -489,7 +489,7 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DetectResolution')
 
-  def StartCapturingAudio(self, port_id):
+  def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 
     Refer to the docstring of StartPlayingEcho about the restriction of
@@ -497,6 +497,7 @@ class ChameleondInterface(object):
 
     Args:
       port_id: The ID of the audio input port.
+      has_file: True for saving audio data to file. False otherwise.
     """
     raise NotImplementedError('StartCapturingAudio')
 

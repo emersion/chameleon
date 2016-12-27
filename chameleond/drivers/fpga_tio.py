@@ -935,7 +935,7 @@ class ChameleondDriver(ChameleondInterface):
     return self._audio_board is not None
 
   @_AudioMethod(input_only=True)
-  def StartCapturingAudio(self, port_id):
+  def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 
     Refer to the docstring of StartPlayingEcho about the restriction of
@@ -943,10 +943,11 @@ class ChameleondDriver(ChameleondInterface):
 
     Args:
       port_id: The ID of the audio input port.
+      has_file: True for saving audio data to file. False otherwise.
     """
     self._SelectInput(port_id)
     logging.info('Start capturing audio from port #%d', port_id)
-    self._flows[port_id].StartCapturingAudio()
+    self._flows[port_id].StartCapturingAudio(has_file)
 
   @_AudioMethod(input_only=True)
   def StopCapturingAudio(self, port_id):
@@ -962,6 +963,8 @@ class ChameleondDriver(ChameleondInterface):
         of utils.audio.AudioDataFormat for detail.
         Currently, the data format supported is
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+      If we assign parameter has_file=False in StartCapturingAudio, we will get
+      both empty string in path and format.
 
     Raises:
       DriverError: Input is selected to port other than port_id.
@@ -974,6 +977,10 @@ class ChameleondDriver(ChameleondInterface):
           'The input is selected to %r not %r', self._selected_input, port_id)
     path, data_format = self._flows[port_id].StopCapturingAudio()
     logging.info('Stopped capturing audio from port #%d', port_id)
+    # If there is no path, set it to empty string. Because XMLRPC doesn't
+    # support None as return value.
+    if path is None and data_format is None:
+      return '', ''
     return path, data_format
 
   @_AudioMethod(output_only=True)

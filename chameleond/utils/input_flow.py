@@ -418,16 +418,24 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
     """Is input flow capturing audio?"""
     return self._audio_capture_manager.is_capturing
 
-  def StartCapturingAudio(self):
-    """Starts capturing audio."""
+  def StartCapturingAudio(self, has_file):
+    """Starts capturing audio.
+
+    Args:
+      has_file: True for saving audio data to file. False otherwise.
+    """
     self._audio_route_manager.SetupRouteFromInputToDumper(self._input_id)
-    self._audio_recorded_file = tempfile.NamedTemporaryFile(
-        prefix='audio_', suffix='.raw', delete=False)
-    logging.info('Save captured audio to %s', self._audio_recorded_file.name)
+    self._audio_recorded_file = None
+    file_path = None
+    if has_file:
+      self._audio_recorded_file = tempfile.NamedTemporaryFile(
+          prefix='audio_', suffix='.raw', delete=False)
+      file_path = self._audio_recorded_file.name
+      logging.info('Save captured audio to %s',
+                   self._audio_recorded_file.name)
     # Resets audio logic for issue crbug.com/623466.
     self._ResetAudioLogic()
-    self._audio_capture_manager.StartCapturingAudio(
-        self._audio_recorded_file.name)
+    self._audio_capture_manager.StartCapturingAudio(file_path)
 
   def StopCapturingAudio(self):
     """Stops capturing audio.
@@ -437,6 +445,8 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
       path: The path to the captured audio data.
       format: The dict representation of AudioDataFormat. Refer to docstring
         of utils.audio.AudioDataFormat for detail.
+      If we assign parameter has_file=False in StartCapturingAudio, we will get
+      both None in path and format.
 
     Raises:
       AudioCaptureManagerError: If captured time or page exceeds the limit.
@@ -444,7 +454,10 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
     """
     data_format = self._audio_capture_manager.StopCapturingAudio()
     self.ResetRoute()
-    return self._audio_recorded_file.name, data_format
+    if self._audio_recorded_file:
+      return self._audio_recorded_file.name, data_format
+    else:
+      return None, None
 
   def ResetRoute(self):
     """Resets the audio route."""

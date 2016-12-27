@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # Copyright 2015 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -13,6 +13,8 @@ import readline
 import rlcompleter
 import subprocess
 import xmlrpclib
+
+from audio.audio_value_detector import AudioValueDetector
 
 
 def ShowMessages(proxy):
@@ -40,20 +42,50 @@ def ShowMessages(proxy):
       p.StartCapturingAudio(%d) to capture from LineIn.
       p.StopCapturingAudio(%d) to stop capturing from LineIn.
       p.Plug(%d) to plug HDMI.
-      p.UnPlug(%d) to unplug HDMI.''',
-      '\n      '.join(port_messages), linein_port, linein_port,
-      hdmi_port, hdmi_port)
+      p.Unplug(%d) to unplug HDMI.''', '\n      '.join(port_messages),
+               linein_port, linein_port, hdmi_port, hdmi_port)
 
 
-def StartInteractiveShell(p, options):
+def DetectAudioValue0(channels=None, margin=0.01, continuous_samples=5,
+                      duration=3600, dump_samples=48000):
+  """Detects if Chameleon captures continuous audio data close to 0.
+
+  This function will get the audio streaming data from stream server and will
+  check if the audio data is close to 0 by the margin parameter.
+  -margin < value < margin will be considered to be close to 0.
+  If there are continuous audio samples close to 0 in the streamed data,
+  test_server will log it and save the audio data to a wav file.
+
+  E.g.
+  >>> ConnectCrosToLineIn()
+  >>> p.StartCapturingAudio(6, False)
+  >>> DetectAudioValue0(duration=24*3600, margin=0.001)
+
+  Args:
+    channels: Array of audio channels we want to check.
+        E.g. [0, 1] means we only care about channel 0 and channel 1.
+    margin: Used to decide if the value is closed to 0. Maximum value is 1.
+    continuous_samples: When continuous_samples samples are closed to 0, trigger
+        event.
+    duration: The duration of monitoring in seconds.
+    dump_samples: When event happens, how many audio samples we want to
+        save to file.
+  """
+  if not channels:
+    channels = [0, 1]
+  detecter = AudioValueDetector(options.host)  # pylint: disable=undefined-variable
+  detecter.Detect(channels, margin, continuous_samples, duration, dump_samples)
+  return True
+
+
+def StartInteractiveShell(p, options):  # pylint: disable=unused-argument
   """Starts an interactive shell.
 
   Args:
     p: The xmlrpclib.ServerProxy to chameleond.
     options: The namespace from argparse.
-
   """
-  vars = globals()
+  vars = globals()  # pylint: disable=redefined-builtin
   vars.update(locals())
   readline.set_completer(rlcompleter.Completer(vars).complete)
   readline.parse_and_bind("tab: complete")
@@ -64,8 +96,8 @@ def StartInteractiveShell(p, options):
 def ParseArgs():
   """Parses the arguments.
 
-  Returns: the namespace containing parsed arguments.
-
+  Returns:
+    the namespace containing parsed arguments.
   """
   parser = argparse.ArgumentParser(
       description='Connect to Chameleond and use interactive shell.',
@@ -94,12 +126,11 @@ def GetAndConvertRecordedFile(remote_path):
 
   Args:
     remote_path: The file to copy from Chameleon host.
-
   """
   basename = os.path.basename(remote_path)
   # options is already in the namespace.
   subprocess.check_call(
-      ['scp', 'root@%s:%s' % (options.host, remote_path), basename])
+      ['scp', 'root@%s:%s' % (options.host, remote_path), basename])  # pylint: disable=undefined-variable
   subprocess.check_call(
       ['sox', '-b', '32', '-r', '48000', '-c', '8', '-e', 'signed',
        basename, '-c', '2', basename + '.wav'])
@@ -107,8 +138,8 @@ def GetAndConvertRecordedFile(remote_path):
 
 def ConnectCrosToLineIn():
   """Connects a audio bus path from Cros headphone to Chameleon LineIn."""
-  p.AudioBoardConnect(1, 'Cros device headphone')
-  p.AudioBoardConnect(1, 'Chameleon FPGA line-in')
+  p.AudioBoardConnect(1, 'Cros device headphone') # pylint: disable=undefined-variable
+  p.AudioBoardConnect(1, 'Chameleon FPGA line-in') # pylint: disable=undefined-variable
 
 
 def Main():

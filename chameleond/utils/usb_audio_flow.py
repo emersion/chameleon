@@ -185,8 +185,14 @@ class InputUSBAudioFlow(USBAudioFlow):
     self._captured_file_type = capture_configs.file_type
     self._usb_ctrl.SetDriverCaptureConfigs(capture_configs)
 
-  def StartCapturingAudio(self):
-    """Starts recording audio data."""
+  def StartCapturingAudio(self, has_file):
+    """Starts capturing audio.
+
+    Args:
+      has_file: It is only can be True for USB audio.
+    """
+    if not has_file:
+      raise USBAudioFlowError('USB Audio only supports save to file')
     self._supported_data_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
     self._supported_data_format.file_type = self._captured_file_type
     params_list = self._GetAlsaUtilCommandArgs(self._supported_data_format)

@@ -6,15 +6,12 @@
 import logging
 import os
 import struct
-import tempfile
-import time
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import fpga
 from chameleond.utils import ids
 from chameleond.utils import mem
 from chameleond.utils import memory_dumper
-from chameleond.utils import system_tools
 
 
 class AudioCaptureManagerError(Exception):
@@ -52,12 +49,14 @@ class AudioCaptureManager(object):
     """Starts capturing audio.
 
     Args:
-      file_path: The target file for audio capturing.
+      file_path: The target file for audio capturing. None for no target file.
     """
     self._file_path = file_path
     self._adump.StartDumpingToMemory()
-    self._mem_dumper = memory_dumper.MemoryDumper(file_path, self._adump)
-    self._mem_dumper.start()
+    self._mem_dumper = None
+    if file_path:
+      self._mem_dumper = memory_dumper.MemoryDumper(file_path, self._adump)
+      self._mem_dumper.start()
     logging.info('Started capturing audio.')
 
   def StopCapturingAudio(self):
@@ -74,12 +73,13 @@ class AudioCaptureManager(object):
     if not self.is_capturing:
       raise AudioCaptureManagerError('Stop Capturing audio before Start')
 
-    self._mem_dumper.Stop()
-    self._mem_dumper.join()
-    start_address, page_count = self._adump.StopDumpingToMemory()
+    if self._mem_dumper:
+      self._mem_dumper.Stop()
+      self._mem_dumper.join()
+    _, page_count = self._adump.StopDumpingToMemory()
     logging.info('Stopped capturing audio.')
 
-    if self._mem_dumper.exitcode:
+    if self._mem_dumper and self._mem_dumper.exitcode:
       raise AudioCaptureManagerError(
           'MemoryDumper was terminated unexpectedly.')
 
@@ -89,7 +89,8 @@ class AudioCaptureManager(object):
 
     # Workaround for issue crbug.com/574683 where the last two pages should
     # be neglected.
-    self._TruncateFile(2)
+    if self._file_path:
+      self._TruncateFile(2)
 
     return self._adump.audio_data_format_as_dict
 
@@ -105,7 +106,7 @@ class AudioCaptureManager(object):
     file_size = os.path.getsize(self._file_path)
     new_file_size = file_size - self._adump.PAGE_SIZE * pages
     if new_file_size <= 0:
-     raise AudioCaptureManagerError('Not enough audio data was captured.')
+      raise AudioCaptureManagerError('Not enough audio data was captured.')
 
     with open(self._file_path, 'r+') as f:
       f.truncate(new_file_size)
@@ -382,4 +383,3 @@ class AudioRouteManager(object):
       True if generator clock is required for source.
     """
     return source != fpga.AudioSource.RX_I2S
-
