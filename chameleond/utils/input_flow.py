@@ -63,7 +63,7 @@ class InputFlow(object):
     """Emulates unplug."""
     raise NotImplementedError('Unplug')
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready."""
     pass
 
@@ -233,7 +233,7 @@ class FpgaInputFlow(InputFlow):
     """
     return self._frame_manager.CacheFrameThumbnail(frame_index, ratio)
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
     The receiver requires to do the FSM in order to clear its state, in case
@@ -618,7 +618,7 @@ class DpInputFlow(FpgaInputFlow):
       return True
     return False
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
     The receiver requires to do the FSM in order to clear its state, in case
@@ -790,7 +790,7 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
       return True
     return False
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
     The receiver requires to do the FSM in order to clear its state, in case
@@ -1008,7 +1008,7 @@ class VgaInputFlow(FpgaInputFlow):
     """Writes the EDID content."""
     self._edid.WriteEdid(data)
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Does the Finite-State-Machine to ensure the input flow ready.
 
     The receiver requires to do the FSM in order to clear its state, in case

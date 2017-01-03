@@ -547,7 +547,7 @@ class ChameleondDriver(ChameleondInterface):
     if port_id != self._selected_input:
       self._flows[port_id].Select()
       self._selected_input = port_id
-    self._flows[port_id].Do_FSM()
+    self._flows[port_id].DoFSM()
 
   def _SelectOutput(self, port_id):
     """Selects the output on Chameleon.
@@ -558,7 +558,7 @@ class ChameleondDriver(ChameleondInterface):
     if port_id != self._selected_output:
       self._flows[port_id].Select()
       self._selected_output = port_id
-    self._flows[port_id].Do_FSM()
+    self._flows[port_id].DoFSM()
 
   def StartMonitoringAudioVideoCapturingDelay(self):
     """Starts an audio/video synchronization utility

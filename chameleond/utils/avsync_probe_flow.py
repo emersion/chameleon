@@ -192,12 +192,12 @@ class AVSyncProbeFlow(input_flow.InputFlow):
     """Emulates unplug. Do nothing for AVSyncProbeFlow"""
     logging.debug('AVSyncProbe flow #%d: Unplug() called.', self._port_id)
 
-  def Do_FSM(self):
-    """fpga_tio calls Do_FSM after a flow is selected.
+  def DoFSM(self):
+    """fpga_tio calls DoFSM after a flow is selected.
 
     Do nothing for AVSyncProbeFlow
     """
-    logging.debug('AVSyncProbe flow #%d: Do_FSM() called.', self._port_id)
+    logging.debug('AVSyncProbe flow #%d: DoFSM() called.', self._port_id)
 
   def Capture(self, sample_duration_seconds=10.0):
     """Get the sample results of the probe.

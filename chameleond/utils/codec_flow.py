@@ -99,8 +99,8 @@ class CodecFlow(object):
     logging.warning(
         'Unplug on CodecFlow is not implemented. Do nothing.')
 
-  def Do_FSM(self):
-    """fpga_tio calls Do_FSM after a flow is selected. Do nothing for codec."""
+  def DoFSM(self):
+    """fpga_tio calls DoFSM after a flow is selected. Do nothing for codec."""
     pass
 
 

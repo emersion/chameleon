@@ -82,10 +82,10 @@ class USBHIDFlow(object):
     """Emulates unplug for USB hid gadget by disabling hid gadget driver."""
     self._usb_ctrl.DisableDriver()
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Do nothing for USBHIDFlow.
 
-    fpga_tio calls Do_FSM after a flow is selected.
+    fpga_tio calls DoFSM after a flow is selected.
     """
     pass
 

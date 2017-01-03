@@ -93,10 +93,10 @@ class USBAudioFlow(object):
     """
     self._usb_ctrl.DisableDriver()
 
-  def Do_FSM(self):
+  def DoFSM(self):
     """Do nothing for USBAudioFlow.
 
-    fpga_tio calls Do_FSM after a flow is selected.
+    fpga_tio calls DoFSM after a flow is selected.
     """
     pass
 

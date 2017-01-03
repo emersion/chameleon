@@ -87,12 +87,12 @@ class BluetoothHIDFlow(object):
     """Disconnect to the device by removing the serial driver."""
     self._usb_ctrl.DisableDriver()
 
-  def Do_FSM(self):
-    """fpga_tio calls Do_FSM after a flow is selected.
+  def DoFSM(self):
+    """fpga_tio calls DoFSM after a flow is selected.
 
     Do nothing for BlueoothHIDFlow.
     """
-    logging.debug('Bluetooth HID flow #%d: Do_FSM() called.', self._port_id)
+    logging.debug('Bluetooth HID flow #%d: DoFSM() called.', self._port_id)
 
 
 class BluetoothHIDMouseFlow(BluetoothHIDMouse, BluetoothHIDFlow):
