@@ -7,6 +7,7 @@ import logging
 import time
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.utils import common
 from chameleond.utils import i2c
 
 
@@ -19,6 +20,9 @@ class DpRx(i2c.I2cSlave):
   """A class to control ITE IT6506 DisplayPort Receiver."""
 
   SLAVE_ADDRESSES = (0x58, 0x59)
+
+  _DELAY_VIDEO_MODE_PROBE = 1.0
+  _TIMEOUT_VIDEO_STABLE_PROBE = 5
 
   _AUDIO_RESET_DELAY = 0.001
   _VIDEO_RESET_DELAY = 0.001
@@ -101,6 +105,23 @@ class DpRx(i2c.I2cSlave):
     input_status = self.Get(self._REG_INPUT_STATUS)
     return bool(input_status & self._BIT_VIDEO_STABLE)
 
+  def WaitVideoInputStable(self, timeout=None):
+    """Waits the video input stable or timeout.
+
+    Returns:
+      True if the video input is stable before timeout; otherwise, False.
+    """
+    if timeout is None:
+      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+
+    try:
+      common.WaitForCondition(
+          self.IsVideoInputStable, True, self._DELAY_VIDEO_MODE_PROBE,
+          timeout)
+      return True
+    except common.TimeoutError:
+      return False
+
   def GetPixelClock(self):
     """Returns the pixel clock of the input signal in MHz."""
     # PCLK = 27MHz * 1024 / PCLK_COUNT
@@ -143,6 +164,9 @@ class HdmiRx(i2c.I2cSlave):
   """A class to control ITE IT6803 HDMI Receiver."""
 
   SLAVE_ADDRESSES = (0x48, )
+
+  _DELAY_VIDEO_MODE_PROBE = 0.1
+  _TIMEOUT_VIDEO_STABLE_PROBE = 10
 
   _AUDIO_RESET_DELAY = 0.001
 
@@ -326,6 +350,23 @@ class HdmiRx(i2c.I2cSlave):
     video_mode = self.Get(self._REG_VIDEO_MODE)
     return bool(video_mode & self._BIT_VIDEO_STABLE)
 
+  def WaitVideoInputStable(self, timeout=None):
+    """Waits the video input stable or timeout.
+
+    Returns:
+      True if the video input is stable before timeout; otherwise, False.
+    """
+    if timeout is None:
+      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
+
+    try:
+      common.WaitForCondition(
+          self.IsVideoInputStable, True, self._DELAY_VIDEO_MODE_PROBE,
+          timeout)
+      return True
+    except common.TimeoutError:
+      return False
+
   def GetPixelClock(self):
     """Returns the pixel clock of the input signal in MHz."""
     pclk_div = self.Get(self._REG_PIXEL_CLOCK_DIV)
@@ -419,6 +460,9 @@ class VgaRx(i2c.I2cSlave):
   """A class to control ITE CAT9883C CRT Receiver."""
 
   SLAVE_ADDRESSES = (0x4c, )
+
+  _DELAY_CHECKING_STABLE_PROBE = 0.1
+  _TIMEOUT_CHECKING_STABLE = 5
 
   _REG_SYNC_DETECT = 0x14
   _BIT_HSYNC_DETECTED = 1 << 7
@@ -608,6 +652,23 @@ class VgaRx(i2c.I2cSlave):
   def IsSyncDetected(self):
     """Returns True if Hsync or Vsync is detected."""
     return bool(self.Get(self._REG_SYNC_DETECT) & self._BITS_SYNC_MASK)
+
+  def WaitVideoInputStable(self, timeout=None):
+    """Waits the video input stable or timeout.
+
+    Returns:
+      True if the video input is stable before timeout; otherwise, False.
+    """
+    if timeout is None:
+      timeout = self._TIMEOUT_CHECKING_STABLE
+    try:
+      # Check if H-Sync/V-Sync recevied from the source.
+      common.WaitForCondition(
+          self.IsSyncDetected, True, self._DELAY_CHECKING_STABLE_PROBE,
+          timeout)
+    except common.TimeoutError:
+      return False
+    return True
 
   def IsInterlaced(self):
     """Returns True if the input video is in interlaced mode."""

@@ -540,16 +540,7 @@ class DpInputFlow(FpgaInputFlow):
 
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout."""
-    if timeout is None:
-      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
-
-    try:
-      common.WaitForCondition(
-          self._rx.IsVideoInputStable, True, self._DELAY_VIDEO_MODE_PROBE,
-          timeout)
-      return True
-    except common.TimeoutError:
-      return False
+    return self._rx.WaitVideoInputStable(timeout)
 
   def _IsFrameLocked(self):
     """Returns whether the FPGA frame is locked.
@@ -629,14 +620,14 @@ class DpInputFlow(FpgaInputFlow):
     """
     if not self._rx.IsVideoInputStable() or not self._IsFrameLocked():
       self.Initialize()  # reset rx
-      video_input_stable = self.WaitVideoInputStable()
+      video_input_stable = self._rx.WaitVideoInputStable()
 
       if not video_input_stable:
         logging.info('Send DP HPD pulse to reset source...')
         self._fpga.hpd.Unplug(self._input_id)
         time.sleep(self._HPD_PULSE_WIDTH)
         self._fpga.hpd.Plug(self._input_id)
-        video_input_stable = self.WaitVideoInputStable()
+        video_input_stable = self._rx.WaitVideoInputStable()
 
       if video_input_stable:
         self._SetPixelMode()
@@ -811,7 +802,7 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
     if is_reset_needed:
       self._rx.Reset()
 
-    if self.WaitVideoInputStable():
+    if self._rx.WaitVideoInputStable():
       pixel_mode_changed = self._SetPixelMode()
       if is_reset_needed or pixel_mode_changed:
         self.WaitVideoOutputStable()
@@ -825,15 +816,7 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
 
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout. Returns success or not."""
-    if timeout is None:
-      timeout = self._TIMEOUT_VIDEO_STABLE_PROBE
-    try:
-      common.WaitForCondition(
-          self._rx.IsVideoInputStable, True, self._DELAY_VIDEO_MODE_PROBE,
-          timeout)
-    except common.TimeoutError:
-      return False
-    return True
+    return self._rx.WaitVideoInputStable(timeout)
 
   def _IsFrameLocked(self):
     """Returns whether the FPGA frame is locked.
@@ -930,7 +913,7 @@ class VgaInputFlow(FpgaInputFlow):
     plugged_before_check = self.IsPlugged()
     if not plugged_before_check:
       self.Plug()
-    is_stable = self.WaitVideoInputStable()
+    is_stable = self._rx.WaitVideoInputStable()
     if not plugged_before_check:
       self.Unplug()
     return is_stable
@@ -1027,7 +1010,7 @@ class VgaInputFlow(FpgaInputFlow):
     """
     if self._auto_vga_mode:
       # Detect the VGA mode and set it properly.
-      if self.WaitVideoInputStable():
+      if self._rx.WaitVideoInputStable():
         self._rx.SetMode(self._rx.DetectMode())
         self.WaitVideoOutputStable()
       else:
@@ -1035,16 +1018,7 @@ class VgaInputFlow(FpgaInputFlow):
 
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout. Returns success or not."""
-    if timeout is None:
-      timeout = self._TIMEOUT_CHECKING_STABLE
-    try:
-      # Check if H-Sync/V-Sync recevied from the source.
-      common.WaitForCondition(
-          self._rx.IsSyncDetected, True, self._DELAY_CHECKING_STABLE_PROBE,
-          timeout)
-    except common.TimeoutError:
-      return False
-    return True
+    return self._rx.WaitVideoInputStable(timeout)
 
   def _IsResolutionValid(self):
     """Returns True if the resolution from FPGA is valid and not floating."""
