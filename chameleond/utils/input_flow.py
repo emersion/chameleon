@@ -645,8 +645,16 @@ class DpInputFlow(FpgaInputFlow):
           logging.info('DP FSM done')
           return
 
-      logging.error('DP FSM failed')
-      raise InputFlowError('DP FSM failed')
+      # Check the cable still connected, a common dongle problem
+      if not self.IsPhysicalPlugged():
+        logging.error('DP cable disconnected; probably a dongle issue')
+        raise InputFlowError('DP cable disconnected')
+      elif not self.IsPlugged():
+        logging.error('DP port not plugged; probably a programming issue')
+        raise InputFlowError('DP port not plugged')
+      else:
+        logging.error('DP FSM failed')
+        raise InputFlowError('DP FSM failed')
     else:
       if self._SetPixelMode():
         self.WaitVideoOutputStable()
