@@ -326,6 +326,7 @@ class ChameleondDriver(ChameleondInterface):
       True if the video input becomes stable within the timeout period;
       otherwise, False.
     """
+    self._SelectInput(port_id)
     return self._flows[port_id].WaitVideoInputStable(timeout)
 
   def _ReadDefaultEdid(self):
