@@ -20,8 +20,9 @@ class IoExpander(i2c.I2cSlave):
   """
 
   # TIO uses TCA6416A on 0x20, 0x21.
-  # The audio board uses TCA9995 on 0x20, 0x21, 0x22.
-  SLAVE_ADDRESSES = (0x20, 0x21, 0x22)
+  # The audio board uses TCA9555 on 0x20, 0x21, 0x22.
+  # The motor board uses TCA9555 on 0x23.
+  SLAVE_ADDRESSES = (0x20, 0x21, 0x22, 0x23)
 
   _INPUT_BASE = 0
   _OUTPUT_BASE = 2
