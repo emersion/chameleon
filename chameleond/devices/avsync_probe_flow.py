@@ -8,9 +8,9 @@ import logging
 import struct
 import time
 
-import input_flow
-import serial_utils
-import system_tools
+from chameleond.devices import input_flow
+from chameleond.utils import serial_utils
+from chameleond.utils import system_tools
 
 
 class AVSyncProbeSerial(object):

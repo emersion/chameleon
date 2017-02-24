@@ -12,19 +12,19 @@ import xmlrpclib
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
+from chameleond.devices import avsync_probe_flow
+from chameleond.devices import bluetooth_hid_flow
+from chameleond.devices import codec_flow
+from chameleond.devices import input_flow
+from chameleond.devices import usb_audio_flow
+from chameleond.devices import usb_hid_flow
 from chameleond.utils import audio_board
-from chameleond.utils import avsync_probe_flow
-from chameleond.utils import bluetooth_hid_flow
 from chameleond.utils import caching_server
-from chameleond.utils import codec_flow
 from chameleond.utils import fpga
 from chameleond.utils import i2c
 from chameleond.utils import ids
-from chameleond.utils import input_flow
 from chameleond.utils import system_tools
 from chameleond.utils import usb
-from chameleond.utils import usb_audio_flow
-from chameleond.utils import usb_hid_flow
 
 
 class DriverError(Exception):

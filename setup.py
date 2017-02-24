@@ -10,7 +10,8 @@ from setuptools import setup
 setup(
     name='chameleond',
     version='0.0.2',
-    packages=['chameleond', 'chameleond.drivers', 'chameleond.utils'],
+    packages=['chameleond', 'chameleond.devices', 'chameleond.drivers',
+              'chameleond.utils'],
     package_data={'chameleond': ['data/*.bin', 'data/*.bitmap']},
     url='http://www.chromium.org',
     maintainer='chromium os',
