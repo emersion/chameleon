@@ -548,7 +548,7 @@ class ChameleondDriver(ChameleondInterface):
     if port_id != self._selected_input:
       self._flows[port_id].Select()
       self._selected_input = port_id
-      self._flows[port_id].DoFSM()
+    self._flows[port_id].DoFSM()
 
   def _SelectOutput(self, port_id):
     """Selects the output on Chameleon.
