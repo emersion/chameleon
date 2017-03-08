@@ -7,13 +7,15 @@ import logging
 import os
 import select
 
+from chameleond.devices import chameleon_device
+
 
 class USBHIDFlowError(Exception):
   """Exception raised when any error occurs in USBHIDFlow."""
   pass
 
 
-class USBHIDFlow(object):
+class USBHIDFlow(chameleon_device.Flow):
   """The control interface of USB HID flow module driver."""
 
   _HID_FILE_PATTERN = '/dev/hidg%d'
@@ -34,12 +36,28 @@ class USBHIDFlow(object):
       bounce: Whether to send a zero string after each report.
       usb_ctrl: A USBController object that USBHIDFlow keep reference to.
     """
+    super(USBHIDFlow, self).__init__()
     self._port_id = port_id
     self._connector_type = connector_type
     self._hid_file = self._HID_FILE_PATTERN % hid_id
     self._report_length = report_length
     self._bounce = bounce
     self._usb_ctrl = usb_ctrl
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def Initialize(self):
     """Enables USB port controller.
@@ -264,6 +282,21 @@ class KeyboardUSBHIDFlow(USBHIDFlow):
                                              self._KEYBOARD_BOUNCE,
                                              usb_ctrl)
 
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
+
   def SendKey(self, key, is_ctrl_pressed=False, is_shift_pressed=False,
               is_alt_pressed=False):
     """Sends a key pressed event.
@@ -383,6 +416,21 @@ class TouchUSBHIDFlow(USBHIDFlow):
             str(self._TOUCH_BOUNDARY), str(point)))
       chars += [axis % 256, axis / 256]
     return chars
+
+  # TODO
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def SendTrace(self, track_points):
     """Sends a trace event within a list of trajectory points.

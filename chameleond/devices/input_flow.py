@@ -10,6 +10,7 @@ import time
 from abc import ABCMeta
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.devices import chameleon_device
 from chameleond.utils import audio_utils
 from chameleond.utils import common
 from chameleond.utils import edid
@@ -25,50 +26,8 @@ class InputFlowError(Exception):
   pass
 
 
-class InputFlow(object):
-  """An abstraction of the entire flow for a specific input.
-
-  It provides the basic interfaces of Chameleond driver for a specific input.
-  Using this abstraction, each flow can have its own behavior. No need to
-  share the same Chameleond driver code.
-  """
-  _CONNECTOR_TYPE = 'Unknown'  # A subclass should override it.
-
-  def Initialize(self):
-    """Initializes the input flow."""
-    raise NotImplementedError('IsDualPixelMode')
-
-  @classmethod
-  def GetConnectorType(cls):
-    """Returns the human readable string for the connector type."""
-    return cls._CONNECTOR_TYPE
-
-  def Select(self):
-    """Selects the flow."""
-    raise NotImplementedError('Select')
-
-  def IsPhysicalPlugged(self):
-    """Returns if the physical cable is plugged."""
-    raise NotImplementedError('IsPhysicalPlugged')
-
-  def IsPlugged(self):
-    """Returns if the flow is plugged."""
-    raise NotImplementedError('IsPlugged')
-
-  def Plug(self):
-    """Emulates plug."""
-    raise NotImplementedError('Plug')
-
-  def Unplug(self):
-    """Emulates unplug."""
-    raise NotImplementedError('Unplug')
-
-  def DoFSM(self):
-    """Does the Finite-State-Machine to ensure the input flow ready."""
-    pass
-
-
-class FpgaInputFlow(InputFlow):
+# TODO(mojahsu): Rename the XxxxFlow to XxxxDevice
+class FpgaInputFlow(chameleon_device.Flow):
   """An abstraction of the entire flow for InputFlow on FPGA."""
   __metaclass__ = ABCMeta
 
@@ -97,6 +56,7 @@ class FpgaInputFlow(InputFlow):
       main_i2c_bus: The main I2cBus object.
       fpga_ctrl: The FpgaController object.
     """
+    super(FpgaInputFlow, self).__init__()
     self._input_id = input_id
     self._main_bus = main_i2c_bus
     self._fpga = fpga_ctrl
@@ -467,7 +427,7 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
 class DpInputFlow(FpgaInputFlow):
   """An abstraction of the entire flow for DisplayPort."""
 
-  _CONNECTOR_TYPE = 'DP'
+  _DEVICE_NAME = 'DP'
 
   _DELAY_VIDEO_MODE_PROBE = 1.0
   _TIMEOUT_VIDEO_STABLE_PROBE = 5
@@ -489,6 +449,21 @@ class DpInputFlow(FpgaInputFlow):
 
     super(DpInputFlow, self).__init__(*args)
     self._edid = edid.DpEdid(args[0], self._main_bus)
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
@@ -696,15 +671,15 @@ class DpInputFlow(FpgaInputFlow):
 class HdmiInputFlow(FpgaInputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
 
-  _CONNECTOR_TYPE = 'HDMI'
+  _DEVICE_NAME = 'HDMI'
 
   # The firmware for the 6803 reference board sets the rx in dual pixel mode
   # when the pixel clock is greater than 160. Here, we use 130 instead of 160
   # as the FPGA works more reliably when the pixel clock is under this value.
   # Two thresholds defining a hysteresis zone to avoid rapid mode changes due
   # to pixel clock noise.
-  _PIXEL_MODE_PCLK_THRESHOLD_HIGH = 130 # MHz
-  _PIXEL_MODE_PCLK_THRESHOLD_LOW = 126 # MHz
+  _PIXEL_MODE_PCLK_THRESHOLD_HIGH = 130  # MHz
+  _PIXEL_MODE_PCLK_THRESHOLD_LOW = 126  # MHz
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
@@ -715,6 +690,21 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
 
     super(HdmiInputFlow, self).__init__(*args)
     self._edid = edid.HdmiEdid(self._main_bus)
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""
@@ -903,7 +893,7 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
 class VgaInputFlow(FpgaInputFlow):
   """An abstraction of the entire flow for VGA."""
 
-  _CONNECTOR_TYPE = 'VGA'
+  _DEVICE_NAME = 'VGA'
   _IS_DUAL_PIXEL_MODE = False
   _DELAY_CHECKING_STABLE_PROBE = 0.1
   _TIMEOUT_CHECKING_STABLE = 5
@@ -913,6 +903,21 @@ class VgaInputFlow(FpgaInputFlow):
     super(VgaInputFlow, self).__init__(*args)
     self._edid = edid.VgaEdid(self._fpga)
     self._auto_vga_mode = True
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def IsDualPixelMode(self):
     """Returns if the input flow uses dual pixel mode."""

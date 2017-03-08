@@ -8,7 +8,7 @@ import logging
 import struct
 import time
 
-from chameleond.devices import input_flow
+from chameleond.devices import chameleon_device
 from chameleond.utils import serial_utils
 from chameleond.utils import system_tools
 
@@ -132,9 +132,10 @@ class AVSyncProbeSerial(object):
     time.sleep(0.002)
 
 
-class AVSyncProbeFlow(input_flow.InputFlow):
+class AVSyncProbeFlow(chameleon_device.Flow):
   """A client class of the A/V sync probe device."""
 
+  _DEVICE_NAME = 'AVSyncProbe'
   _KERNEL_MODULE = 'ch341'
   _DETECT_RETRY = 3
 
@@ -144,6 +145,7 @@ class AVSyncProbeFlow(input_flow.InputFlow):
     Args:
       port_id: the port id that represents the type of port used.
     """
+    super(AVSyncProbeFlow, self).__init__()
     logging.info('AVSyncProbe __init__ #%d.', port_id)
     self._port_id = port_id
     self._av_sync_probe = None
@@ -164,6 +166,21 @@ class AVSyncProbeFlow(input_flow.InputFlow):
         return
 
     logging.warning('AVSyncProbe: There is no device.')
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def Select(self):
     """Selects the flow. Do nothing for AVSyncProbeFlow."""

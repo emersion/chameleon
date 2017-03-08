@@ -6,16 +6,18 @@
 import logging
 import tempfile
 
-import chameleon_common #pylint: disable=W0611
+import chameleon_common  # pylint: disable=W0611
+from chameleond.devices import chameleon_device
 from chameleond.utils import audio
 from chameleond.utils import system_tools
+
 
 class USBAudioFlowError(Exception):
   """Exception raised when there is any error in USBAudioFlow."""
   pass
 
 
-class USBAudioFlow(object):
+class USBAudioFlow(chameleon_device.Flow):
   """An abstraction for the entire USB Audio flow.
 
   Properties:
@@ -36,6 +38,7 @@ class USBAudioFlow(object):
       usb_ctrl: a USBAudioController object that USBAudioFlow objects keep
           reference to.
     """
+    super(USBAudioFlow, self).__init__()
     self._port_id = port_id
     self._usb_ctrl = usb_ctrl
     self._subprocess = None
@@ -154,6 +157,21 @@ class InputUSBAudioFlow(USBAudioFlow):
     self._file_path = None
     self._captured_file_type = self._DEFAULT_FILE_TYPE
 
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
+
   def SetDriverCaptureConfigs(self, capture_data_format):
     """Sets USB driver capture configurations in AudioDataFormat form.
 
@@ -256,6 +274,21 @@ class OutputUSBAudioFlow(USBAudioFlow):
   def __init__(self, *args):
     """Constructs an OutputUSBAudioFlow object."""
     super(OutputUSBAudioFlow, self).__init__(*args)
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement, if we can use base class's, remove it
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def SetDriverPlaybackConfigs(self, playback_data_format):
     """Sets USB driver playback configurations in AudioDataFormat form.

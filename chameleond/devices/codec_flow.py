@@ -7,6 +7,7 @@ import logging
 import tempfile
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.devices import chameleon_device
 from chameleond.utils import audio_utils
 from chameleond.utils import codec
 from chameleond.utils import ids
@@ -17,7 +18,7 @@ class CodecFlowError(Exception):
   pass
 
 
-class CodecFlow(object):
+class CodecFlow(chameleon_device.Flow):
   """An abstraction of the entire flow for audio codec.
 
   It provides the basic interfaces of Chameleond driver for a specific
@@ -49,6 +50,7 @@ class CodecFlow(object):
       codec_i2c_bus: The I2cBus object for codec.
       fpga_ctrl: The FpgaController object.
     """
+    super(CodecFlow, self).__init__()
     self._port_id = port_id
     self._fpga = fpga_ctrl
     self._audio_codec = codec_i2c_bus.GetSlave(
@@ -117,6 +119,21 @@ class InputCodecFlow(CodecFlow):
     self._recorded_file = None
     self._audio_capture_manager = audio_utils.AudioCaptureManager(
         self._fpga.adump)
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def Select(self):
     """Selects the codec flow.
@@ -198,6 +215,21 @@ class OutputCodecFlow(CodecFlow):
     self._audio_stream_manager = audio_utils.AudioStreamManager(
         self._fpga.astream)
     self._fpga.aiis.Disable()
+
+  # TODO(mojahsu): Implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): Implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): Implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def Select(self):
     """Selects the codec flow to set the proper codec path and FPGA paths."""

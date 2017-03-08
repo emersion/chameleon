@@ -5,6 +5,7 @@
 
 import logging
 
+from chameleond.devices import chameleon_device
 from chameleond.utils import serial_utils
 from chameleond.utils.bluetooth_hid import BluetoothHID
 from chameleond.utils.bluetooth_hid import BluetoothHIDMouse
@@ -15,7 +16,7 @@ class BluetoothHIDFlowError(Exception):
   pass
 
 
-class BluetoothHIDFlow(object):
+class BluetoothHIDFlow(chameleon_device.Flow):
   """The control interface of bluetooth HID flow module driver."""
 
   # the serial driver for chameleon to access the bluetooth emulation kit
@@ -34,6 +35,21 @@ class BluetoothHIDFlow(object):
     self._usb_ctrl = usb_ctrl
     self._tty = None
     super(BluetoothHIDFlow, self).__init__()
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def Initialize(self):
     """Enables Bluetooth HID port controller.
@@ -107,3 +123,18 @@ class BluetoothHIDMouseFlow(BluetoothHIDMouse, BluetoothHIDFlow):
     """
     BluetoothHIDFlow.__init__(self, port_id, 'ClassicBluetoothMouse', usb_ctrl)
     BluetoothHIDMouse.__init__(self, BluetoothHID.PIN_CODE_MODE)
+
+  # TODO(mojahsu): implement
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    raise NotImplementedError('IsDetected')
+
+  # TODO(mojahsu): implement
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    raise NotImplementedError('InitDevice')
+
+  # TODO(mojahsu): implement
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
