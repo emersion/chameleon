@@ -24,6 +24,19 @@ install_pip() {
     python "${PIP_DIR}/${PIP_BOOTSTRAP}"
 }
 
+uninstall_old_chameleond_from_pip() {
+    # On the first installation of PIP, Chameleond was already there,
+    # i.e /usr/lib/python2.7/site-packages/chameleond.
+    # Since then, the new Chameleond is installed in a different path,
+    # i.e. /usr/lib/python2.7/site-packages/chameleond-0.0.2-py2.7.egg.
+    # So check the package directory and uninstall the old Chameleond.
+    pip show chameleond | grep 'Location: .*\.egg' > /dev/null
+    if [ $? -ne 0 ]; then
+        echo PIP still has the old chameleond. Uninstall it...
+        pip uninstall -y chameleond
+        rm -rf /usr/lib/python2.7/site-packages/chameleond
+    fi
+}
 
 # Set the correct time. Otherwise, installation of pip may fail.
 set_time
@@ -31,3 +44,6 @@ set_time
 # Install the missing standard python modules needed to install pip.
 install_standard_python_modules
 install_pip
+
+# Uninstall old chameleond package from pip
+uninstall_old_chameleond_from_pip
