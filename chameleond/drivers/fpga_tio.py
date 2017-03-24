@@ -21,6 +21,7 @@ from chameleond.devices import usb_hid_flow
 from chameleond.utils import audio_board
 from chameleond.utils import caching_server
 from chameleond.utils import fpga
+from chameleond.utils import flow_manager
 from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import system_tools
@@ -32,40 +33,6 @@ class DriverError(Exception):
   pass
 
 
-def _AudioMethod(input_only=False, output_only=False):
-  """Decorator that checks the port_id argument is an audio port.
-
-  Args:
-    input_only: True to check if port is an input port.
-    output_only: True to check if port is an output port.
-  """
-  def _ActualDecorator(func):
-    @functools.wraps(func)
-    def wrapper(instance, port_id, *args, **kwargs):
-      if not ids.IsAudioPort(port_id):
-        raise DriverError(
-            'Not a valid port_id for audio operation: %d' % port_id)
-      if input_only and not ids.IsInputPort(port_id):
-        raise DriverError(
-            'Not a valid port_id for input operation: %d' % port_id)
-      elif output_only and not ids.IsOutputPort(port_id):
-        raise DriverError(
-            'Not a valid port_id for output operation: %d' % port_id)
-      return func(instance, port_id, *args, **kwargs)
-    return wrapper
-  return _ActualDecorator
-
-
-def _VideoMethod(func):
-  """Decorator that checks the port_id argument is a video port."""
-  @functools.wraps(func)
-  def wrapper(instance, port_id, *args, **kwargs):
-    if not ids.IsVideoPort(port_id):
-      raise DriverError('Not a valid port_id for video operation: %d' % port_id)
-    return func(instance, port_id, *args, **kwargs)
-  return wrapper
-
-
 def _AudioBoardMethod(func):
   """Decorator that checks there is an audio board."""
   @functools.wraps(func)
@@ -73,16 +40,6 @@ def _AudioBoardMethod(func):
     if not instance.HasAudioBoard():
       raise DriverError('There is no audio board')
     return func(instance, *args, **kwargs)
-  return wrapper
-
-
-def _USBHIDMethod(func):
-  """Decorator that checks the port_id argument is a USB HID port."""
-  @functools.wraps(func)
-  def wrapper(instance, port_id, *args, **kwargs):
-    if not ids.IsUSBHIDPort(port_id):
-      raise DriverError('Not a valid port_id for HID operation: %d' % port_id)
-    return func(instance, port_id, *args, **kwargs)
   return wrapper
 
 
@@ -105,12 +62,8 @@ class ChameleondDriver(ChameleondInterface):
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
-    self._selected_input = None
-    self._selected_output = None
     self._captured_params = {}
     self._process = None
-    # Reserve index 0 as the default EDID.
-    self._all_edids = [self._ReadDefaultEdid()]
 
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
     audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
@@ -141,15 +94,12 @@ class ChameleondDriver(ChameleondInterface):
             ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
         ids.AVSYNC_PROBE: avsync_probe_flow.AVSyncProbeFlow(ids.AVSYNC_PROBE),
     }
-
     # Allow to accees the mouse methods through bluetooth_mouse member object.
     # Hence, there is no need to export the mouse methods in ChameleondDriver.
     self.bluetooth_mouse = self._flows[ids.BLUETOOTH_HID_MOUSE]
     self.avsync_probe = self._flows[ids.AVSYNC_PROBE]
 
-    for flow in self._flows.itervalues():
-      if flow:
-        flow.Initialize()
+    self._flow_manager = flow_manager.FlowManager(self._flows)
 
     # Some Chameleon might not have audio board installed.
     self._audio_board = None
@@ -166,29 +116,13 @@ class ChameleondDriver(ChameleondInterface):
   def Reset(self):
     """Resets Chameleon board."""
     logging.info('Execute the reset process')
-    # TODO(waihong): Add other reset routines.
-    logging.info('Apply the default EDID and enable DDC on all video inputs')
-    for port_id in self.GetSupportedInputs():
-      if self.HasVideoSupport(port_id):
-        self.ApplyEdid(port_id, ids.EDID_ID_DEFAULT)
-        self.SetDdcState(port_id, enabled=True)
-    for port_id in self.GetSupportedPorts():
-      if self.HasAudioSupport(port_id):
-        # Stops all audio capturing.
-        if ids.IsInputPort(port_id) and self._flows[port_id].is_capturing_audio:
-          self._flows[port_id].StopCapturingAudio()
-
-        self._flows[port_id].ResetRoute()
+    self._flow_manager.Reset()
 
     if self.HasAudioBoard():
       self._audio_board.Reset()
 
     self._ClearAudioFiles()
     caching_server.ClearCachedDir()
-
-    # Set all ports unplugged on initialization.
-    for port_id in self.GetSupportedPorts():
-      self.Unplug(port_id)
 
   def Reboot(self):
     """Reboots Chameleon board."""
@@ -204,7 +138,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A tuple of port_id, for all supported ports on the board.
     """
-    return self._flows.keys()
+    return self._flow_manager.GetSupportedPorts()
 
   def GetSupportedInputs(self):
     """Returns all supported input ports on the board.
@@ -215,7 +149,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A tuple of port_id, for all supported input port on the board.
     """
-    return ids.INPUT_PORTS
+    return self._flow_manager.GetSupportedInputs()
 
   def GetSupportedOutputs(self):
     """Returns all supported output ports on the board.
@@ -226,7 +160,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A tuple of port_id, for all supported output port on the board.
     """
-    return ids.OUTPUT_PORTS
+    return self._flow_manager.GetSupportedOutputs()
 
   def IsPhysicalPlugged(self, port_id):
     """Returns true if the physical cable is plugged between DUT and Chameleon.
@@ -237,7 +171,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the physical cable is plugged; otherwise, False.
     """
-    return self._flows[port_id].IsPhysicalPlugged()
+    return self._flow_manager.IsPhysicalPlugged(port_id)
 
   def ProbePorts(self):
     """Probes all the connected ports on Chameleon board.
@@ -245,8 +179,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A tuple of port_id, for the ports connected to DUT.
     """
-    return tuple(port_id for port_id in self.GetSupportedPorts()
-                 if self.IsPhysicalPlugged(port_id))
+    return self._flow_manager.ProbePorts()
 
   def ProbeInputs(self):
     """Probes all the connected input ports on Chameleon board.
@@ -254,8 +187,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A tuple of port_id, for the input ports connected to DUT.
     """
-    return tuple(port_id for port_id in self.GetSupportedInputs()
-                 if self.IsPhysicalPlugged(port_id))
+    return self._flow_manager.ProbeInputs()
 
   def ProbeOutputs(self):
     """Probes all the connected output ports on Chameleon board.
@@ -263,8 +195,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A tuple of port_id, for the output ports connected to DUT.
     """
-    return tuple(port_id for port_id in self.GetSupportedOutputs()
-                 if self.IsPhysicalPlugged(port_id))
+    return self._flow_manager.ProbeOutputs()
 
   def GetConnectorType(self, port_id):
     """Returns the human readable string for the connector type.
@@ -275,7 +206,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A string, like "HDMI", "DP", "MIC", etc.
     """
-    return self._flows[port_id].GetConnectorType()
+    return self._flow_manager.GetConnectorType(port_id)
 
   def HasAudioSupport(self, port_id):
     """Returns true if the port has audio support.
@@ -286,7 +217,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the input/output port has audio support; otherwise, False.
     """
-    return ids.IsAudioPort(port_id)
+    return self._flow_manager.HasAudioSupport(port_id)
 
   def HasVideoSupport(self, port_id):
     """Returns true if the port has video support.
@@ -297,9 +228,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the input/output port has video support; otherwise, False.
     """
-    return ids.IsVideoPort(port_id)
+    return self._flow_manager.HasVideoSupport(port_id)
 
-  @_VideoMethod
   def SetVgaMode(self, port_id, mode):
     """Sets the mode for VGA monitor.
 
@@ -308,13 +238,8 @@ class ChameleondDriver(ChameleondInterface):
       mode: A string of the mode name, e.g. 'PC_1920x1080x60'. Use 'auto'
             to detect the VGA mode automatically.
     """
-    if port_id == ids.VGA:
-      logging.info('Set VGA port #%d to mode: %s', port_id, mode)
-      self._flows[port_id].SetVgaMode(mode)
-    else:
-      raise DriverError('SetVgaMode only works on VGA port.')
+    return self._flow_manager.SetVgaMode(port_id, mode)
 
-  @_VideoMethod
   def WaitVideoInputStable(self, port_id, timeout=None):
     """Waits the video input stable or timeout.
 
@@ -326,18 +251,7 @@ class ChameleondDriver(ChameleondInterface):
       True if the video input becomes stable within the timeout period;
       otherwise, False.
     """
-    self._SelectInput(port_id)
-    return self._flows[port_id].WaitVideoInputStable(timeout)
-
-  def _ReadDefaultEdid(self):
-    """Reads the default EDID from file.
-
-    Returns:
-      A byte array of EDID data.
-    """
-    driver_dir = os.path.dirname(os.path.realpath(__file__))
-    edid_path = os.path.join(driver_dir, '..', 'data', 'default_edid.bin')
-    return open(edid_path).read()
+    return self._flow_manager.WaitVideoInputStable(port_id, timeout)
 
   def CreateEdid(self, edid):
     """Creates an internal record of EDID using the given byte array.
@@ -348,13 +262,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       An edid_id.
     """
-    if None in self._all_edids:
-      last = self._all_edids.index(None)
-      self._all_edids[last] = edid.data
-    else:
-      last = len(self._all_edids)
-      self._all_edids.append(edid.data)
-    return last
+    return self._flow_manager.CreateEdid(edid)
 
   def DestroyEdid(self, edid_id):
     """Destroys the internal record of EDID. The internal data will be freed.
@@ -362,12 +270,8 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       edid_id: The ID of the EDID, which was created by CreateEdid().
     """
-    if edid_id > ids.EDID_ID_DEFAULT:
-      self._all_edids[edid_id] = None
-    else:
-      raise DriverError('Not a valid edid_id.')
+    self._flow_manager.DestroyEdid(edid_id)
 
-  @_VideoMethod
   def SetDdcState(self, port_id, enabled):
     """Sets the enabled/disabled state of DDC bus on the given video input.
 
@@ -376,10 +280,8 @@ class ChameleondDriver(ChameleondInterface):
       enabled: True to enable DDC bus due to an user request; False to
                disable it.
     """
-    logging.info('Set DDC bus on port #%d to enabled %r', port_id, enabled)
-    self._flows[port_id].SetDdcState(enabled)
+    self._flow_manager.SetDdcState(port_id, enabled)
 
-  @_VideoMethod
   def IsDdcEnabled(self, port_id):
     """Checks if the DDC bus is enabled or disabled on the given video input.
 
@@ -389,9 +291,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the DDC bus is enabled; False if disabled.
     """
-    return self._flows[port_id].IsDdcEnabled()
+    return self._flow_manager.IsDdcEnabled(port_id)
 
-  @_VideoMethod
   def ReadEdid(self, port_id):
     """Reads the EDID content of the selected video input on Chameleon.
 
@@ -402,13 +303,8 @@ class ChameleondDriver(ChameleondInterface):
       A byte array of EDID data, wrapped in a xmlrpclib.Binary object,
       or None if the EDID is disabled.
     """
-    if self._flows[port_id].IsEdidEnabled():
-      return xmlrpclib.Binary(self._flows[port_id].ReadEdid())
-    else:
-      logging.debug('Read EDID on port #%d which is disabled.', port_id)
-      return None
+    return self._flow_manager.ReadEdid(port_id)
 
-  @_VideoMethod
   def ApplyEdid(self, port_id, edid_id):
     """Applies the EDID to the selected video input.
 
@@ -419,15 +315,7 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
       edid_id: The ID of the EDID.
     """
-    if edid_id == ids.EDID_ID_DISABLE:
-      logging.info('Disable EDID on port #%d', port_id)
-      self._flows[port_id].SetEdidState(False)
-    elif edid_id >= ids.EDID_ID_DEFAULT:
-      logging.info('Apply EDID #%d to port #%d', edid_id, port_id)
-      self._flows[port_id].WriteEdid(self._all_edids[edid_id])
-      self._flows[port_id].SetEdidState(True)
-    else:
-      raise DriverError('Not a valid edid_id.')
+    self._flow_manager.ApplyEdid(port_id, edid_id)
 
   def IsPlugged(self, port_id):
     """Returns true if the port is emulated as plugged.
@@ -438,7 +326,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the port is emualted as plugged; otherwise, False.
     """
-    return self._flows[port_id].IsPlugged()
+    return self._flow_manager.IsPlugged(port_id)
 
   def Plug(self, port_id):
     """Emualtes plug, like asserting HPD line to high on a video port.
@@ -446,8 +334,7 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       port_id: The ID of the input/output port.
     """
-    logging.info('Plug port #%d', port_id)
-    return self._flows[port_id].Plug()
+    return self._flow_manager.Plug(port_id)
 
   def Unplug(self, port_id):
     """Emulates unplug, like deasserting HPD line to low on a video port.
@@ -455,10 +342,8 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       port_id: The ID of the input/output port.
     """
-    logging.info('Unplug port #%d', port_id)
-    return self._flows[port_id].Unplug()
+    return self._flow_manager.Unplug(port_id)
 
-  @_VideoMethod
   def FireHpdPulse(self, port_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1,
                    end_level=1):
@@ -473,16 +358,10 @@ class ChameleondDriver(ChameleondInterface):
       repeat_count: The count of HPD pulses to fire.
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
-    if assert_interval_usec is None:
-      # Fall back to use the same value as deassertion if not given.
-      assert_interval_usec = deassert_interval_usec
+    return self._flow_manager.FireHpdPulse(
+        port_id, deassert_interval_usec, assert_interval_usec, repeat_count,
+        end_level)
 
-    logging.info('Fire HPD pulse on port #%d, ending with %s',
-                 port_id, 'high' if end_level else 'low')
-    return self._flows[port_id].FireHpdPulse(
-        deassert_interval_usec, assert_interval_usec, repeat_count, end_level)
-
-  @_VideoMethod
   def FireMixedHpdPulses(self, port_id, widths_msec):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
 
@@ -500,11 +379,8 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
       widths_msec: list of pulse segment widths in milli-second.
     """
-    logging.info('Fire mixed HPD pulse on port #%d, ending with %s',
-                 port_id, 'high' if len(widths_msec) % 2 else 'low')
-    return self._flows[port_id].FireMixedHpdPulses(widths_msec)
+    return self._flow_manager.FireMixedHpdPulses(port_id, widths_msec)
 
-  @_VideoMethod
   def SetContentProtection(self, port_id, enabled):
     """Sets the content protection state on the port.
 
@@ -512,10 +388,8 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the video input port.
       enabled: True to enable; False to disable.
     """
-    logging.info('Set content protection on port #%d: %r', port_id, enabled)
-    self._flows[port_id].SetContentProtection(enabled)
+    self._flow_manager.SetContentProtection(port_id, enabled)
 
-  @_VideoMethod
   def IsContentProtectionEnabled(self, port_id):
     """Returns True if the content protection is enabled on the port.
 
@@ -525,9 +399,8 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the content protection is enabled; otherwise, False.
     """
-    return self._flows[port_id].IsContentProtectionEnabled()
+    return self._flow_manager.IsContentProtectionEnabled(port_id)
 
-  @_VideoMethod
   def IsVideoInputEncrypted(self, port_id):
     """Returns True if the video input on the port is encrypted.
 
@@ -537,29 +410,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if the video input is encrypted; otherwise, False.
     """
-    return self._flows[port_id].IsVideoInputEncrypted()
-
-  def _SelectInput(self, port_id):
-    """Selects the input on Chameleon.
-
-    Args:
-      port_id: The ID of the input port.
-    """
-    if port_id != self._selected_input:
-      self._flows[port_id].Select()
-      self._selected_input = port_id
-    self._flows[port_id].DoFSM()
-
-  def _SelectOutput(self, port_id):
-    """Selects the output on Chameleon.
-
-    Args:
-      port_id: The ID of the output port.
-    """
-    if port_id != self._selected_output:
-      self._flows[port_id].Select()
-      self._selected_output = port_id
-    self._flows[port_id].DoFSM()
+    return self._flow_manager.IsVideoInputEncrypted(port_id)
 
   def StartMonitoringAudioVideoCapturingDelay(self):
     """Starts an audio/video synchronization utility
@@ -602,7 +453,6 @@ class ChameleondDriver(ChameleondInterface):
 
     return float(out)
 
-  @_VideoMethod
   def DumpPixels(self, port_id, x=None, y=None, width=None, height=None):
     """Dumps the raw pixel array of the selected area.
 
@@ -648,7 +498,6 @@ class ChameleondDriver(ChameleondInterface):
     else:
       raise DriverError('Some of area arguments are not specified.')
 
-  @_VideoMethod
   def GetMaxFrameLimit(self, port_id, width, height):
     """Gets the maximal number of frames which are accommodated in the buffer.
 
@@ -663,11 +512,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A number of the frame limit.
     """
-    # This result is related to the video flow status, e.g.
-    # single/dual pixel mode, progressive/interlaced mode.
-    # Need to select the input flow first.
-    self._SelectInput(port_id)
-    return self._flows[port_id].GetMaxFrameLimit(width, height)
+    return self._flow_manager.GetMaxFrameLimit(port_id, width, height)
 
   def _PrepareCapturingVideo(self, port_id, x, y, width, height):
     """Prepares capturing video on the given video input.
@@ -680,15 +525,15 @@ class ChameleondDriver(ChameleondInterface):
       height: The height of the area of crop.
     """
     caching_server.ClearCachedDir()
-    self._SelectInput(port_id)
-    if not self.IsPlugged(port_id):
+    self._flow_manager.SelectInput(port_id)
+    if not self._flow_manager.IsPlugged(port_id):
       raise DriverError('HPD is unplugged. No signal is expected.')
     self._captured_params = {
         'port_id': port_id,
-        'max_frame_limit': self._flows[port_id].GetMaxFrameLimit(width, height)
+        'max_frame_limit': self._flow_manager.GetMaxFrameLimit(port_id,
+                                                               width, height)
     }
 
-  @_VideoMethod
   def StartCapturingVideo(self, port_id, x=None, y=None, width=None,
                           height=None):
     """Starts video capturing continuously on the given video input.
@@ -715,8 +560,9 @@ class ChameleondDriver(ChameleondInterface):
     self._PrepareCapturingVideo(port_id, x, y, width, height)
     max_frame_limit = self._captured_params['max_frame_limit']
     logging.info('Start capturing video from port #%d', port_id)
-    self._flows[port_id].StartDumpingFrames(
-        max_frame_limit, x, y, width, height, self._MAX_CAPTURED_FRAME_COUNT)
+    self._flow_manager.StartDumpingFrames(
+        port_id, max_frame_limit, x, y, width, height,
+        self._MAX_CAPTURED_FRAME_COUNT)
 
   def StopCapturingVideo(self, stop_index=None):
     """Stops video capturing which was started previously.
@@ -738,13 +584,12 @@ class ChameleondDriver(ChameleondInterface):
       while self.GetCapturedFrameCount() < stop_index:
         pass
 
-    self._flows[port_id].StopDumpingFrames()
+    self._flow_manager.StopDumpingFrames(port_id)
     logging.info('Stopped capturing video from port #%d', port_id)
     if self.GetCapturedFrameCount() >= self._MAX_CAPTURED_FRAME_COUNT:
       raise DriverError('Exceeded the limit of capture, frame_count >= %d' %
                         self._MAX_CAPTURED_FRAME_COUNT)
 
-  @_VideoMethod
   def CaptureVideo(self, port_id, total_frame, x=None, y=None, width=None,
                    height=None):
     """Captures the video stream on the given video input to the buffer.
@@ -776,8 +621,9 @@ class ChameleondDriver(ChameleondInterface):
                         total_frame, max_frame_limit)
 
     # TODO(waihong): Make the timeout value based on the FPS rate.
-    self._flows[port_id].DumpFramesToLimit(
-        total_frame, x, y, width, height, self._TIMEOUT_FRAME_DUMP_PROBE)
+    self._flow_manager.DumpFramesToLimit(
+        port_id, total_frame, x, y, width, height,
+        self._TIMEOUT_FRAME_DUMP_PROBE)
 
   def GetCapturedFrameCount(self):
     """Gets the total count of the captured frames.
@@ -786,7 +632,7 @@ class ChameleondDriver(ChameleondInterface):
       The number of frames captured.
     """
     port_id = self._captured_params['port_id']
-    return self._flows[port_id].GetDumpedFrameCount()
+    return self._flow_manager.GetDumpedFrameCount(port_id)
 
   def GetCapturedResolution(self):
     """Gets the resolution of the captured frame.
@@ -798,7 +644,7 @@ class ChameleondDriver(ChameleondInterface):
       A (width, height) tuple.
     """
     port_id = self._captured_params['port_id']
-    return self._flows[port_id].GetCapturedResolution()
+    return self._flow_manager.GetCapturedResolution(port_id)
 
   def ReadCapturedFrame(self, frame_index):
     """Reads the content of the captured frame from the buffer.
@@ -821,7 +667,7 @@ class ChameleondDriver(ChameleondInterface):
 
     # Use the projected index.
     frame_index = frame_index % max_frame_limit
-    screen = self._flows[port_id].ReadCapturedFrame(frame_index)
+    screen = self._flow_manager.ReadCapturedFrame(port_id, frame_index)
     return xmlrpclib.Binary(screen)
 
   def CacheFrameThumbnail(self, frame_index, ratio=2):
@@ -835,7 +681,7 @@ class ChameleondDriver(ChameleondInterface):
       An ID to identify the cached thumbnail.
     """
     port_id = self._captured_params['port_id']
-    return self._flows[port_id].CacheFrameThumbnail(frame_index, ratio)
+    return self._flow_manager.CacheFrameThumbnail(port_id, frame_index, ratio)
 
   def _GetCapturedSignals(self, signal_func_name, start_index=0,
                           stop_index=None):
@@ -889,7 +735,6 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._GetCapturedSignals('GetHistograms', start_index, stop_index)
 
-  @_VideoMethod
   def ComputePixelChecksum(
       self, port_id, x=None, y=None, width=None, height=None):
     """Computes the checksum of pixels in the selected area.
@@ -911,7 +756,6 @@ class ChameleondDriver(ChameleondInterface):
     return self.GetCapturedChecksums(self._DEFAULT_FRAME_INDEX,
                                      self._DEFAULT_FRAME_INDEX + 1)[0]
 
-  @_VideoMethod
   def DetectResolution(self, port_id):
     """Detects the video source resolution.
 
@@ -921,10 +765,7 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       A (width, height) tuple.
     """
-    self._SelectInput(port_id)
-    resolution = self._flows[port_id].GetResolution()
-    logging.info('Detected resolution on port #%d: %dx%d', port_id, *resolution)
-    return resolution
+    return self._flow_manager.DetectResolution(port_id)
 
   def HasAudioBoard(self):
     """Returns True if there is an audio board.
@@ -934,7 +775,6 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._audio_board is not None
 
-  @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 
@@ -945,11 +785,8 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the audio input port.
       has_file: True for saving audio data to file. False otherwise.
     """
-    self._SelectInput(port_id)
-    logging.info('Start capturing audio from port #%d', port_id)
-    self._flows[port_id].StartCapturingAudio(has_file)
+    self._flow_manager.StartCapturingAudio(port_id, has_file)
 
-  @_AudioMethod(input_only=True)
   def StopCapturingAudio(self, port_id):
     """Stops capturing audio and returns recorded data path and format.
 
@@ -965,25 +802,9 @@ class ChameleondDriver(ChameleondInterface):
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
       If we assign parameter has_file=False in StartCapturingAudio, we will get
       both empty string in path and format.
-
-    Raises:
-      DriverError: Input is selected to port other than port_id.
-        This happens if user has used API related to input operation on
-        other port. The API includes CaptureVideo, StartCapturingVideo,
-        DetectResolution, StartCapturingAudio, StartPlayingEcho.
     """
-    if self._selected_input != port_id:
-      raise DriverError(
-          'The input is selected to %r not %r', self._selected_input, port_id)
-    path, data_format = self._flows[port_id].StopCapturingAudio()
-    logging.info('Stopped capturing audio from port #%d', port_id)
-    # If there is no path, set it to empty string. Because XMLRPC doesn't
-    # support None as return value.
-    if path is None and data_format is None:
-      return '', ''
-    return path, data_format
+    return self._flow_manager.StopCapturingAudio(port_id)
 
-  @_AudioMethod(output_only=True)
   def StartPlayingAudio(self, port_id, path, data_format):
     """Playing audio data from an output port.
 
@@ -998,17 +819,9 @@ class ChameleondDriver(ChameleondInterface):
         dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
         Chameleon user should do the format conversion to minimize work load
         on Chameleon board.
-
-    Raises:
-      DriverError: There is no file at the path.
     """
-    if not os.path.exists(path):
-      raise DriverError('File path %r does not exist' % path)
-    self._SelectOutput(port_id)
-    logging.info('Start playing audio from port #%d', port_id)
-    self._flows[port_id].StartPlayingAudio(path, data_format)
+    self._flow_manager.StartPlayingAudio(port_id, path, data_format)
 
-  @_AudioMethod(output_only=True)
   def StartPlayingEcho(self, port_id, input_id):
     """Echoes audio data received from input_id and plays to port_id.
 
@@ -1039,36 +852,16 @@ class ChameleondDriver(ChameleondInterface):
     Args:
       port_id: The ID of the output connector. Check the value in ids.py.
       input_id: The ID of the input connector. Check the value in ids.py.
-
-    Raises:
-      DriverError: input_id is not valid for audio operation.
     """
-    if not ids.IsAudioPort(input_id) or not ids.IsInputPort(input_id):
-      raise DriverError(
-          'Not a valid input_id for audio operation: %d' % input_id)
-    self._SelectInput(input_id)
-    self._SelectOutput(port_id)
-    logging.info('Start playing echo from port #%d using source from port#%d',
-                 port_id, input_id)
-    self._flows[port_id].StartPlayingEcho(input_id)
+    self._flow_manager.StartPlayingEcho(port_id, input_id)
 
-  @_AudioMethod(output_only=True)
   def StopPlayingAudio(self, port_id):
     """Stops playing audio from port_id port.
 
     Args:
       port_id: The ID of the output connector.
-
-    Raises:
-      DriverError: Output is selected to port other than port_id.
-        This happens if user has used API related to output operation on other
-        port. The API includes StartPlayingAudio, StartPlayingEcho.
     """
-    if self._selected_output != port_id:
-      raise DriverError(
-          'The output is selected to %r not %r', self._selected_output, port_id)
-    logging.info('Stop playing audio from port #%d', port_id)
-    self._flows[port_id].StopPlayingAudio()
+    self._flow_manager.StopPlayingAudio(port_id)
 
   def _ClearAudioFiles(self):
     """Clears temporary audio files.
@@ -1207,18 +1000,8 @@ class ChameleondDriver(ChameleondInterface):
         for setting file type before playing audio. It is specified by the audio
         file passed in for playback. Other fields are used to set USB driver
         configurations.
-
-    Raises:
-      DriverError if any of the USB Flows is playing or capturing audio.
     """
-    if (self._flows[ids.USB_AUDIO_IN].is_capturing_audio or
-        self._flows[ids.USB_AUDIO_OUT].is_playing_audio):
-      error_message = ('Configuration changes not allowed when USB audio '
-                       'driver is still performing playback/capture in one of '
-                       'the flows.')
-      raise DriverError(error_message)
-    self._flows[ids.USB_AUDIO_OUT].SetDriverPlaybackConfigs(
-        playback_data_format)
+    self._flow_manager.SetUSBDriverPlaybackConfigs(playback_data_format)
 
   def SetUSBDriverCaptureConfigs(self, capture_data_format):
     """Updates the corresponding capture configurations to argument values.
@@ -1231,17 +1014,8 @@ class ChameleondDriver(ChameleondInterface):
         'file_type' field will be saved by InputUSBAudioFlow as the file type
         for captured data. Other fields are used to set USB driver
         configurations.
-
-    Raises:
-      DriverError if any of the USB audio Flows is playing or capturing audio.
     """
-    if (self._flows[ids.USB_AUDIO_IN].is_capturing_audio or
-        self._flows[ids.USB_AUDIO_OUT].is_playing_audio):
-      error_message = ('Configuration changes not allowed when USB audio '
-                       'driver is still performing playback/capture in one of '
-                       'the flows.')
-      raise DriverError(error_message)
-    self._flows[ids.USB_AUDIO_IN].SetDriverCaptureConfigs(capture_data_format)
+    self._flow_manager.SetUSBDriverCaptureConfigs(capture_data_format)
 
   def GetMacAddress(self):
     """Gets the MAC address of this Chameleon.
@@ -1251,7 +1025,6 @@ class ChameleondDriver(ChameleondInterface):
     """
     return open('/sys/class/net/eth0/address').read().strip()
 
-  @_USBHIDMethod
   def SendHIDEvent(self, port_id, event_type, *args, **kwargs):
     """Sends HID event with event_type and arguments for HID port #port_id.
 
@@ -1262,4 +1035,4 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       Returns as event function if applicable.
     """
-    return self._flows[port_id].Send(event_type, *args, **kwargs)
+    return self._flow_manager.SendHIDEvent(port_id, event_type, *args, **kwargs)
