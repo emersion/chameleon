@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 """IDs shared with Chameleond drivers."""
 
-# IDs of ports
+# IDs of ports or devices
 DP1 = 1
 DP2 = 2
 HDMI = 3
@@ -21,6 +21,30 @@ BLUETOOTH_HID_MOUSE = 14
 BLUETOOTH_HID_COMBO = 15
 BLUETOOTH_HID_JOYSTICK = 16
 AVSYNC_PROBE = 17
+AUDIO_BOARD = 18
+
+# device names
+DEVICE_NAMES = {
+    DP1: 'dp1',
+    DP2: 'dp2',
+    HDMI: 'hdmi',
+    VGA: 'vga',
+    MIC: 'mic',
+    LINEIN: 'linein',
+    LINEOUT: 'lineout',
+    USB_AUDIO_IN: 'usb_audio_in',
+    USB_AUDIO_OUT: 'usb_audio_out',
+    USB_KEYBOARD: 'usb_keyboard',
+    USB_TOUCH: 'usb_touch',
+    BLUETOOTH_HID_KEYBOARD: 'bluetooth_hid_keyboard',
+    BLUETOOTH_HID_GAMEPAD: 'bluetooth_hid_gaamepad',
+    BLUETOOTH_HID_MOUSE: 'bluetooth_hid_mouse',
+    BLUETOOTH_HID_COMBO: 'bluetooth_hid_combo',
+    BLUETOOTH_HID_JOYSTICK: 'bluetooth_hid_joystick',
+    AVSYNC_PROBE: 'avsync_probe',
+    AUDIO_BOARD: 'audio_board'
+}
+
 
 # Input/output ports
 INPUT_PORTS = [DP1, DP2, HDMI, VGA, MIC, LINEIN, USB_AUDIO_IN]
