@@ -37,6 +37,7 @@ class ChameleonDevice(object):
     """Reset chameleon device."""
     raise NotImplementedError('Reset')
 
+  # TODO(mojahsu): Since we define the names in ids.py, we can remove it.
   def GetDeviceName(self):
     """Returns the human readable string for the device."""
     return self._device_name
@@ -83,7 +84,8 @@ class Flow(ChameleonDevice):
     """Does the Finite-State-Machine to ensure the input flow ready."""
     pass
 
-  # TODO(mojahsu) Replace it with GetDeviceName()
+  # TODO(mojahsu): Add connector Type back. we may have 2 devices with the same
+  # type. It't not suitable to use GetDeviceName to replace it.
   def GetConnectorType(self):
     """Returns the human readable string for the connector type."""
     return self.GetDeviceName()

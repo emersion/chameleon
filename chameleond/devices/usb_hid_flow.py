@@ -44,20 +44,17 @@ class USBHIDFlow(chameleon_device.Flow):
     self._bounce = bounce
     self._usb_ctrl = usb_ctrl
 
-  # TODO(mojahsu): implement
   def IsDetected(self):
     """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
+    return self._usb_ctrl.DetectDriver()
 
-  # TODO(mojahsu): implement
   def InitDevice(self):
     """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
+    pass
 
-  # TODO(mojahsu): implement
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
+    pass
 
   def Initialize(self):
     """Enables USB port controller.
@@ -282,21 +279,6 @@ class KeyboardUSBHIDFlow(USBHIDFlow):
                                              self._KEYBOARD_BOUNCE,
                                              usb_ctrl)
 
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def Reset(self):
-    """Reset chameleon device."""
-    raise NotImplementedError('Reset')
-
   def SendKey(self, key, is_ctrl_pressed=False, is_shift_pressed=False,
               is_alt_pressed=False):
     """Sends a key pressed event.
@@ -416,21 +398,6 @@ class TouchUSBHIDFlow(USBHIDFlow):
             str(self._TOUCH_BOUNDARY), str(point)))
       chars += [axis % 256, axis / 256]
     return chars
-
-  # TODO
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO
-  def Reset(self):
-    """Reset chameleon device."""
-    raise NotImplementedError('Reset')
 
   def SendTrace(self, track_points):
     """Sends a trace event within a list of trajectory points.

@@ -132,7 +132,7 @@ class AVSyncProbeSerial(object):
     time.sleep(0.002)
 
 
-class AVSyncProbeFlow(chameleon_device.Flow):
+class AVSyncProbe(chameleon_device.ChameleonDevice):
   """A client class of the A/V sync probe device."""
 
   _DEVICE_NAME = 'AVSyncProbe'
@@ -145,15 +145,14 @@ class AVSyncProbeFlow(chameleon_device.Flow):
     Args:
       port_id: the port id that represents the type of port used.
     """
-    super(AVSyncProbeFlow, self).__init__()
+    super(AVSyncProbe, self).__init__()
     logging.info('AVSyncProbe __init__ #%d.', port_id)
     self._port_id = port_id
     self._av_sync_probe = None
     system_tools.SystemTools.Call('modprobe', self._KERNEL_MODULE)
 
-  def Initialize(self):
-    """Initialize AVSyncProbe. We will check if the device exists."""
-    logging.info('Initialized AVSyncProbe flow #%d.', self._port_id)
+  def IsDetected(self):
+    """Returns if the device can be detected."""
     # We need some time for system to detect the device.
     for i in xrange(self._DETECT_RETRY, 0, -1):
       try:
@@ -162,59 +161,17 @@ class AVSyncProbeFlow(chameleon_device.Flow):
         logging.info('AVSyncProbe: Retry detecting device (%d left).', i)
         time.sleep(1)
       else:
-        logging.info('AVSyncProbe: There is a device.')
-        return
+        return True
+    return False
 
-    logging.warning('AVSyncProbe: There is no device.')
-
-  # TODO(mojahsu): implement
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): implement
   def InitDevice(self):
     """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
+    # No need to init the device.
+    pass
 
-  # TODO(mojahsu): implement
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
-
-  def Select(self):
-    """Selects the flow. Do nothing for AVSyncProbeFlow."""
-    logging.debug('Selected AVSyncProbe flow #%d.', self._port_id)
-
-  def IsPhysicalPlugged(self):
-    """Returns if the physical cable is plugged.
-
-    Returns:
-      True if we can probe the AVSyncProbe device.
-      False otherwise.
-    """
-    logging.debug('AVSyncProbe flow #%d: IsPhysicalPlugged() called',
-                  self._port_id)
-    return bool(self._av_sync_probe)
-
-  def IsPlugged(self):
-    """Returns if the flow is plugged."""
-    return self.IsPhysicalPlugged()
-
-  def Plug(self):
-    """Emulates plug. Do nothing for AVSyncProbeFlow"""
-    logging.debug('AVSyncProbe flow #%d: Plug() called.', self._port_id)
-
-  def Unplug(self):
-    """Emulates unplug. Do nothing for AVSyncProbeFlow"""
-    logging.debug('AVSyncProbe flow #%d: Unplug() called.', self._port_id)
-
-  def DoFSM(self):
-    """fpga_tio calls DoFSM after a flow is selected.
-
-    Do nothing for AVSyncProbeFlow
-    """
-    logging.debug('AVSyncProbe flow #%d: DoFSM() called.', self._port_id)
+    self._av_sync_probe.StopCapturing()
 
   def Capture(self, sample_duration_seconds=10.0):
     """Get the sample results of the probe.

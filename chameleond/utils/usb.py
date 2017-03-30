@@ -7,7 +7,7 @@ import copy
 import logging
 import re
 
-import chameleon_common #pylint: disable=W0611
+import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import system_tools
 from chameleond.utils import usb_audio_configs
 
@@ -190,6 +190,27 @@ class USBController(object):
   def DisableUSBOTGDriver(self):
     """Disables dwc2 driver so USB port does not get controlled by Chameleon."""
     system_tools.SystemTools.Call('modprobe', '-r', 'dwc2')
+
+  def DetectDriver(self):
+    """Detect if we have the USB module driver.
+
+    We detect it by checking the module driver information.
+
+    Returns:
+      True for detecting success, False otherwise
+    """
+    # If the module is already loaded, just return True
+    if self._is_modprobed:
+      return True
+    # Check if we have the module driver in system.
+    # Use modinfo to check. If there is no such module in system, we will have
+    # exception.
+    try:
+      system_tools.SystemTools.Call('modinfo', self._module)
+      return True
+    except Exception:
+      logging.info('Try to modinfo %s fail', self._module)
+      return False
 
 
 class USBAudioController(USBController):

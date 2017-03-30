@@ -67,8 +67,6 @@ BLUETOOTH_HID_PORTS = [BLUETOOTH_HID_KEYBOARD,
                        BLUETOOTH_HID_COMBO,
                        BLUETOOTH_HID_JOYSTICK]
 
-AVSYNC_PROBE_PORTS = [AVSYNC_PROBE]
-
 # Convenience methods
 IsInputPort = lambda port_id: port_id in INPUT_PORTS
 IsOutputPort = lambda port_id: port_id in OUTPUT_PORTS
@@ -77,7 +75,6 @@ IsVideoPort = lambda port_id: port_id in VIDEO_PORTS
 IsUSBAudioPort = lambda port_id: port_id in USB_AUDIO_PORTS
 IsUSBHIDPort = lambda port_id: port_id in USB_HID_PORTS
 IsBluetoothHIDPort = lambda port_id: port_id in BLUETOOTH_HID_PORTS
-IsAVSyncProbePort = lambda port_id: port_id in AVSYNC_PROBE_PORTS
 
 # IDs of EDIDs
 EDID_ID_DEFAULT = 0

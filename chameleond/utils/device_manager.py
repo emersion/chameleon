@@ -52,7 +52,6 @@ class DeviceManager(object):
 
     for device in self._detected_devices.values():
       device.InitDevice()
-      device.Reset()
 
   def Reset(self):
     """Reset all detected chameleon devices."""

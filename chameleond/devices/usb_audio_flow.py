@@ -44,6 +44,14 @@ class USBAudioFlow(chameleon_device.Flow):
     self._subprocess = None
     self._supported_data_format = None
 
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    return self._usb_ctrl.DetectDriver()
+
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    pass
+
   def Initialize(self):
     """Enables USB port controller.
 
@@ -157,20 +165,10 @@ class InputUSBAudioFlow(USBAudioFlow):
     self._file_path = None
     self._captured_file_type = self._DEFAULT_FILE_TYPE
 
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO(mojahsu): implement, if we can use base class's, remove it
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
+    if self.is_capturing_audio:
+      self.StopCapturingAudio()
 
   def SetDriverCaptureConfigs(self, capture_data_format):
     """Sets USB driver capture configurations in AudioDataFormat form.
@@ -245,6 +243,7 @@ class InputUSBAudioFlow(USBAudioFlow):
       self._subprocess.terminate()
       logging.info('Stopped capturing audio.')
 
+    self._subprocess = None
     return (self._file_path, self._supported_data_format.AsDict())
 
   @property
@@ -275,20 +274,10 @@ class OutputUSBAudioFlow(USBAudioFlow):
     """Constructs an OutputUSBAudioFlow object."""
     super(OutputUSBAudioFlow, self).__init__(*args)
 
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): implement, if we can use base class's, remove it
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO(mojahsu): implement, if we can use base class's, remove it
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
+    if self.is_playing_audio:
+      self.StopPlayingAudio()
 
   def SetDriverPlaybackConfigs(self, playback_data_format):
     """Sets USB driver playback configurations in AudioDataFormat form.
@@ -380,6 +369,8 @@ class OutputUSBAudioFlow(USBAudioFlow):
     elif self._subprocess.poll() is None:
       self._subprocess.terminate()
       logging.info('Stopped playing audio.')
+
+    self._subprocess = None
 
   @property
   def is_playing_audio(self):

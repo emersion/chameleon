@@ -7,6 +7,7 @@ import logging
 import time
 
 import chameleon_common  # pylint: disable=W0611
+from chameleond.devices import chameleon_device
 from chameleond.utils import i2c
 from chameleond.utils import chameleon_io as io
 
@@ -213,7 +214,6 @@ class _JackPlugger(object):
   --------------------------
      0      1         plug
      1      0         unplug
-
   """
   # The I/O expander index is 1.
   _INDEX = 1
@@ -316,7 +316,6 @@ class _BluetoothController(object):
   pin    backward   play/stop
 
   ==================================================
-
   """
   # The I/O expander index is 1.
   _INDEX = 1
@@ -594,7 +593,7 @@ class AudioBoardException(Exception):
   """Errors in AudioBoard."""
 
 
-class AudioBoard(object):
+class AudioBoard(chameleon_device.ChameleonDevice):
   """A class to control audio board.
 
   The audio functions includes:
@@ -604,7 +603,6 @@ class AudioBoard(object):
      in audio box.
   4. TODO (cychiang) Audio button function switching.
   5. TODO (cychiang) Audio button press control.
-
   """
   def __init__(self, i2c_bus):
     """Runs the initialization sequence for the audio board.
@@ -615,23 +613,46 @@ class AudioBoard(object):
     Raises:
       AudioBoardException: If audio board can not be initialized.
     """
+    self._i2c_bus = i2c_bus
+    self._io_controller = None
+    self._jack_plugger = None
+    self._bluetooth_ctrl = None
+    self._audio_buses = None
+    self._switch_controller = None
+    super(AudioBoard, self).__init__()
+
+  def IsDetected(self):
+    """Returns if the device can be detected."""
     try:
-      io_controller = _AudioBoardIOController(i2c_bus)
-      self._switch_controller = _AudioBoardSwitchController(io_controller)
+      self._io_controller = _AudioBoardIOController(self._i2c_bus)
+      return True
+    except i2c.I2cBusError:
+      logging.error('Can not access I2c bus at %#x on audio board.',
+                    self._i2c_bus.base_addr)
+      return False
+
+  def InitDevice(self):
+    """Runs the initialization sequence for the audio board.
+
+    Raises:
+      AudioBoardException: If audio board can not be initialized.
+    """
+    try:
+      self._switch_controller = _AudioBoardSwitchController(self._io_controller)
       self._audio_buses = {
           1: _AudioBus(self._switch_controller, 1),
           2: _AudioBus(self._switch_controller, 2)}
     except i2c.I2cBusError:
       logging.error('Can not access I2c bus at %#x on audio board.',
-                    i2c_bus.base_addr)
+                    self._i2c_bus.base_addr)
       raise AudioBoardException('Can not initialize audio board')
     try:
-      self._jack_plugger = _JackPlugger(io_controller)
+      self._jack_plugger = _JackPlugger(self._io_controller)
     except _JackPluggerException:
       logging.error('Can not access jack plugger.')
       self._jack_plugger = None
 
-    self._bluetooth_ctrl = _BluetoothController(io_controller)
+    self._bluetooth_ctrl = _BluetoothController(self._io_controller)
 
     logging.info('Audio board initialized')
 

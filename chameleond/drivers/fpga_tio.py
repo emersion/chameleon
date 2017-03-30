@@ -12,14 +12,15 @@ import xmlrpclib
 import chameleon_common  # pylint: disable=W0611
 from chameleond.interface import ChameleondInterface
 
-from chameleond.devices import avsync_probe_flow
+from chameleond.devices import audio_board
+from chameleond.devices import avsync_probe
 from chameleond.devices import bluetooth_hid_flow
 from chameleond.devices import codec_flow
 from chameleond.devices import input_flow
 from chameleond.devices import usb_audio_flow
 from chameleond.devices import usb_hid_flow
-from chameleond.utils import audio_board
 from chameleond.utils import caching_server
+from chameleond.utils import device_manager
 from chameleond.utils import fpga
 from chameleond.utils import flow_manager
 from chameleond.utils import i2c
@@ -33,14 +34,20 @@ class DriverError(Exception):
   pass
 
 
-def _AudioBoardMethod(func):
-  """Decorator that checks there is an audio board."""
-  @functools.wraps(func)
-  def wrapper(instance, *args, **kwargs):
-    if not instance.HasAudioBoard():
-      raise DriverError('There is no audio board')
-    return func(instance, *args, **kwargs)
-  return wrapper
+def _DeviceMethod(device_id):
+  """Decorator that checks if the device exists.
+
+  Args:
+    device_id: The device ID.
+  """
+  def _ActualDecorator(func):
+    @functools.wraps(func)
+    def wrapper(instance, *args, **kwargs):
+      if not instance.HasDevice(device_id):
+        raise DriverError('There is no %s' % ids.DEVICE_NAMES[device_id])
+      return func(instance, *args, **kwargs)
+    return wrapper
+  return _ActualDecorator
 
 
 class ChameleondDriver(ChameleondInterface):
@@ -66,20 +73,21 @@ class ChameleondDriver(ChameleondInterface):
     self._process = None
 
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
+    audio_board_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_BOARD)
     audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
     fpga_ctrl = fpga.FpgaController()
     usb_audio_ctrl = usb.USBAudioController()
     usb_hid_ctrl = usb.USBController('g_hid')
     bluetooth_hid_ctrl = usb.USBController('ftdi_sio')
 
-    self._flows = {
+    self._devices = {
         ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
         ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
         ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
         ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
         ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_codec_bus, fpga_ctrl),
-        ids.LINEIN: codec_flow.InputCodecFlow(ids.LINEIN, audio_codec_bus,
-                                              fpga_ctrl),
+        ids.LINEIN: codec_flow.InputCodecFlow(
+            ids.LINEIN, audio_codec_bus, fpga_ctrl),
         ids.LINEOUT: codec_flow.OutputCodecFlow(
             ids.LINEOUT, audio_codec_bus, fpga_ctrl),
         ids.USB_AUDIO_IN: usb_audio_flow.InputUSBAudioFlow(
@@ -92,24 +100,23 @@ class ChameleondDriver(ChameleondInterface):
             ids.USB_TOUCH, usb_hid_ctrl),
         ids.BLUETOOTH_HID_MOUSE: bluetooth_hid_flow.BluetoothHIDMouseFlow(
             ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
-        ids.AVSYNC_PROBE: avsync_probe_flow.AVSyncProbeFlow(ids.AVSYNC_PROBE),
+        ids.AVSYNC_PROBE: avsync_probe.AVSyncProbe(ids.AVSYNC_PROBE),
+        ids.AUDIO_BOARD: audio_board.AudioBoard(audio_board_bus)
     }
-    # Allow to accees the mouse methods through bluetooth_mouse member object.
-    # Hence, there is no need to export the mouse methods in ChameleondDriver.
-    self.bluetooth_mouse = self._flows[ids.BLUETOOTH_HID_MOUSE]
-    self.avsync_probe = self._flows[ids.AVSYNC_PROBE]
+
+    self._device_manager = device_manager.DeviceManager(self._devices)
+    self._device_manager.Init()
+    self._flows = self._device_manager.GetDetectedFlows()
+
+    # Allow to accees the methods through object.
+    # Hence, there is no need to export the methods in ChameleondDriver.
+    self.audio_board = self._device_manager.GetChameleonDevice(ids.AUDIO_BOARD)
+    self.bluetooth_mouse = self._device_manager.GetChameleonDevice(
+        ids.BLUETOOTH_HID_MOUSE)
+    self.avsync_probe = self._device_manager.GetChameleonDevice(
+        ids.AVSYNC_PROBE)
 
     self._flow_manager = flow_manager.FlowManager(self._flows)
-
-    # Some Chameleon might not have audio board installed.
-    self._audio_board = None
-    try:
-      audio_board_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_BOARD)
-      self._audio_board = audio_board.AudioBoard(audio_board_bus)
-    except audio_board.AudioBoardException:
-      logging.warning('There is no audio board on this Chameleon')
-    else:
-      logging.info('There is an audio board on this Chameleon')
 
     self.Reset()
 
@@ -117,9 +124,7 @@ class ChameleondDriver(ChameleondInterface):
     """Resets Chameleon board."""
     logging.info('Execute the reset process')
     self._flow_manager.Reset()
-
-    if self.HasAudioBoard():
-      self._audio_board.Reset()
+    self._device_manager.Reset()
 
     self._ClearAudioFiles()
     caching_server.ClearCachedDir()
@@ -128,6 +133,23 @@ class ChameleondDriver(ChameleondInterface):
     """Reboots Chameleon board."""
     logging.info('The chameleon board is going to reboot.')
     system_tools.SystemTools.Call('reboot')
+
+  def GetDetectedStatus(self):
+    """Returns detetcted status of all devices.
+
+    User can use this API to know the capability of the chameleon board.
+
+    Returns:
+      A list of a tuple of detected devices' strings detected status.
+      e.g. [('HDMI', True), ('MIC', False)]
+    """
+    detected_list = []
+    for device_id in self._devices:
+      detected = False
+      if self._device_manager.GetChameleonDevice(device_id):
+        detected = True
+      detected_list.append((ids.DEVICE_NAMES[device_id], detected))
+    return detected_list
 
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
@@ -773,7 +795,15 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if there is an audio board. False otherwise.
     """
-    return self._audio_board is not None
+    return self.audio_board is not None
+
+  def HasDevice(self, device_id):
+    """Returns True if there is a device.
+
+    Returns:
+      True if there is a device . False otherwise.
+    """
+    return self._device_manager.GetChameleonDevice(device_id) is not None
 
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
@@ -872,7 +902,7 @@ class ChameleondDriver(ChameleondInterface):
     for path in glob.glob('/tmp/audio_*'):
       os.unlink(path)
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardConnect(self, bus_number, endpoint):
     """Connects an endpoint to an audio bus.
 
@@ -885,16 +915,16 @@ class ChameleondDriver(ChameleondInterface):
                    endpoint occupying audio bus.
     """
     if audio_board.IsSource(endpoint):
-      current_sources, _ = self._audio_board.GetConnections(bus_number)
+      current_sources, _ = self.audio_board.GetConnections(bus_number)
       if current_sources and endpoint not in current_sources:
         raise DriverError(
             'Sources %s other than %s are currently occupying audio bus.' %
             (current_sources, endpoint))
 
-    self._audio_board.SetConnection(
+    self.audio_board.SetConnection(
         bus_number, endpoint, True)
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardDisconnect(self, bus_number, endpoint):
     """Disconnects an endpoint to an audio bus.
 
@@ -905,15 +935,15 @@ class ChameleondDriver(ChameleondInterface):
     Raises:
       DriverError: If the endpoint is not connected to audio bus.
     """
-    if not self._audio_board.IsConnected(bus_number, endpoint):
+    if not self.audio_board.IsConnected(bus_number, endpoint):
       raise DriverError(
           'Endpoint %s is not connected to audio bus %d.' %
           (endpoint, bus_number))
 
-    self._audio_board.SetConnection(
+    self.audio_board.SetConnection(
         bus_number, endpoint, False)
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardGetRoutes(self, bus_number):
     """Gets a list of routes on audio bus.
 
@@ -925,7 +955,7 @@ class ChameleondDriver(ChameleondInterface):
       where source and sink are endpoints defined in
       audio_board.AudioBusEndpoint.
     """
-    sources, sinks = self._audio_board.GetConnections(bus_number)
+    sources, sinks = self.audio_board.GetConnections(bus_number)
     routes = []
     for source in sources:
       for sink in sinks:
@@ -934,16 +964,16 @@ class ChameleondDriver(ChameleondInterface):
         routes.append((source, sink))
     return routes
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardClearRoutes(self, bus_number):
     """Clears routes on an audio bus.
 
     Args:
       bus_number: 1 or 2 for audio bus 1 or bus 2.
     """
-    self._audio_board.ResetConnections(bus_number)
+    self.audio_board.ResetConnections(bus_number)
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardHasJackPlugger(self):
     """If there is jack plugger on audio board.
 
@@ -953,40 +983,40 @@ class ChameleondDriver(ChameleondInterface):
     Returns:
       True if there is jack plugger on audio board. False otherwise.
     """
-    return self._audio_board.HasJackPlugger()
+    return self.audio_board.HasJackPlugger()
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardAudioJackPlug(self):
     """Plugs audio jack to connect audio board and Cros device."""
     logging.info('Plug audio jack to connect audio board and Cros device.')
-    self._audio_board.SetJackPlugger(True)
+    self.audio_board.SetJackPlugger(True)
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardAudioJackUnplug(self):
     """Unplugs audio jack to disconnect audio board and Cros device."""
     logging.info('Unplug audio jack to disconnect audio board and Cros device.')
-    self._audio_board.SetJackPlugger(False)
+    self.audio_board.SetJackPlugger(False)
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardResetBluetooth(self):
     """Resets bluetooth module on audio board."""
     logging.info('Resets bluetooth module on audio board.')
-    self._audio_board.ResetBluetooth()
+    self.audio_board.ResetBluetooth()
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardDisableBluetooth(self):
     """Disables bluetooth module on audio board."""
     logging.info('Disables bluetooth module on audio board.')
-    self._audio_board.DisableBluetooth()
+    self.audio_board.DisableBluetooth()
 
-  @_AudioBoardMethod
+  @_DeviceMethod(ids.AUDIO_BOARD)
   def AudioBoardIsBluetoothEnabled(self):
     """Checks if bluetooth module on audio board is enabled.
 
     Returns:
       True if bluetooth module is enabled. False otherwise.
     """
-    return self._audio_board.IsBluetoothEnabled()
+    return self.audio_board.IsBluetoothEnabled()
 
   def SetUSBDriverPlaybackConfigs(self, playback_data_format):
     """Updates the corresponding playback configurations to argument values.

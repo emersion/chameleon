@@ -6,6 +6,7 @@
 import logging
 
 from chameleond.devices import chameleon_device
+from chameleond.utils import common
 from chameleond.utils import serial_utils
 from chameleond.utils.bluetooth_hid import BluetoothHID
 from chameleond.utils.bluetooth_hid import BluetoothHIDMouse
@@ -21,6 +22,7 @@ class BluetoothHIDFlow(chameleon_device.Flow):
 
   # the serial driver for chameleon to access the bluetooth emulation kit
   SERIAL_DRIVER = 'ftdi_sio'
+  DETECT_SLEEP_SECS = 2  # the time to sleep in detect.
 
   def __init__(self, port_id, connector_type, usb_ctrl):
     """Initializes a BluetoothHIDFlow object.
@@ -36,29 +38,31 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     self._tty = None
     super(BluetoothHIDFlow, self).__init__()
 
-  # TODO(mojahsu): implement
   def IsDetected(self):
     """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
 
-  # TODO(mojahsu): implement
+    # Enables Bluetooth HID port controller.
+    # Enables USB port device mode controller so USB host on the other side will
+    # not get confused when trying to enumerate this USB device.
+    self._usb_ctrl.EnableUSBOTGDriver()
+    self._usb_ctrl.EnableDriver()
+    try:
+      common.WaitForCondition(
+          lambda: bool(serial_utils.FindTtyByDriver(self.SERIAL_DRIVER)),
+          True, 1.0, self.DETECT_SLEEP_SECS)
+      return True
+    except common.TimeoutError:
+      return False
+
   def InitDevice(self):
     """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
+    self._tty = serial_utils.FindTtyByDriver(self.SERIAL_DRIVER)
 
-  # TODO(mojahsu): implement
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
+    pass
 
   def Initialize(self):
-    """Enables Bluetooth HID port controller.
-
-    Enables USB port device mode controller so USB host on the other side will
-    not get confused when trying to enumerate this USB device.
-    """
-    self._usb_ctrl.EnableDriver()
-    self._usb_ctrl.EnableUSBOTGDriver()
     logging.debug('Initialized Bluetooth HID flow #%d.', self._port_id)
 
   def Select(self):
@@ -123,18 +127,3 @@ class BluetoothHIDMouseFlow(BluetoothHIDMouse, BluetoothHIDFlow):
     """
     BluetoothHIDFlow.__init__(self, port_id, 'ClassicBluetoothMouse', usb_ctrl)
     BluetoothHIDMouse.__init__(self, BluetoothHID.PIN_CODE_MODE)
-
-  # TODO(mojahsu): implement
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): implement
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO(mojahsu): implement
-  def Reset(self):
-    """Reset chameleon device."""
-    raise NotImplementedError('Reset')

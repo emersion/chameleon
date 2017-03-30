@@ -10,6 +10,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.devices import chameleon_device
 from chameleond.utils import audio_utils
 from chameleond.utils import codec
+from chameleond.utils import i2c
 from chameleond.utils import ids
 
 
@@ -53,10 +54,27 @@ class CodecFlow(chameleon_device.Flow):
     super(CodecFlow, self).__init__()
     self._port_id = port_id
     self._fpga = fpga_ctrl
-    self._audio_codec = codec_i2c_bus.GetSlave(
+    self._codec_i2c_bus = codec_i2c_bus
+    self._audio_codec = None
+    self._audio_route_manager = None
+
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    try:
+      self._codec_i2c_bus.GetSlave(codec.AudioCodec.SLAVE_ADDRESSES[0])
+      return True
+    except i2c.I2cBusError:
+      return False
+
+  def InitDevice(self):
+    """Init the real device of chameleon board."""
+    self._audio_codec = self._codec_i2c_bus.GetSlave(
         codec.AudioCodec.SLAVE_ADDRESSES[0])
-    self._audio_route_manager = audio_utils.AudioRouteManager(
-        self._fpga.aroute)
+    self._audio_route_manager = audio_utils.AudioRouteManager(self._fpga.aroute)
+
+  def Reset(self):
+    """Reset chameleon device."""
+    raise NotImplementedError('Reset')
 
   def Initialize(self):
     """Initializes codec."""
@@ -120,20 +138,11 @@ class InputCodecFlow(CodecFlow):
     self._audio_capture_manager = audio_utils.AudioCaptureManager(
         self._fpga.adump)
 
-  # TODO(mojahsu): implement
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): implement
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO(mojahsu): implement
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
+    if self.is_capturing_audio:
+      self.StopCapturingAudio()
+    self._recorded_file = None
 
   def Select(self):
     """Selects the codec flow.
@@ -216,20 +225,10 @@ class OutputCodecFlow(CodecFlow):
         self._fpga.astream)
     self._fpga.aiis.Disable()
 
-  # TODO(mojahsu): Implement
-  def IsDetected(self):
-    """Returns if the device can be detected."""
-    raise NotImplementedError('IsDetected')
-
-  # TODO(mojahsu): Implement
-  def InitDevice(self):
-    """Init the real device of chameleon board."""
-    raise NotImplementedError('InitDevice')
-
-  # TODO(mojahsu): Implement
   def Reset(self):
     """Reset chameleon device."""
-    raise NotImplementedError('Reset')
+    if self.is_playing_audio_from_memory:
+      self.StopPlayingAudio()
 
   def Select(self):
     """Selects the codec flow to set the proper codec path and FPGA paths."""

@@ -17,6 +17,25 @@ class ChameleondInterface(object):
     """Resets Chameleon board."""
     raise NotImplementedError('Reset')
 
+  def GetDetectedStatus(self):
+    """Returns detetcted status of all devices.
+
+    User can use this API to know the capability of the chameleon board.
+
+    Returns:
+      A list of a tuple of detected devices' strings detected status.
+      e.g. [('HDMI', True), ('MIC', False)]
+    """
+    raise NotImplementedError('GetDetectedStatus')
+
+  def HasDevice(self, device_id):
+    """Returns True if there is a device.
+
+    Returns:
+      True if there is a device . False otherwise.
+    """
+    raise NotImplementedError('HasDevice')
+
   def GetSupportedPorts(self):
     """Returns all supported ports on the board.
 

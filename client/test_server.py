@@ -35,15 +35,21 @@ def ShowMessages(proxy):
     if port_type == 'HDMI':
       hdmi_port = port
     port_messages.append('Port %d is %s.' % (port, port_type))
-
-  logging.info('''
+  message = '''
       %s
-      E.g.
+      E.g.''' % '\n      '.join(port_messages)
+  if linein_port:
+    message += '''
       p.StartCapturingAudio(%d) to capture from LineIn.
-      p.StopCapturingAudio(%d) to stop capturing from LineIn.
+      p.StopCapturingAudio(%d) to stop capturing from LineIn.''' % (
+          linein_port, linein_port)
+
+  if hdmi_port:
+    message += '''
       p.Plug(%d) to plug HDMI.
-      p.Unplug(%d) to unplug HDMI.''', '\n      '.join(port_messages),
-               linein_port, linein_port, hdmi_port, hdmi_port)
+      p.Unplug(%d) to unplug HDMI.''' % (hdmi_port, hdmi_port)
+
+  logging.info(message)
 
 
 def DetectAudioValue0(channels=None, margin=0.01, continuous_samples=5,
