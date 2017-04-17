@@ -10,7 +10,6 @@ import time
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import chameleon_io as io
-from chameleond.utils import i2c
 
 """
 Holds bit offsets for motor ports.
@@ -33,12 +32,12 @@ MotorParams = collections.namedtuple(
 
 
 class ButtonFunction(object):
-    """Button functions that motor touch/release."""
-    CALL = 'Call'
-    HANG_UP = 'Hang Up'
-    MUTE = 'Mute'
-    VOL_UP = 'Vol Up'
-    VOL_DOWN = 'Vol Down'
+  """Button functions that motor touch/release."""
+  CALL = 'Call'
+  HANG_UP = 'Hang Up'
+  MUTE = 'Mute'
+  VOL_UP = 'Vol Up'
+  VOL_DOWN = 'Vol Down'
 
 
 class MotorBoardException(Exception):
@@ -141,23 +140,40 @@ class MotorBoard(object):
     Args:
       i2c_bus: The I2cBus object.
     """
-    self._motor_io = None
-    try:
-      self._motor_io = io.IoExpander(i2c_bus, io.IoExpander.SLAVE_ADDRESSES[3])
-    except i2c.I2cBusError:
-      logging.error('Can not access I2c bus at %#x on motor board.',
-                    i2c_bus.base_addr)
-      raise MotorBoardNotExistException('Can not initialize motor board')
-
-    self._ResetPorts()
+    self._i2c_bus = i2c_bus
+    self._motor_io = io.IoExpander(self._i2c_bus,
+                                   io.IoExpander.SLAVE_ADDRESSES[3])
+    self._i2c_bus.AddSlave(self._motor_io)
     self._motors = {}
 
+  def IsDetected(self):
+    """Returns if the device can be detected."""
+    if self._motor_io.IsDetected():
+      return True
+    else:
+      logging.info('Can not access I2c slave on motor board. '
+                   'Assume it is not connected')
+      return False
+
+  def InitDevice(self):
+    """Runs the initialization sequence for the motor board.
+
+    Raises:
+      MotorBoardException: If motor board can not be initialized.
+    """
+    self._ResetPorts()
     model_name = self._GetModelName()
-    logging.info('Create motor board for model: %s', model_name)
+    logging.info('Init motor board for model: %s', model_name)
 
     self._CreateMotors(model_name)
 
     logging.info('MotorBoard initialized')
+
+  def Reset(self):
+    """Resets motor boards by releasing button and resetting port directions."""
+    for func, motor in self._motors.iteritems():
+      logging.info('Reset motor for %s function', func)
+      motor.Reset()
 
   def _GetModelName(self):
     """Gets model name for this motor board.
@@ -169,7 +185,8 @@ class MotorBoard(object):
       If model tag path does not exist or it contains unexpected model name.
     """
     if not os.path.exists(self._MODEL_TAG_PATH):
-      raise MotorBoardException('Model path does not exist: %s' % self._MODEL_TAG_PATH)
+      raise MotorBoardException(
+          'Model path does not exist: %s' % self._MODEL_TAG_PATH)
     with open(self._MODEL_TAG_PATH) as f:
       model_name = f.readline().strip()
     if model_name not in self._MODEL_PARAMS_MAP:
@@ -250,6 +267,7 @@ class Motor(object):
   """Class to control one motor."""
   _MOTOR_PULSE_HIGH = 1
   _MOTOR_PULSE_LOW = 0
+  _RESET_NUM_PULSE = 800
 
   def __init__(self, motor_io, motor_ports, params):
     """Initializes one Motor.
@@ -264,6 +282,15 @@ class Motor(object):
     self._params = params
     # TODO(cychiang) See if this assumption is true, or add a mechanism
     # to reset the motor state when init.
+    self._state = _MotorState.RELEASED
+
+  def Reset(self):
+    """Controls the motor to reset position."""
+    self._Enable(True)
+    self._SetDirection(_MotorDirection.UP)
+    self._Move(self._RESET_NUM_PULSE)
+    self._Enable(False)
+
     self._state = _MotorState.RELEASED
 
   def Touch(self):
@@ -319,7 +346,7 @@ class Motor(object):
     or let it sleep for power saving.
 
     Args:
-      Enable: True to enable; False to disable.
+      enable: True to enable; False to disable.
     """
     # TODO(cychiang) Find out whether this port works or not.
     # Enable: set port to 0.
@@ -328,15 +355,21 @@ class Motor(object):
     offset = self._ports.enable
     self._motor_io.SetBit(offset, value)
 
-  def _Move(self):
+  def _Move(self, num_pulse=None):
     """Moves motor by driving pulses on step port.
 
     Drives num_pulse pulses with each pulse period_ms duration in ms.
+
+    Args:
+      num_pulse: Number of pulse to drive motor. If this is None, use
+                 num_pulse in self._params.
     """
     offset = self._ports.step
     half_period_sec = self._params.period_ms / 2 * 0.001
+    if num_pulse is None:
+      num_pulse = self._params.num_pulse
 
-    for _ in xrange(self._params.num_pulse):
+    for _ in xrange(num_pulse):
       self._motor_io.SetBit(offset, self._MOTOR_PULSE_LOW)
       time.sleep(half_period_sec)
       self._motor_io.SetBit(offset, self._MOTOR_PULSE_HIGH)

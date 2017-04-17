@@ -22,6 +22,7 @@ BLUETOOTH_HID_COMBO = 15
 BLUETOOTH_HID_JOYSTICK = 16
 AVSYNC_PROBE = 17
 AUDIO_BOARD = 18
+MOTOR_BOARD = 19
 
 # device names
 DEVICE_NAMES = {
@@ -42,7 +43,8 @@ DEVICE_NAMES = {
     BLUETOOTH_HID_COMBO: 'bluetooth_hid_combo',
     BLUETOOTH_HID_JOYSTICK: 'bluetooth_hid_joystick',
     AVSYNC_PROBE: 'avsync_probe',
-    AUDIO_BOARD: 'audio_board'
+    AUDIO_BOARD: 'audio_board',
+    MOTOR_BOARD: 'motor_board'
 }
 
 

@@ -17,6 +17,7 @@ from chameleond.devices import avsync_probe
 from chameleond.devices import bluetooth_hid_flow
 from chameleond.devices import codec_flow
 from chameleond.devices import input_flow
+from chameleond.devices import motor_board
 from chameleond.devices import usb_audio_flow
 from chameleond.devices import usb_hid_flow
 from chameleond.utils import caching_server
@@ -55,7 +56,7 @@ class ChameleondDriver(ChameleondInterface):
 
   _I2C_BUS_MAIN = 0
   _I2C_BUS_AUDIO_CODEC = 1
-  _I2C_BUS_AUDIO_BOARD = 3
+  _I2C_BUS_EXT_BOARD = 3
 
   # Time to wait for video frame dump to start before a timeout error is raised
   _TIMEOUT_FRAME_DUMP_PROBE = 60.0
@@ -73,7 +74,7 @@ class ChameleondDriver(ChameleondInterface):
     self._process = None
 
     main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
-    audio_board_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_BOARD)
+    ext_board_bus = i2c.I2cBus(self._I2C_BUS_EXT_BOARD)
     audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
     fpga_ctrl = fpga.FpgaController()
     usb_audio_ctrl = usb.USBAudioController()
@@ -101,7 +102,8 @@ class ChameleondDriver(ChameleondInterface):
         ids.BLUETOOTH_HID_MOUSE: bluetooth_hid_flow.BluetoothHIDMouseFlow(
             ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
         ids.AVSYNC_PROBE: avsync_probe.AVSyncProbe(ids.AVSYNC_PROBE),
-        ids.AUDIO_BOARD: audio_board.AudioBoard(audio_board_bus)
+        ids.AUDIO_BOARD: audio_board.AudioBoard(ext_board_bus),
+        ids.MOTOR_BOARD: motor_board.MotorBoard(ext_board_bus)
     }
 
     self._device_manager = device_manager.DeviceManager(self._devices)
@@ -115,6 +117,7 @@ class ChameleondDriver(ChameleondInterface):
         ids.BLUETOOTH_HID_MOUSE)
     self.avsync_probe = self._device_manager.GetChameleonDevice(
         ids.AVSYNC_PROBE)
+    self.motor_board = self._device_manager.GetChameleonDevice(ids.MOTOR_BOARD)
 
     self._flow_manager = flow_manager.FlowManager(self._flows)
 
