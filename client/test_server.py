@@ -12,6 +12,7 @@ import os
 import readline
 import rlcompleter
 import subprocess
+import time
 import xmlrpclib
 
 from audio.audio_value_detector import AudioValueDetector
@@ -146,6 +147,27 @@ def ConnectCrosToLineIn():
   """Connects a audio bus path from Cros headphone to Chameleon LineIn."""
   p.AudioBoardConnect(1, 'Cros device headphone') # pylint: disable=undefined-variable
   p.AudioBoardConnect(1, 'Chameleon FPGA line-in') # pylint: disable=undefined-variable
+
+
+def TestMotors():
+  """Test motors by touching and releasing each button once."""
+  for func in ['Call', 'Hang Up', 'Mute', 'Vol Up', 'Vol Down']:
+    PressOneFunc(func)
+
+
+def PressOneFunc(func, time_sec=0):
+  """Test motors by touching and releasing one button.
+
+  Args:
+    func: The motor function. One of 'Call', 'Hang Up', 'Mute', 'Vol Up',
+          'Vol Down'.
+    time_sec: Hold time in seconds after touch and before release.
+  """
+  logging.info('Testing %s button, press and hold for %f seconds',
+               func, time_sec)
+  p.motor_board.Touch(func)
+  time.sleep(time_sec)
+  p.motor_board.Release(func)
 
 
 def Main():
