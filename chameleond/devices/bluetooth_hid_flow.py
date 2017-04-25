@@ -62,9 +62,6 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     """Reset chameleon device."""
     pass
 
-  def Initialize(self):
-    logging.debug('Initialized Bluetooth HID flow #%d.', self._port_id)
-
   def Select(self):
     """Selects the USB HID flow."""
     logging.debug('Selected Bluetooth HID flow #%d.', self._port_id)

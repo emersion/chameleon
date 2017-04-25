@@ -98,18 +98,14 @@ class FpgaInputFlow(chameleon_device.Flow):
       return False
 
   def InitDevice(self):
-    """Init the real device of chameleon board."""
-    pass
-
-  def Reset(self):
-    """Reset chameleon device."""
-    self.Unplug()
-
-  def Initialize(self):
     """Initializes the input flow."""
     logging.info('Initialize FpgaInputFlow #%d.', self._input_id)
     self._power_io.ResetReceiver(self._input_id)
     self._rx.Initialize(self.IsDualPixelMode())
+
+  def Reset(self):
+    """Reset chameleon device."""
+    self.Unplug()
 
   def Select(self):
     """Selects the input flow to set the proper muxes and FPGA paths."""
@@ -618,7 +614,7 @@ class DpInputFlow(FpgaInputFlow):
     frames.
     """
     if not self._rx.IsVideoInputStable() or not self._IsFrameLocked():
-      self.Initialize()  # reset rx
+      self.InitDevice()  # reset rx
       video_input_stable = self._rx.WaitVideoInputStable()
 
       if not video_input_stable:

@@ -49,10 +49,6 @@ class USBAudioFlow(chameleon_device.Flow):
     return self._usb_ctrl.DetectDriver()
 
   def InitDevice(self):
-    """Init the real device of chameleon board."""
-    pass
-
-  def Initialize(self):
     """Enables USB port controller.
 
     Enables USB port device mode controller so USB host on the other side will

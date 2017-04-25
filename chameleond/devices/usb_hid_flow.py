@@ -49,14 +49,6 @@ class USBHIDFlow(chameleon_device.Flow):
     return self._usb_ctrl.DetectDriver()
 
   def InitDevice(self):
-    """Init the real device of chameleon board."""
-    pass
-
-  def Reset(self):
-    """Reset chameleon device."""
-    pass
-
-  def Initialize(self):
     """Enables USB port controller.
 
     Enables USB port device mode controller so USB host on the other side will
@@ -64,6 +56,10 @@ class USBHIDFlow(chameleon_device.Flow):
     """
     self._usb_ctrl.EnableUSBOTGDriver()
     logging.info('Initialized USB HID flow #%d.', self._port_id)
+
+  def Reset(self):
+    """Reset chameleon device."""
+    pass
 
   def Select(self):
     """Selects the USB HID flow."""

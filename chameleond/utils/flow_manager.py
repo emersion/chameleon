@@ -97,9 +97,6 @@ class FlowManager(object):
     self._selected_output = None
     # Reserve index 0 as the default EDID.
     self._all_edids = [self._ReadDefaultEdid()]
-    for flow in self.flows.itervalues():
-      if flow:
-        flow.Initialize()
 
   def _RetrievePortsInFlowTable(self, ports):
     """Retrieve intersection of ports and keys of flow table.

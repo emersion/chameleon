@@ -55,11 +55,6 @@ class Flow(ChameleonDevice):
     """Constructs a Flow object."""
     super(Flow, self).__init__()
 
-  # TODO(mojahsu): use InitDevice to replace it
-  def Initialize(self):
-    """Initializes the input flow."""
-    raise NotImplementedError('Initialize')
-
   def IsPhysicalPlugged(self):
     """Returns if the physical cable is plugged."""
     raise NotImplementedError('IsPhysicalPlugged')

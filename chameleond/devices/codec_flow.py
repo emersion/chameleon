@@ -67,19 +67,16 @@ class CodecFlow(chameleon_device.Flow):
       return False
 
   def InitDevice(self):
-    """Init the real device of chameleon board."""
+    """Initializes codec."""
+    logging.info('Initialize CodecFlow #%d.', self._port_id)
     self._audio_codec = self._codec_i2c_bus.GetSlave(
         codec.AudioCodec.SLAVE_ADDRESSES[0])
     self._audio_route_manager = audio_utils.AudioRouteManager(self._fpga.aroute)
+    self._audio_codec.Initialize()
 
   def Reset(self):
     """Reset chameleon device."""
     raise NotImplementedError('Reset')
-
-  def Initialize(self):
-    """Initializes codec."""
-    logging.info('Initialize CodecFlow #%d.', self._port_id)
-    self._audio_codec.Initialize()
 
   def Select(self):
     """Selects the codec flow to set the proper codec path and FPGA paths."""
