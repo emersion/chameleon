@@ -80,6 +80,18 @@ class IoExpander(i2c.I2cSlave):
 
     self.SetDirection(new_value)
 
+  def IsDetected(self):
+    """Checks if this I/O expander is detected.
+
+    Returns:
+      True if it is connected. False otherwise.
+    """
+    try:
+      self._GetDirection()
+      return True
+    except i2c.I2cBusError:
+      return False
+
   def GetInput(self):
     """Gets the input ports value.
 

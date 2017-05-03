@@ -37,10 +37,23 @@ class _AudioBoardIOController(object):
     for io_expander in self._io_expanders:
       i2c_bus.AddSlave(io_expander)
 
-    self._ResetDirections()
-    logging.info('_AudioBoardIOController initialized')
+    logging.info('_AudioBoardIOController created')
 
-  def _ResetDirections(self):
+  def IsDetected(self):
+    """Checks if all the I/O expanders are detected.
+
+    Returns:
+      True if all three I/O expanders are detected. False otherwise.
+    """
+    for io_expander in self._io_expanders:
+      if not io_expander.IsDetected():
+        logging.warning('Can not detect I/O expander at address 0x%x',
+                        io_expander.slave)
+        return False
+
+    return True
+
+  def Reset(self):
     """Resets all ports to be input."""
     for expander in self._io_expanders:
       expander.SetDirection(0xffff)
@@ -614,21 +627,19 @@ class AudioBoard(chameleon_device.ChameleonDevice):
       AudioBoardException: If audio board can not be initialized.
     """
     self._i2c_bus = i2c_bus
-    self._io_controller = None
     self._jack_plugger = None
     self._bluetooth_ctrl = None
     self._audio_buses = None
     self._switch_controller = None
+    self._io_controller = _AudioBoardIOController(self._i2c_bus)
     super(AudioBoard, self).__init__()
 
   def IsDetected(self):
     """Returns if the device can be detected."""
-    try:
-      self._io_controller = _AudioBoardIOController(self._i2c_bus)
+    if self._io_controller.IsDetected():
       return True
-    except i2c.I2cBusError:
-      logging.error('Can not access I2c bus at %#x on audio board.',
-                    self._i2c_bus.base_addr)
+    else:
+      logging.warning('Can not detect audio board. Assume it is not connected')
       return False
 
   def InitDevice(self):
@@ -637,6 +648,7 @@ class AudioBoard(chameleon_device.ChameleonDevice):
     Raises:
       AudioBoardException: If audio board can not be initialized.
     """
+    self._io_controller.Reset()
     try:
       self._switch_controller = _AudioBoardSwitchController(self._io_controller)
       self._audio_buses = {
