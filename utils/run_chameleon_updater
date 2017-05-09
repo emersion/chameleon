@@ -1,0 +1,99 @@
+#!/bin/sh
+# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Update chameleon bundle
+
+DAEMON_NAME='chameleond'
+CONFIG_FILE="/etc/default/${DAEMON_NAME}"
+. "${CONFIG_FILE}"
+
+MIRROR_URL='http://commondatastorage.googleapis.com/chromeos-localmirror'
+BUNDLE_PATH='distfiles/chameleon-bundle'
+BUNDLE_URL="${MIRROR_URL}/${BUNDLE_PATH}"
+CHECK_FILE="/var/run/chameleon_updater"
+# Wait for 3 minutes for updating process.
+TIME_OUT=180
+
+get_ver () {
+    # chameleond-0.0.1-r2.tar.gz -> 0.0.1
+    local name=$1
+    local ver=${name%-r*}
+    local ver=${ver#*-}
+    echo ${ver}
+}
+
+get_rev () {
+    # chameleond-0.0.1-r2.tar.gz -> 2
+    local name=$1
+    local rev=${name%.tar.gz}
+    local rev=${rev##*-r}
+    echo ${rev}
+}
+
+do_start() {
+    trap "{ rm ${CHECK_FILE}; }" EXIT
+    touch ${CHECK_FILE}
+    echo 'Checking Chameleon update...'
+    local latest_bundle=$(wget -qO - "${BUNDLE_URL}/LATEST")
+    if [[ -z ${latest_bundle} ]] ; then
+        echo 'Failed to get the LATEST bundle.'
+        exit
+    fi
+
+    local bundle_dir=${latest_bundle%%-r*}
+    local current_ver=$(get_ver ${BUNDLE_VERSION})
+    local current_rev=$(get_rev ${BUNDLE_VERSION})
+    local latest_ver=$(get_ver ${latest_bundle})
+    local latest_rev=$(get_rev ${latest_bundle})
+    if [[ "${current_ver}" > "${latest_ver}" ]] ; then
+        echo 'No new update.'
+        exit
+    fi
+    if [[ "${current_ver}" = "${latest_ver}" ]] ; then
+        if [[ ${current_rev} -ge ${latest_rev} ]] ; then
+            echo 'No new update.'
+            exit
+        fi
+    fi
+
+    echo "Update Chameleon daemon:" \
+            "${current_ver}-r${current_rev} -> ${latest_ver}-r${latest_rev}"
+    pushd /tmp > /dev/null
+    # Specifying "-O" in wget would overwrite the same bundle on the chameleon.
+    # Otherwise, ".1", ".2", would be appended to the same bundle name
+    # which is not desired.
+    wget -q "${BUNDLE_URL}/${latest_bundle}" -O "${latest_bundle}"
+    tar zxf ${latest_bundle}
+    cd ${bundle_dir}
+    make install \
+        BUNDLE_VERSION="${latest_ver}-r${latest_rev}" \
+        CHAMELEON_BOARD="${CHAMELEON_BOARD}"
+    popd > /dev/null
+}
+
+do_stop() {
+    if [ ! -f ${CHECK_FILE} ] ; then
+        echo 'do nothing'
+        exit
+    fi
+    t=${TIME_OUT}
+    while [ -f ${CHECK_FILE} -a ${t} != 0 ] ; do
+        echo "Wait ${t} seconds for chameleon bundle updating process."
+        sleep 1
+        ((t=t-1))
+    done
+}
+
+case "$1" in
+    start|stop)
+        do_${1}
+        ;;
+
+    *)
+        echo "Usage: run_chameleon_updater {start|stop}"
+        exit 1
+        ;;
+esac
+exit 0

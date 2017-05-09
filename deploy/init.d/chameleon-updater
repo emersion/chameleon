@@ -14,72 +14,29 @@
 #                    the Google Cloud Storage and installing it.
 ### END INIT INFO
 
-UPDATER_NAME='chameleon-updater'
-DAEMON_NAME='chameleond'
-CONFIG_FILE="/etc/default/${DAEMON_NAME}"
+DAEMON_NAME="chameleon_updater"
+CONFIG_FILE="/etc/default/chameleond"
 . "${CONFIG_FILE}"
 
-MIRROR_URL='http://commondatastorage.googleapis.com/chromeos-localmirror'
-BUNDLE_PATH='distfiles/chameleon-bundle'
-BUNDLE_URL="${MIRROR_URL}/${BUNDLE_PATH}"
-
-get_ver () {
-    # chameleond-0.0.1-r2.tar.gz -> 0.0.1
-    local name=$1
-    local ver=${name%-r*}
-    local ver=${ver#*-}
-    echo ${ver}
-}
-
-get_rev () {
-    # chameleond-0.0.1-r2.tar.gz -> 2
-    local name=$1
-    local rev=${name%.tar.gz}
-    local rev=${rev##*-r}
-    echo ${rev}
-}
+DAEMON="${CHAMELEOND_DIR}/run_chameleon_updater"
+DAEMON_USER='root'
+PIDFILE="/var/run/${DAEMON_NAME}.pid"
+LOGFILE="/var/log/${DAEMON_NAME}.log"
 
 do_start () {
-    echo 'Checking Chameleon update...'
-    local latest_bundle=$(wget -qO - "${BUNDLE_URL}/LATEST")
-    if [[ -z ${latest_bundle} ]] ; then
-        echo 'Failed to get the LATEST bundle.'
-        exit
-    fi
-
-    local bundle_dir=${latest_bundle%%-r*}
-    local current_ver=$(get_ver ${BUNDLE_VERSION})
-    local current_rev=$(get_rev ${BUNDLE_VERSION})
-    local latest_ver=$(get_ver ${latest_bundle})
-    local latest_rev=$(get_rev ${latest_bundle})
-    if [[ "${current_ver}" > "${latest_ver}" ]] ; then
-        echo 'No new update.'
-        exit
-    fi
-    if [[ "${current_ver}" = "${latest_ver}" ]] ; then
-        if [[ ${current_rev} -ge ${latest_rev} ]] ; then
-            echo 'No new update.'
-            exit
-        fi
-    fi
-
-    echo "Update Chameleon daemon:" \
-            "${current_ver}-r${current_rev} -> ${latest_ver}-r${latest_rev}"
-    pushd /tmp > /dev/null
-    # Specifying "-O" in wget would overwrite the same bundle on the chameleon.
-    # Otherwise, ".1", ".2", would be appended to the same bundle name
-    # which is not desired.
-    wget -q "${BUNDLE_URL}/${latest_bundle}" -O "${latest_bundle}"
-    tar zxf ${latest_bundle}
-    cd ${bundle_dir}
-    make install \
-        BUNDLE_VERSION="${latest_ver}-r${latest_rev}" \
-        CHAMELEON_BOARD="${CHAMELEON_BOARD}"
-    popd > /dev/null
+    echo "Check new chameleon bundle"
+    # Start a daemon, so it won't be killed when reboot.
+    start-stop-daemon --start --background --pidfile "${PIDFILE}" \
+        --make-pidfile --user "${DAEMON_USER}" --chuid "${DAEMON_USER}" \
+        --startas /bin/bash -- \
+        -c "exec ${DAEMON} start >> ${LOGFILE} 2>&1"
 }
 
 do_stop () {
-    echo 'do nothing'
+    # Call the daemon stop directly, it will check if the updating process is
+    # running or not and wait until the updating process is done.
+    ${DAEMON} stop
+    rm -f "${PIDFILE}"
 }
 
 case "$1" in

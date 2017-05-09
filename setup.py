@@ -24,5 +24,5 @@ setup(
     install_requires=['pyserial==2.7', 'schedule'],
     scripts=['utils/run_chameleond', 'utils/run_displayd',
              'utils/run_stream_server', 'chameleond/utils/server_time',
-             'utils/run_scheduler']
+             'utils/run_scheduler', 'utils/run_chameleon_updater']
 )
