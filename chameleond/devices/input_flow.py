@@ -274,7 +274,14 @@ class FpgaInputFlow(chameleon_device.Flow):
       repeat_count: The count of HPD pulses to fire.
       end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
     """
-    raise NotImplementedError('FireHpdPulse')
+    for i in range(repeat_count):
+      self.Unplug()
+      time.sleep(deassert_interval_usec / 1000000.0)
+      self.Plug()
+      time.sleep(assert_interval_usec / 1000000.0)
+
+    if not end_level:
+      self.Unplug()
 
   def FireMixedHpdPulses(self, widths_msec):
     """Fires one or more HPD pulses, starting at low, of mixed widths.
