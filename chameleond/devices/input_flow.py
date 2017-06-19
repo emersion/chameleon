@@ -944,39 +944,6 @@ class VgaInputFlow(FpgaInputFlow):
     # For VGA, block the RGB source to emulate unplug.
     self._mux_io.SetOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 
-  def FireHpdPulse(
-      self, deassert_interval_usec, assert_interval_usec, repeat_count,
-      end_level):
-    """Fires one or more HPD pulse (low -> high -> low -> ...).
-
-    Args:
-      deassert_interval_usec: The time in microsecond of the deassert pulse.
-      assert_interval_usec: The time in microsecond of the assert pulse.
-                            If None, then use the same value as
-                            deassert_interval_usec.
-      repeat_count: The count of HPD pulses to fire.
-      end_level: HPD ends with 0 for LOW (unplugged) or 1 for HIGH (plugged).
-    """
-    pass
-
-  def FireMixedHpdPulses(self, widths_msec):
-    """Fires one or more HPD pulses, starting at low, of mixed widths.
-
-    One must specify a list of segment widths in the widths_msec argument where
-    widths_msec[0] is the width of the first low segment, widths_msec[1] is that
-    of the first high segment, widths_msec[2] is that of the second low segment,
-    etc.
-    The HPD line stops at low if even number of segment widths are specified;
-    otherwise, it stops at high.
-
-    The method is equivalent to a series of calls to Unplug() and Plug()
-    separated by specified pulse widths.
-
-    Args:
-      widths_msec: list of pulse segment widths in milli-second.
-    """
-    pass
-
   def SetVgaMode(self, mode):
     """Sets the mode for VGA monitor."""
     if mode.lower() == 'auto':
