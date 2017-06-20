@@ -481,6 +481,20 @@ class FlowManager(object):
 
   @_FlowMethod
   @_VideoMethod
+  def ScheduleHpdToggle(self, port_id, delay_ms, rising_edge):
+    """Schedules one HPD Toggle, with a delay between the toggle.
+
+    Args:
+      port_id: The ID of the video input port.
+      delay_ms: Delay in milli-second before the toggle takes place.
+      rising_edge: Whether the toggle should be a rising edge or a falling edge.
+    """
+    logging.info('Schedule HPD %s toggle on port #%d, in %d ms',
+                 'rising' if rising_edge  else 'falling', port_id, delay_ms)
+    return self.flows[port_id].ScheduleHpdToggle(port_id, delay_ms, rising_edge)
+
+  @_FlowMethod
+  @_VideoMethod
   def SetContentProtection(self, port_id, enabled):
     """Sets the content protection state on the port.
 

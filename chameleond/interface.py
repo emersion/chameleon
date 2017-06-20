@@ -286,6 +286,16 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('FireMixedHpdPulses')
 
+  def ScheduleHpdToggle(self, port_id, delay_ms, rising_edge):
+    """Schedules one HPD Toggle, with a delay between the toggle.
+
+    Args:
+      port_id: The ID of the video input port.
+      delay_ms: Delay in milli-second before the toggle takes place.
+      rising_edge: Whether the toggle should be a rising edge or a falling edge.
+    """
+    raise NotImplementedError('ScheduleHpdToggle')
+
   def SetContentProtection(self, port_id, enabled):
     """Sets the content protection state on the port.
 

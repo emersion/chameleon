@@ -6,6 +6,7 @@
 import itertools
 import logging
 import tempfile
+import threading
 import time
 from abc import ABCMeta
 
@@ -73,6 +74,7 @@ class FpgaInputFlow(chameleon_device.Flow):
     self._edid = None  # be overwitten by a subclass.
     self._edid_enabled = True
     self._ddc_enabled = True
+    self._timer = None
 
   def _GetEffectiveVideoDumpers(self):
     """Gets effective video dumpers on the flow."""
@@ -318,6 +320,36 @@ class FpgaInputFlow(chameleon_device.Flow):
         raise
 
       time.sleep(sleep_time)
+
+  def _RunHpdToggle(self, port_id, rising_edge):
+    logging.info('Run HPD %s toggle on port #%d',
+                 'rising' if rising_edge  else 'falling', port_id)
+
+    if rising_edge:
+      self.Plug()
+    else:
+      self.Unplug()
+
+  def ScheduleHpdToggle(self, port_id, delay_ms, rising_edge):
+    """Schedules one HPD Toggle, with a delay between the toggle.
+
+    Args:
+      port_id: The ID of the video input port.
+      delay_ms: Delay in milli-second before the toggle takes place.
+      rising_edge: Whether the toggle should be a rising edge or a falling edge.
+    """
+
+    if self._timer and self._timer.isAlive():
+      raise InputFlowError('previous timer already enabled')
+
+    self._timer = threading.Timer(delay_ms / 1000.0, self._RunHpdToggle,
+                                  [port_id, rising_edge])
+    self._timer.start()
+
+    if rising_edge:
+      self.Unplug()
+    else:
+      self.Plug()
 
   def _EnableDdc(self):
     """Enables the DDC bus."""

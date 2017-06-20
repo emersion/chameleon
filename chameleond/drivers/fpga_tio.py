@@ -406,6 +406,16 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._flow_manager.FireMixedHpdPulses(port_id, widths_msec)
 
+  def ScheduleHpdToggle(self, port_id, delay_ms, rising_edge):
+    """Schedules one HPD Toggle, with a delay between the toggle.
+
+    Args:
+      port_id: The ID of the video input port.
+      delay_ms: Delay in milli-second before the toggle takes place.
+      rising_edge: Whether the toggle should be a rising edge or a falling edge.
+    """
+    return self._flow_manager.ScheduleHpdToggle(port_id, delay_ms, rising_edge)
+
   def SetContentProtection(self, port_id, enabled):
     """Sets the content protection state on the port.
 
