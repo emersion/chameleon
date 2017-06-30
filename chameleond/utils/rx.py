@@ -566,6 +566,22 @@ class VgaRx(i2c.I2cSlave):
                               0x19, 0x00, 0x00]
   }
 
+  _VGA_MODES_DETECT = [
+    (0x1a0, 0x240, 'PC_480px60'),
+    (0x240, 0x2d0, 'PC_800x600x60'),
+    (0x2d0, 0x310, 'PC_720px60'),
+    (0x310, 0x31d, 'PC_1360x768x60'),
+    (0x31e, 0x331, 'PC_1024x768x60'),
+    (0x332, 0x352, 'PC_1280x800x60'),
+    (0x3a0, 0x3a7, 'PC_1440x900x60'),
+    (0x3c0, 0x400, 'PC_1280x960x60'),
+    (0x420, 0x437, 'PC_1280x1024x60'),
+    (0x440, 0x459, 'PC_1680x1050x60'),
+    (0x459, 0x490, 'PC_1920x1080x60'),
+    (0x4d0, 0x4d7, 'PC_1920x1200xReduce'),
+    (0x4da, 0x510, 'PC_1600x1200x60'),
+  ]
+
   def Initialize(self, unused_dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize CRT RX chip.')
@@ -595,38 +611,15 @@ class VgaRx(i2c.I2cSlave):
     self.Set(self._BITS_HSYNC_COUNTER_REFRESH, self._REG_HSYNC_COUNTER_REFRESH)
     hsync_counter = (((self.Get(self._REG_HSYNC_COUNTER_H) << 4) & 0xf00) +
                      self.Get(self._REG_HSYNC_COUNTER_L))
+    mode = None
     if not self._IsTvMode():
       # For simplification, this detection logic only works on 60Hz reflesh
       # rate.
-      if hsync_counter >= 0x1a0 and hsync_counter < 0x240:
-        # Original driver is returning mode PC_640x480x60. But it does not
-        # work on the resolution 720x480. Changing to PC_480px60 works better.
-        mode = 'PC_480px60'
-      elif hsync_counter >= 0x240 and hsync_counter < 0x2d0:
-        mode = 'PC_800x600x60'
-      elif hsync_counter >= 0x2d0 and hsync_counter < 0x310:
-        mode = 'PC_720px60'
-      elif hsync_counter >= 0x310 and hsync_counter < 0x31d:
-        mode = 'PC_1360x768x60'
-      elif hsync_counter >= 0x31e and hsync_counter < 0x331:
-        mode = 'PC_1024x768x60'
-      elif hsync_counter >= 0x332 and hsync_counter < 0x352:
-        mode = 'PC_1280x800x60'
-      elif hsync_counter >= 0x3a0 and hsync_counter < 0x3a7:
-        mode = 'PC_1440x900x60'
-      elif hsync_counter >= 0x3c0 and hsync_counter < 0x400:
-        mode = 'PC_1280x960x60'
-      elif hsync_counter >= 0x420 and hsync_counter < 0x437:
-        mode = 'PC_1280x1024x60'
-      elif hsync_counter >= 0x440 and hsync_counter < 0x459:
-        mode = 'PC_1680x1050x60'
-      elif hsync_counter >= 0x459 and hsync_counter < 0x490:
-        mode = 'PC_1920x1080x60'
-      elif hsync_counter >= 0x4d0 and hsync_counter < 0x4d7:
-        mode = 'PC_1920x1200xReduce'
-      elif hsync_counter >= 0x4da and hsync_counter < 0x510:
-        mode = 'PC_1600x1200x60'
-      else:
+      for min, max, detect_mode in self._VGA_MODES_DETECT:
+        if min <= hsync_counter < max:
+          mode = detect_mode
+
+      if not mode:
         raise RxError('Failed to detect the VGA mode, #hsync: %#x' %
                       hsync_counter)
     else:
@@ -649,6 +642,16 @@ class VgaRx(i2c.I2cSlave):
       reg = index + 1
       self.Set(value, reg)
 
+  def IsValidVGAMode(self):
+    """Return True if the VGA mode is valid."""
+    self.Set(self._BITS_HSYNC_COUNTER_REFRESH, self._REG_HSYNC_COUNTER_REFRESH)
+    hsync_counter = (((self.Get(self._REG_HSYNC_COUNTER_H) << 4) & 0xf00) +
+                     self.Get(self._REG_HSYNC_COUNTER_L))
+    for min, max, _ in self._VGA_MODES_DETECT:
+      if min <= hsync_counter < max:
+        return True
+    return False
+
   def IsSyncDetected(self):
     """Returns True if Hsync or Vsync is detected."""
     return bool(self.Get(self._REG_SYNC_DETECT) & self._BITS_SYNC_MASK)
@@ -664,8 +667,8 @@ class VgaRx(i2c.I2cSlave):
     try:
       # Check if H-Sync/V-Sync recevied from the source.
       common.WaitForCondition(
-          self.IsSyncDetected, True, self._DELAY_CHECKING_STABLE_PROBE,
-          timeout)
+          self.IsSyncDetected and self.IsValidVGAMode, True,
+          self._DELAY_CHECKING_STABLE_PROBE, timeout)
     except common.TimeoutError:
       return False
     return True
