@@ -12,6 +12,7 @@ import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import caching_server
 from chameleond.utils import common
 from chameleond.utils import fpga
+from chameleond.utils import ids
 from chameleond.utils import system_tools
 
 
@@ -108,15 +109,17 @@ class FieldManager(object):
       loop: True to loop-back and continue dump.
     """
     # Check the alignment for a cropped dimension.
-    if self._is_dual:
-      alignment = 16
-    else:
-      alignment = 8
-    if x is not None and x % alignment:
-      raise FieldManagerError('Arguments x not aligned to %d-byte.' % alignment)
-    if width % alignment:
-      raise FieldManagerError('Arguments width not aligned to %d-byte.' %
-                              alignment)
+    if self._input_id != ids.VGA:
+      if self._is_dual:
+        alignment = 16
+      else:
+        alignment = 8
+      if x is not None and x % alignment:
+        raise FieldManagerError('Arguments x not aligned to %d-byte.' %
+                                alignment)
+      if width % alignment:
+        raise FieldManagerError('Arguments width not aligned to %d-byte.' %
+                                alignment)
 
     # Save the dimension of fields.
     self._dimension = (width, height)
