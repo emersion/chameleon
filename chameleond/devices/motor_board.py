@@ -23,12 +23,28 @@ MotorPorts = collections.namedtuple(
 
 
 """
+--------------- All the way to the top
+   {}     |
+   {}     |     num_pulses_reset
+   {}     |
+   {}     V
+   {}  -------- Reset position
+   {}     ^
+   {}     |     num_pulses_move
+   {}     V
+   {}  -------- Touch position
+  ----
+  |  | Button
+
 Motor parameter:
-  num_pulse: Number of pulses to drive step motor.
+  num_pulses_reset: Number of pulses to drive step motor to reset position
+                       starting from all the way to the top.
+  num_pulses_move: Number of pulses to drive step motor to touch position from
+                       reset position.
   period_ms: Duration of each pulse in ms.
 """
 MotorParams = collections.namedtuple(
-    'MotorParams', ['num_pulse', 'period_ms'])
+    'MotorParams', ['num_pulses_reset', 'num_pulses_move', 'period_ms'])
 
 
 class ButtonFunction(object):
@@ -117,18 +133,18 @@ class MotorBoard(object):
   # TODO(cychiang) Tune the duration and parameters.
   _MODEL_PARAMS_MAP = {
       'Atrus': {
-           ButtonFunction.CALL: MotorParams(500, 10),
-           ButtonFunction.HANG_UP: MotorParams(500, 10),
-           ButtonFunction.MUTE: MotorParams(500, 10),
-           ButtonFunction.VOL_UP: MotorParams(500, 10),
-           ButtonFunction.VOL_DOWN: MotorParams(500, 10),
+           ButtonFunction.CALL: MotorParams(200, 250, 0.1),
+           ButtonFunction.HANG_UP: MotorParams(200, 250, 0.1),
+           ButtonFunction.MUTE: MotorParams(200, 250, 0.1),
+           ButtonFunction.VOL_UP: MotorParams(200, 200, 0.1),
+           ButtonFunction.VOL_DOWN: MotorParams(200, 200, 0.1),
       },
       'Jabra': {
-           ButtonFunction.CALL: MotorParams(600, 3),
-           ButtonFunction.HANG_UP: MotorParams(600, 3),
-           ButtonFunction.MUTE: MotorParams(600, 3),
-           ButtonFunction.VOL_UP: MotorParams(600, 3),
-           ButtonFunction.VOL_DOWN: MotorParams(600, 3),
+           ButtonFunction.CALL: MotorParams(400, 200, 0.1),
+           ButtonFunction.HANG_UP: MotorParams(400, 200, 0.1),
+           ButtonFunction.MUTE: MotorParams(400, 200, 0.1),
+           ButtonFunction.VOL_UP: MotorParams(400, 200, 0.1),
+           ButtonFunction.VOL_DOWN: MotorParams(400, 200, 0.1),
       }
   }
 
@@ -267,7 +283,7 @@ class Motor(object):
   """Class to control one motor."""
   _MOTOR_PULSE_HIGH = 1
   _MOTOR_PULSE_LOW = 0
-  _RESET_NUM_PULSE = 800
+  _NUM_PULSES_RESET_TO_TOP = 800
 
   def __init__(self, motor_io, motor_ports, params):
     """Initializes one Motor.
@@ -287,8 +303,12 @@ class Motor(object):
   def Reset(self):
     """Controls the motor to reset position."""
     self._Enable(True)
+    # Moves all the way to the top.
     self._SetDirection(_MotorDirection.UP)
-    self._Move(self._RESET_NUM_PULSE)
+    self._Move(self._NUM_PULSES_RESET_TO_TOP)
+    # Moves down to reset position.
+    self._SetDirection(_MotorDirection.DOWN)
+    self._Move(self._params.num_pulses_reset)
     self._Enable(False)
 
     self._state = _MotorState.RELEASED
@@ -300,7 +320,7 @@ class Motor(object):
 
     self._Enable(True)
     self._SetDirection(_MotorDirection.DOWN)
-    self._Move()
+    self._Move(self._params.num_pulses_move)
     self._Enable(False)
 
     self._state = _MotorState.TOUCHED
@@ -312,7 +332,7 @@ class Motor(object):
 
     self._Enable(True)
     self._SetDirection(_MotorDirection.UP)
-    self._Move()
+    self._Move(self._params.num_pulses_move)
     self._Enable(False)
 
     self._state = _MotorState.RELEASED
@@ -355,19 +375,16 @@ class Motor(object):
     offset = self._ports.enable
     self._motor_io.SetBit(offset, value)
 
-  def _Move(self, num_pulse=None):
+  def _Move(self, num_pulse):
     """Moves motor by driving pulses on step port.
 
     Drives num_pulse pulses with each pulse period_ms duration in ms.
 
     Args:
-      num_pulse: Number of pulse to drive motor. If this is None, use
-                 num_pulse in self._params.
+      num_pulse: Number of pulse to drive motor.
     """
     offset = self._ports.step
     half_period_sec = self._params.period_ms / 2 * 0.001
-    if num_pulse is None:
-      num_pulse = self._params.num_pulse
 
     for _ in xrange(num_pulse):
       self._motor_io.SetBit(offset, self._MOTOR_PULSE_LOW)
