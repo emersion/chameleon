@@ -4,6 +4,7 @@
 """This module specifies the interface for usb audio flows."""
 
 import logging
+import os
 import tempfile
 
 import chameleon_common  # pylint: disable=W0611
@@ -28,6 +29,7 @@ class USBAudioFlow(chameleon_device.Flow):
                             supported by the USB driver when it's enabled.
   """
 
+  _USB_HOST_MODE_TAG = '/etc/default/.usb_host_mode'
   _VALID_AUDIO_FILE_TYPES = ['wav', 'raw']
 
   def __init__(self, port_id, usb_ctrl):
@@ -43,6 +45,7 @@ class USBAudioFlow(chameleon_device.Flow):
     self._usb_ctrl = usb_ctrl
     self._subprocess = None
     self._supported_data_format = None
+    self._init_for_device_mode_done = False
 
   def IsDetected(self):
     """Returns if the device can be detected."""
@@ -51,10 +54,18 @@ class USBAudioFlow(chameleon_device.Flow):
   def InitDevice(self):
     """Enables USB port controller.
 
+    For kernel 3.8:
     Enables USB port device mode controller so USB host on the other side will
     not get confused when trying to enumerate this USB device.
+    For kernel 4.2:
+    Also install g_audio driver and remove it so USB host on the other side
+    can enumerate this USB device. Detail in crbug.com/737277.
     """
     self._usb_ctrl.EnableUSBOTGDriver()
+    if os.path.exists(self._USB_HOST_MODE_TAG):
+      logging.info('By default, USB should work in host mode.')
+    else:
+      self.InitForDeviceMode()
     logging.info('Initialized USB Audio flow #%d.', self._port_id)
 
   def Select(self):
@@ -143,6 +154,15 @@ class USBAudioFlow(chameleon_device.Flow):
 
     else:
       return False
+
+  def InitForDeviceMode(self):
+    """Init the USB driver for device mode by plug/unplug."""
+    if self._init_for_device_mode_done:
+      return
+    logging.info('Initialize USB audio driver for device mode.')
+    self.Plug()
+    self.Unplug()
+    self._init_for_device_mode_done = True
 
 
 class InputUSBAudioFlow(USBAudioFlow):
