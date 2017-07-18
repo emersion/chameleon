@@ -133,18 +133,18 @@ class MotorBoard(object):
   # TODO(cychiang) Tune the duration and parameters.
   _MODEL_PARAMS_MAP = {
       'Atrus': {
-           ButtonFunction.CALL: MotorParams(200, 250, 0.1),
-           ButtonFunction.HANG_UP: MotorParams(200, 250, 0.1),
-           ButtonFunction.MUTE: MotorParams(200, 250, 0.1),
-           ButtonFunction.VOL_UP: MotorParams(200, 200, 0.1),
-           ButtonFunction.VOL_DOWN: MotorParams(200, 200, 0.1),
+           ButtonFunction.CALL: MotorParams(200, 250, 1),
+           ButtonFunction.HANG_UP: MotorParams(200, 250, 1),
+           ButtonFunction.MUTE: MotorParams(200, 250, 1),
+           ButtonFunction.VOL_UP: MotorParams(200, 200, 1),
+           ButtonFunction.VOL_DOWN: MotorParams(200, 200, 1),
       },
       'Jabra': {
-           ButtonFunction.CALL: MotorParams(400, 200, 0.1),
-           ButtonFunction.HANG_UP: MotorParams(400, 200, 0.1),
-           ButtonFunction.MUTE: MotorParams(400, 200, 0.1),
-           ButtonFunction.VOL_UP: MotorParams(400, 200, 0.1),
-           ButtonFunction.VOL_DOWN: MotorParams(400, 200, 0.1),
+           ButtonFunction.CALL: MotorParams(350, 250, 1),
+           ButtonFunction.HANG_UP: MotorParams(350, 250, 1),
+           ButtonFunction.MUTE: MotorParams(350, 250, 1),
+           ButtonFunction.VOL_UP: MotorParams(350, 220, 1),
+           ButtonFunction.VOL_DOWN: MotorParams(350, 220, 1),
       }
   }
 
