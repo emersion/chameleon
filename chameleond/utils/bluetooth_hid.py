@@ -10,6 +10,7 @@ import sys
 import time
 
 from bluetooth_rn42 import RN42, RN42Exception
+# TODO(josephsih): Remove import when references to RN42* are no longer used
 
 
 class BluetoothHIDException(Exception):
@@ -17,7 +18,7 @@ class BluetoothHIDException(Exception):
   pass
 
 
-class BluetoothHID(RN42):
+class BluetoothHID(object):
   """A base bluetooth HID emulator class using RN-42 evaluation kit.
 
   Note: every public member method should
@@ -25,25 +26,65 @@ class BluetoothHID(RN42):
         return False or Raise an exception otherwise.
   """
 
+  # the authentication mode
+  OPEN_MODE = RN42.OPEN_MODE
+  SSP_KEYBOARD_MODE = RN42.SSP_KEYBOARD_MODE
+  SSP_JUST_WORK_MODE = RN42.SSP_JUST_WORK_MODE
+  PIN_CODE_MODE = RN42.PIN_CODE_MODE
+  AUTHENTICATION_MODE = RN42.AUTHENTICATION_MODE
+
+  # Supported device types
+  KEYBOARD = RN42.KEYBOARD
+  GAMEPAD = RN42.GAMEPAD
+  MOUSE = RN42.MOUSE
+  COMBO = RN42.COMBO
+  JOYSTICK = RN42.JOYSTICK
+
+  # TODO(alent): The above constants are redirected to RN42 to allow
+  # other classes to pass these options on instantiation. Deduplication will
+  # be addressed by the second phase of the refactor. Remove this comment then.
+
   TMP_PIN_CODE = '0000'     # A temporary pin code
 
   SEND_DELAY_SECS = 0.2     # Need to sleep for a short while otherwise
                             # the bits may get lost during transmission.
   INIT_SLEEP_SECS = 5       # Sleep after initialization for stabilization.
 
-  def __init__(self, device_type, authentication_mode,
+  def __init__(self, device_type, authentication_mode, kit_impl,
                send_delay=SEND_DELAY_SECS):
     """Initialization of BluetoothHID
 
     Args:
       device_type: the device type for emulation
       authentication_mode: the authentication mode
+      kit_impl: the implementation of a peripheral kit to be instantiated
       send_delay: wait a while after sending data
     """
-    super(BluetoothHID, self).__init__()
+    self._kit = kit_impl()
     self.device_type = device_type
     self.authentication_mode = authentication_mode
     self.send_delay = send_delay
+
+  # TODO(josephsih): Remove the use of __getattr__ after a refactor of the
+  # Chameleon-Autotest interface to eliminate kit-specific commands in tests.
+  def __getattr__(self, name):
+    """Gets the attribute of name from the owned peripheral kit instance
+
+    Allows calling methods (or getting attributes in general) on this class or
+    its subclasses that resolve to methods defined on the kit implementation.
+
+    Args:
+      name: The name of the attribute to be found.
+
+    Returns:
+      The attribute of the kit with given name, if it exists.
+      (This is the default behavior and kits should follow it.)
+
+    Raises:
+      AttributeError if the attribute is not found.
+      (This is the default behavior and kits should follow it.)
+    """
+    return getattr(self._kit, name)
 
   def Init(self, factory_reset=True):
     """Initialize the chip correctly.
@@ -102,9 +143,6 @@ class BluetoothHID(RN42):
     logging.info('A bluetooth HID "%s" device is connected.', self.device_type)
     return True
 
-  def __del__(self):
-    self.Close()
-
   def SetHIDDevice(self, device_type):
     """Set HID device to the specified device type.
 
@@ -126,14 +164,15 @@ class BluetoothHID(RN42):
 class BluetoothHIDKeyboard(BluetoothHID):
   """A bluetooth HID keyboard emulator class."""
 
-  def __init__(self, authentication_mode):
+  def __init__(self, authentication_mode, kit_impl):
     """Initialization of BluetoothHIDKeyboard
 
     Args:
       authentication_mode: the authentication mode
+      kit_impl: the implementation of a Bluetooth HID peripheral kit to use
     """
-    super(BluetoothHIDKeyboard, self).__init__(BluetoothHID.KEYBOARD,
-                                               authentication_mode)
+    super(BluetoothHIDKeyboard, self).__init__(
+        BluetoothHID.KEYBOARD, authentication_mode, kit_impl)
 
   def Send(self, data):
     """Send data to the remote host.
@@ -176,14 +215,15 @@ class BluetoothHIDMouse(BluetoothHID):
   LEFT_BUTTON = 0x01
   RIGHT_BUTTON = 0x02
 
-  def __init__(self, authentication_mode):
+  def __init__(self, authentication_mode, kit_impl):
     """Initialization of BluetoothHIDMouse
 
     Args:
       authentication_mode: the authentication mode
+      kit_impl: the implementation of a Bluetooth HID peripheral kit to use
     """
-    super(BluetoothHIDMouse, self).__init__(BluetoothHID.MOUSE,
-                                            authentication_mode)
+    super(BluetoothHIDMouse, self).__init__(
+        BluetoothHID.MOUSE, authentication_mode, kit_impl)
 
   def _Move(self, buttons=0, delta_x=0, delta_y=0):
     """Move the mouse (delta_x, delta_y) pixels with buttons status.
@@ -301,7 +341,7 @@ def DemoBluetoothHIDKeyboard(remote_address, chars):
     chars: the characters to send
   """
   print 'Creating an emulated bluetooth keyboard...'
-  keyboard = BluetoothHIDKeyboard(BluetoothHID.PIN_CODE_MODE)
+  keyboard = BluetoothHIDKeyboard(BluetoothHID.PIN_CODE_MODE, RN42)
   keyboard.Init()
 
   print 'Connecting to the remote address %s...' % remote_address
@@ -350,7 +390,7 @@ def DemoBluetoothHIDMouse(remote_address):
     remote_address: the bluetooth address of the target remote device
   """
   print 'Creating an emulated bluetooth mouse...'
-  mouse = BluetoothHIDMouse(BluetoothHID.PIN_CODE_MODE)
+  mouse = BluetoothHIDMouse(BluetoothHID.PIN_CODE_MODE, RN42)
   mouse.Init()
 
   connected = False

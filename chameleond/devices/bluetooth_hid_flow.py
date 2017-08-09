@@ -10,6 +10,7 @@ from chameleond.utils import common
 from chameleond.utils import serial_utils
 from chameleond.utils.bluetooth_hid import BluetoothHID
 from chameleond.utils.bluetooth_hid import BluetoothHIDMouse
+from chameleond.utils.bluetooth_rn42 import RN42
 
 
 class BluetoothHIDFlowError(Exception):
@@ -124,4 +125,4 @@ class BluetoothHIDMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
       usb_ctrl: a USBController object that BluetoothHIDFlow references to.
     """
     BluetoothHIDFlow.__init__(self, port_id, 'ClassicBluetoothMouse', usb_ctrl)
-    BluetoothHIDMouse.__init__(self, BluetoothHID.PIN_CODE_MODE)
+    BluetoothHIDMouse.__init__(self, BluetoothHID.PIN_CODE_MODE, RN42)
