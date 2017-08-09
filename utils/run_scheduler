@@ -10,6 +10,7 @@ import logging
 import schedule
 import time
 
+from chameleond.utils import file_utils
 from chameleond.utils import network_utils
 
 
@@ -24,6 +25,7 @@ def Main():
   args = parser.parse_args()
 
   SetNetworkSchedule(args.network_period_secs)
+  ClearObsoleteFiles()
 
   Run()
 
@@ -42,6 +44,25 @@ def SetNetworkSchedule(period_secs):
     period_secs: Period in seconds to check network status.
   """
   schedule.every(period_secs).seconds.do(network_utils.PossiblyRestartNetwork)
+
+
+# A list of files whose content we do not care.
+OBSOLETE_FILES = ['/www/logs/lighttpd.error.log']
+# The period in seconds to clear the content of the files.
+CLEAR_PERIOD_SECS = 3600
+
+def ClearObsoleteFiles():
+  """Clears the content of obsolete files.
+
+  Note that we do not remove the files in case system expects the existence
+  of the files.
+  """
+
+  def _ClearFiles():
+    for f in OBSOLETE_FILES:
+      file_utils.TruncateToZero(f)
+
+  schedule.every(CLEAR_PERIOD_SECS).seconds.do(_ClearFiles)
 
 
 if __name__ == '__main__':
