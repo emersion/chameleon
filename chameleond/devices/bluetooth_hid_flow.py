@@ -46,6 +46,11 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     # not get confused when trying to enumerate this USB device.
     self._usb_ctrl.EnableUSBOTGDriver()
     self._usb_ctrl.EnableDriver()
+    # Our Bluetooth HID flow differs substantially from other flows.
+    # We enable the driver in IsDetected (instead of in InitDevice),
+    # initialize a TTY, and report detecting it instead of a driver.
+    # (Other USB flows simulate Plug/Unplug by Enabling/Diabling the driver.)
+    # To Disable the driver, we could use use: self._usb_ctrl.DisableDriver()
     try:
       common.WaitForCondition(
           lambda: bool(serial_utils.FindTtyByDriver(self.SERIAL_DRIVER)),
@@ -100,10 +105,6 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     """
     logging.debug('Bluetooth HID flow #%d: Unplug() called.', self._port_id)
 
-  def Disconnect(self):
-    """Disconnect to the device by removing the serial driver."""
-    self._usb_ctrl.DisableDriver()
-
   def DoFSM(self):
     """fpga_tio calls DoFSM after a flow is selected.
 
@@ -112,7 +113,7 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     logging.debug('Bluetooth HID flow #%d: DoFSM() called.', self._port_id)
 
 
-class BluetoothHIDMouseFlow(BluetoothHIDMouse, BluetoothHIDFlow):
+class BluetoothHIDMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
   """A flow object that emulates a classic bluetooth mouse device."""
 
   def __init__(self, port_id, usb_ctrl):
