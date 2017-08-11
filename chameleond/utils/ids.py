@@ -23,6 +23,11 @@ BLUETOOTH_HID_JOYSTICK = 16
 AVSYNC_PROBE = 17
 AUDIO_BOARD = 18
 MOTOR_BOARD = 19
+BLUETOOTH_HOG_KEYBOARD = 20
+BLUETOOTH_HOG_GAMEPAD = 21
+BLUETOOTH_HOG_MOUSE = 22
+BLUETOOTH_HOG_COMBO = 23
+BLUETOOTH_HOG_JOYSTICK = 24
 
 # device names
 DEVICE_NAMES = {
@@ -38,13 +43,18 @@ DEVICE_NAMES = {
     USB_KEYBOARD: 'usb_keyboard',
     USB_TOUCH: 'usb_touch',
     BLUETOOTH_HID_KEYBOARD: 'bluetooth_hid_keyboard',
-    BLUETOOTH_HID_GAMEPAD: 'bluetooth_hid_gaamepad',
+    BLUETOOTH_HID_GAMEPAD: 'bluetooth_hid_gamepad',
     BLUETOOTH_HID_MOUSE: 'bluetooth_hid_mouse',
     BLUETOOTH_HID_COMBO: 'bluetooth_hid_combo',
     BLUETOOTH_HID_JOYSTICK: 'bluetooth_hid_joystick',
     AVSYNC_PROBE: 'avsync_probe',
     AUDIO_BOARD: 'audio_board',
-    MOTOR_BOARD: 'motor_board'
+    MOTOR_BOARD: 'motor_board',
+    BLUETOOTH_HOG_KEYBOARD: 'bluetooth_hog_keyboard',
+    BLUETOOTH_HOG_GAMEPAD: 'bluetooth_hog_gamepad',
+    BLUETOOTH_HOG_MOUSE: 'bluetooth_hog_mouse',
+    BLUETOOTH_HOG_COMBO: 'bluetooth_hog_combo',
+    BLUETOOTH_HOG_JOYSTICK: 'bluetooth_hog_joystick'
 }
 
 
@@ -69,6 +79,13 @@ BLUETOOTH_HID_PORTS = [BLUETOOTH_HID_KEYBOARD,
                        BLUETOOTH_HID_COMBO,
                        BLUETOOTH_HID_JOYSTICK]
 
+# Ports that support BLUETOOTH HID over GATT (LE)
+BLUETOOTH_HOG_PORTS = [BLUETOOTH_HOG_KEYBOARD,
+                       BLUETOOTH_HOG_GAMEPAD,
+                       BLUETOOTH_HOG_MOUSE,
+                       BLUETOOTH_HOG_COMBO,
+                       BLUETOOTH_HOG_JOYSTICK]
+
 # Convenience methods
 IsInputPort = lambda port_id: port_id in INPUT_PORTS
 IsOutputPort = lambda port_id: port_id in OUTPUT_PORTS
@@ -77,6 +94,7 @@ IsVideoPort = lambda port_id: port_id in VIDEO_PORTS
 IsUSBAudioPort = lambda port_id: port_id in USB_AUDIO_PORTS
 IsUSBHIDPort = lambda port_id: port_id in USB_HID_PORTS
 IsBluetoothHIDPort = lambda port_id: port_id in BLUETOOTH_HID_PORTS
+IsBluetoothHOGPort = lambda port_id: port_id in BLUETOOTH_HOG_PORTS
 
 # IDs of EDIDs
 EDID_ID_DEFAULT = 0
