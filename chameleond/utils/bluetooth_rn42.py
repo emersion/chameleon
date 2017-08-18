@@ -2,22 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""This module provides an abstraction of RN-42 bluetooth chip."""
+"""This module provides an abstraction of the RN-42 bluetooth chip."""
 
 import logging
-import serial
 import time
 
 import common
-import serial_utils
+from bluetooth_peripheral_kit import GetKitInfo
+from bluetooth_peripheral_kit import PeripheralKit
+from bluetooth_peripheral_kit import PeripheralKitException
 
 
-class RN42Exception(Exception):
+class RN42Exception(PeripheralKitException):
   """A dummpy exception class for RN42 class."""
   pass
 
 
-class RN42(object):
+class RN42(PeripheralKit):
   """This is an abstraction of Roving Network's RN-42 bluetooth evaluation kit.
 
   RN-42 supports SPP and HID protocols. The primary use case is to
@@ -35,28 +36,18 @@ class RN42(object):
   http://ww1.microchip.com/downloads/en/DeviceDoc/bluetooth_cr_UG-v1.0r.pdf
   """
 
-  # Serial port settings
+  # Serial port settings (override)
   BAUDRATE = 115200
-  BYTESIZE = serial.EIGHTBITS
-  PARITY = serial.PARITY_NONE
-  STOPBITS = serial.STOPBITS_ONE
 
-  DRIVER = 'ftdi_sio'
   CHIP_NAME = 'RNBT'
   MAX_PIN_LEN = 16
   DEFAULT_PIN_CODE = '1234'     # The default factory pin code.
-  RETRY = 2                     # Try (RETRY + 1) times in total.
-  RETRY_INTERVAL_SECS = 0.1     # time interval between retries in seconds
+  # TODO(josephsih): Improve timing values, find/describe source thereof
   CONNECTION_TIMEOUT_SECS = 10  # the connection timeout in seconds
   POST_CONNECTION_WAIT_SECS = 1 # waiting time for a connection to become stable
   REBOOT_SLEEP_SECS = 3         # the time to sleep after reboot.
   RESET_SLEEP_SECS = 1          # the time to sleep after reboot.
   SET_PIN_CODE_SLEEP_SECS = 0.5 # the time to sleep after setting pin code.
-  CREATE_SERIAL_DEVICE_SLEEP_SECS = 1
-                                # waiting time after creating a serial device
-
-  # A newline is a carriage return '\r' followed by line feed '\n'.
-  NEWLINE = '\r\n'
 
   # Response status
   AOK = 'AOK'                 # Acknowledge OK
@@ -136,6 +127,7 @@ class RN42(object):
   RAW_REPORT_FORMAT_MOUSE_LENGTH = 5
   RAW_REPORT_FORMAT_MOUSE_DESCRIPTOR = 2
 
+  # TODO(alent): Move std scan codes to PeripheralKit when Keyboard implemented
   # modifiers
   LEFT_CTRL = 0x01
   LEFT_SHIFT = 0x02
@@ -259,17 +251,6 @@ class RN42(object):
       'Pair': 'PAIR'        # paring mode
   }
 
-  # the authentication mode
-  OPEN_MODE = '0'
-  SSP_KEYBOARD_MODE = '1'
-  SSP_JUST_WORK_MODE = '2'
-  PIN_CODE_MODE = '4'
-  AUTHENTICATION_MODE = {
-      OPEN_MODE: 'OPEN',
-      SSP_KEYBOARD_MODE: 'SSP_KEYBOARD',
-      SSP_JUST_WORK_MODE: 'SSP_JUST_WORK',
-      PIN_CODE_MODE: 'PIN_CODE'}
-
   # the service profile
   SERVICE_PROFILE = {
       '0': 'SPP',
@@ -278,168 +259,80 @@ class RN42(object):
       '3': 'MDM_SPP',
       '4': 'SPP_AND_DUN_DCE',
       '5': 'APL',
-      '6': 'HID'}
-
-  # Suppoerted device types
-  KEYBOARD = 'KEYBOARD'
-  GAMEPAD = 'GAMEPAD'
-  MOUSE = 'MOUSE'
-  COMBO = 'COMBO'
-  JOYSTICK = 'JOYSTICK'
+      '6': 'HID'
+  }
 
   DEFAULT_CLASS_OF_SERVICE = 0
 
-  # Class of Device
+  # Map HID type to Class of Device
   CLASS_OF_DEVICE = {
-      KEYBOARD: 0x540,
-      GAMEPAD: 0x508,
-      MOUSE: 0x580,
-      COMBO: 0x5C0,
-      JOYSTICK: 0x504}
+      PeripheralKit.KEYBOARD: 0x540,
+      PeripheralKit.GAMEPAD: 0x508,
+      PeripheralKit.MOUSE: 0x580,
+      PeripheralKit.COMBO: 0x5C0,
+      PeripheralKit.JOYSTICK: 0x504
+  }
 
   # The mask of Class of Device
   CLASS_OF_DEVICE_MASK = 0x1FFF
 
-  # HID device types
+  # Map kit-specific HID type to abstract HID type
   HID_DEVICE_TYPE = {
-      '0000': KEYBOARD,
-      '0010': GAMEPAD,
-      '0020': MOUSE,
-      '0030': COMBO,
-      '0040': JOYSTICK}
+      '0000': PeripheralKit.KEYBOARD,
+      '0010': PeripheralKit.GAMEPAD,
+      '0020': PeripheralKit.MOUSE,
+      '0030': PeripheralKit.COMBO,
+      '0040': PeripheralKit.JOYSTICK
+  }
 
-  def __init__(self):
-    self._command_mode = False
-    self._closed = False
-    self._serial = None
-    self._port = None
+  # Map abstract authentication mode to decimal number
+  AUTHENTICATION_MODE = {
+      PeripheralKit.OPEN_MODE: '0',
+      PeripheralKit.SSP_KEYBOARD_MODE: '1',
+      PeripheralKit.SSP_JUST_WORK_MODE: '2',
+      PeripheralKit.PIN_CODE_MODE: '4'
+  }
 
-  def __del__(self):
-    self.Close()
-
-  def CreateSerialDevice(self):
-    """Create a serial device."""
-    try:
-      self._serial = serial_utils.SerialDevice()
-    except Exception as e:
-      error_msg = 'Fail to create a serial device: %s' % e
-      logging.error(error_msg)
-      raise RN42Exception(error_msg)
-
-    try:
-      self._serial.Connect(driver=self.DRIVER,
-                           baudrate=self.BAUDRATE,
-                           bytesize=self.BYTESIZE,
-                           parity=self.PARITY,
-                           stopbits=self.STOPBITS)
-      self._port = self._serial.port
-      logging.info('Connect to the serial port successfully: %s', self._port)
-    except Exception as e:
-      error_msg = 'Fail to connect to the serial device: %s' % e
-      logging.error(error_msg)
-      raise RN42Exception(error_msg)
-
-    self._closed = False
-    time.sleep(self.CREATE_SERIAL_DEVICE_SLEEP_SECS)
-    return True
-
-  def Close(self):
-    """Close the device gracefully."""
-    if not self._closed:
-      try:
-        # It is possible that RN-42 has left command mode. In that case, do not
-        # expect any response from the kit.
-        self.LeaveCommandMode(expect_in='')
-        self._serial.Disconnect()
-      except Exception as e:
-        logging.warn('The serial device was probably already closed: %s', e)
-      self._closed = True
-    return True
-
-  def CheckSerialConnection(self):
-    """Check the USB serial connection between RN-42 and the chameleon board."""
-    port = serial_utils.FindTtyByDriver(self.DRIVER)
-    logging.info('CheckSerialConnection: port is %s', port)
-    return bool(port)
-
-  def SerialSendReceive(self, command, expect='', expect_in='',
-                        msg='serial SendReceive()'):
-    """A wrapper of SerialDevice.SendReceive().
-
-    Args:
-      command: the serial command
-      expect: expect the exact string matching the response
-      expect_in: expect the string in the response
-      msg: the message to log
-
-    Returns:
-      the result received from the serial console
-
-    Raises:
-      RN42Exception if there is an error in serial communication or
-      if the response is not expected.
-    """
-    try:
-      # All commands must end with a newline.
-      # size=0 means to receive all waiting characters.
-      # Retry a few times since sometimes the serial communication
-      # may not be reliable.
-      # Strip the result which ends with a newline too.
-      result = self._serial.SendReceive(command + self.NEWLINE,
-                                        size=0,
-                                        retry=self.RETRY).strip()
-      logging.debug('  SerialSendReceive: %s', result)
-      if ((expect and expect != result) or
-          (expect_in and expect_in not in result)):
-        error_msg = 'Failulre in %s: %s' % (msg, result)
-        raise RN42Exception(error_msg)
-    except:
-      error_msg = 'Failulre in %s' % msg
-      raise RN42Exception(error_msg)
-
-    logging.info('Success in %s: %s', msg, result)
-    return result
+  # Map abstract authentication mode to decimal number
+  REV_AUTHENTICATION_MODE = {v: k for k, v in AUTHENTICATION_MODE.iteritems()}
 
   def EnterCommandMode(self):
-    """Make the chip enter command mode.
+    """Make the kit enter command mode.
+
+    Enter command mode, creating the serial connection if necessary.
+    This must happen before other methods can be called, as they generally rely
+    on sending commands.
 
     Returns:
-      True if entering the command mode successfully.
+      True if the kit succeessfully entered command mode.
 
     Raises:
-      RN42Exception if there is an error in serial communication or
-      if the response is not expected.
+      PeripheralKitException if there is an error in serial communication or
+      if the kit gives an unexpected response.
+      A kit-specific Exception if something else goes wrong.
     """
-    # Create a serial device if not yet.
+    # We must implement this contract, creating the device if it doesn't exist.
     if not self._serial:
       self.CreateSerialDevice()
 
     try:
       # The command to enter command mode is special. It does not end
-      # with a newline.
+      # with a newline. (It is an invalid command once in command mode.)
       # The result is something like '...CMD\r\n' where '...' means
       # some possible random characters in the serial buffer.
-      result = self._serial.SendReceive(self.CMD_ENTER_COMMAND_MODE,
-                                        size=0,
-                                        retry=self.RETRY).strip()
-    except serial.SerialTimeoutException:
-      raise RN42Exception('Failure in entering command mode.')
-
-    if 'CMD' in result:
-      logging.info('Enter command mode successfully.')
+      self.SerialSendReceive(self.CMD_ENTER_COMMAND_MODE,
+                             expect_in='CMD',
+                             msg='entering command mode',
+                             send_newline=False)
+      logging.info('Entered command mode successfully.')
       self._command_mode = True
       return True
-    elif result == '':
-      # If the chip is already in command mode, this would cause timeout
-      # and returns an empty string. So let's check if we could get the
-      # chip name to make sure that it is indeed in command mode.
-      # For some unkowns reason, the first time always failed if the chip
-      # has already been in the command mode. Let's just ignore the exception.
-      try:
-        chip_name = self.GetChipName()
-      except Exception as e:
-        logging.warn('Not able to get the chip name. Ignore it.')
-
+    except PeripheralKitException as e:
+      # This exception happens when the expect fails in SerialSendRecieve.
+      # This may happen if we are already in command mode, since commands must
+      # be followed by a newline. Send a newline to try to reset the state.
+      self.SerialSendReceive('')
+      # Now, try to check if we are in command mode by reading a config value.
       try:
         chip_name = self.GetChipName()
         if chip_name.startswith(self.CHIP_NAME):
@@ -455,24 +348,21 @@ class RN42(object):
         msg = 'Failure to get chip name in entering command mode: %s.' % e
         logging.error(msg)
         raise RN42Exception(msg)
-    else:
-      msg = 'Incorrect response in entering command mode: %s'
-      logging.error(msg, result)
-      raise RN42Exception(msg % result)
 
-  def LeaveCommandMode(self, expect_in='END'):
-    """Make the chip leave command mode.
-
-    An 'END' string is returned from RN-42 if it leaves the command mode
-    normally.
+  def LeaveCommandMode(self, force=False):
+    """Make the kit leave command mode.
 
     Args:
-      expect_in: expect the string in the response
+      force: True if we want to ignore potential errors and attempt to
+             leave command mode regardless.
 
     Returns:
-      True if the kit left the command mode successfully.
+      True if the kit left command mode successfully.
     """
-    if self._command_mode:
+    # An 'END' string is returned from RN-42 if it leaves the command mode
+    # normally.
+    if self._command_mode or force:
+      expect_in = '' if force else 'END'
       self.SerialSendReceive(self.CMD_LEAVE_COMMAND_MODE,
                              expect_in=expect_in,
                              msg='leaving command mode')
@@ -480,10 +370,9 @@ class RN42(object):
     return True
 
   def Reboot(self):
-    """Reboot the chip.
+    """Reboot (or partially reset) the chip.
 
-    Reboot is required to make some settings take effect when the
-    settings are changed.
+    On the RN42 kit, this does not reset the pairing info.
 
     Returns:
       True if the kit rebooted successfully.
@@ -493,14 +382,6 @@ class RN42(object):
                            msg='rebooting RN-42')
     time.sleep(self.REBOOT_SLEEP_SECS)
     return True
-
-  def GetPort(self):
-    """Get the serial port.
-
-    Returns:
-      a string representing the serial port.
-    """
-    return self._port
 
   def FactoryReset(self):
     """Factory reset the chip.
@@ -516,29 +397,28 @@ class RN42(object):
     return True
 
   def GetChipName(self):
-    """Get the chip name.
+    """Get the name advertised by the kit.
 
     The chip returns something like 'RNBT-A955\\r\\n'
     where 'RN' means Roving Network, 'BT' bluetooth, and
     'A955' the last four digits of its MAC address.
 
     Returns:
-      the chip name
+      The name that the kit advertises to other Bluetooth devices.
     """
     return self.SerialSendReceive(self.CMD_GET_CHIP_NAME,
                                   expect_in='RNBT',
                                   msg='getting chip name')
 
   def GetFirmwareVersion(self):
-    """Get the firmware version of the chip.
+    """Get the firmware version of the kit.
 
     The chip returns something like
-        'Ver 6.15 04/26/2013\\r\\n(c) Roving Networks\\r\\n'
-
+    'Ver 6.15 04/26/2013\\r\\n(c) Roving Networks\\r\\n'
     Note that the version must be higher than 6.11 to support HID profile.
 
     Returns:
-      the firmware version
+      The firmware version of the kit.
     """
     return self.SerialSendReceive(self.CMD_GET_FIRMWARE_VERSION,
                                   expect_in='Ver',
@@ -547,18 +427,22 @@ class RN42(object):
   def GetOperationMode(self):
     """Get the operation mode.
 
+    This is master/slave in Bluetooth BR/EDR.
+
     Returns:
-      the operation mode
+      The operation mode of the kit.
     """
     result = self.SerialSendReceive(self.CMD_GET_OPERATION_MODE,
                                     msg='getting operation mode')
     return self.OPERATION_MODE.get(result)
 
   def SetMasterMode(self):
-    """Set the chip to master mode.
+    """Set the kit to master mode.
 
     Returns:
-      True if setting master mode successfully.
+      True if master mode was set successfully.
+      False if the kit does not support master mode. The client
+      should adjust accordingly.
     """
     self.SerialSendReceive(self.CMD_SET_MASTER_MODE,
                            expect=self.AOK,
@@ -566,10 +450,12 @@ class RN42(object):
     return True
 
   def SetSlaveMode(self):
-    """Set the chip to slave mode.
+    """Set the kit to slave mode.
 
     Returns:
-      True if setting slave mode successfully.
+      True if slave mode was set successfully.
+      False if the kit does not support slave mode. The client
+      should adjust accordingly.
     """
     self.SerialSendReceive(self.CMD_SET_SLAVE_MODE,
                            expect=self.AOK,
@@ -579,35 +465,46 @@ class RN42(object):
   def GetAuthenticationMode(self):
     """Get the authentication mode.
 
+    This specifies how the device will authenticate with the DUT, for example,
+    a PIN code may be used.
+
     Returns:
-      a string representing the authentication mode
+      The authentication mode of the kit (from the choices in PeripheralKit).
     """
     result = self.SerialSendReceive(self.CMD_GET_AUTHENTICATION_MODE,
                                     msg='getting authentication mode')
-    return self.AUTHENTICATION_MODE.get(result)
+    return self.REV_AUTHENTICATION_MODE.get(result)
 
   def SetAuthenticationMode(self, mode):
     """Set the authentication mode to the specified mode.
 
+    If mode is PIN_CODE_MODE, implementations must ensure the default PIN
+    is set by calling _SetDefaultPinCode() as appropriate.
+
     Args:
-      mode: the authentication mode
+      mode: the desired authentication mode (specified in PeripheralKit)
 
     Returns:
-      True if setting the mode successfully.
+      True if the mode was set successfully,
+      False if the mode is not supported.
     """
     if mode not in self.AUTHENTICATION_MODE:
-      raise RN42Exception('The mode "%s" is not supported.' % mode)
+      return False
 
-    self.SerialSendReceive(self.CMD_SET_AUTHENTICATION_MODE + mode,
+    digit_mode = self.AUTHENTICATION_MODE.get(mode)
+
+    self.SerialSendReceive(self.CMD_SET_AUTHENTICATION_MODE + digit_mode,
                            expect=self.AOK,
                            msg='setting authentication mode "%s"' % mode)
+    if mode == PeripheralKit.PIN_CODE_MODE:
+      return self._SetDefaultPinCode()
     return True
 
   def GetPinCode(self):
     """Get the pin code.
 
     Returns:
-      a string representing the pin code.
+      A string representing the pin code.
     """
     result = self.SerialSendReceive(self.CMD_GET_PIN_CODE,
                                     msg='getting pin code')
@@ -617,40 +514,34 @@ class RN42(object):
     """Set the pin code.
 
     Returns:
-      True if the pin code is set successfully.
+      True if the pin code is set successfully,
+      False if the pin code is invalid.
     """
     if len(pin) > self.MAX_PIN_LEN:
-      raise RN42Exception('The pin code "%s" is longer than max length (%d).' %
-                          (pin, self.MAX_PIN_LEN))
+      logging.warn('The pin code "%s" is longer than max length (%d).',
+                   pin, self.MAX_PIN_LEN)
+      return False
 
     result = self.SerialSendReceive(self.CMD_SET_PIN_CODE + pin,
                                     msg='setting pin code')
     time.sleep(self.SET_PIN_CODE_SLEEP_SECS)
     return result
 
-  def SetDefaultPinCode(self):
-    """Set the default pin code.
-
-    Returns:
-      True if the pin code is set to the default value successfully.
-    """
-    return self.SetPinCode(self.DEFAULT_PIN_CODE)
-
   def GetServiceProfile(self):
     """Get the service profile.
 
     Returns:
-      a string representing the service profile
+      The service profile currently in use (as per constant in PeripheralKit)
     """
     result = self.SerialSendReceive(self.CMD_GET_SERVICE_PROFILE,
                                     msg='getting service profile')
     return self.SERVICE_PROFILE.get(result)
 
   def SetServiceProfileSPP(self):
-    """Set SPP as service profile.
+    """Set SPP as the service profile.
 
     Returns:
-      True if setting SPP profile successfully.
+      True if the service profile was set to SPP successfully.
     """
     self.SerialSendReceive(self.CMD_SET_SERVICE_PROFILE_SPP,
                            expect=self.AOK,
@@ -658,10 +549,10 @@ class RN42(object):
     return True
 
   def SetServiceProfileHID(self):
-    """Set HID as service profile.
+    """Set HID as the service profile.
 
     Returns:
-      True if setting HID profile successfully.
+      True if the service profile was set to HID successfully.
     """
     self.SerialSendReceive(self.CMD_SET_SERVICE_PROFILE_HID,
                            expect=self.AOK,
@@ -669,13 +560,17 @@ class RN42(object):
     return True
 
   def GetLocalBluetoothAddress(self):
-    """Get the local RN-42 bluetooth mac address.
+    """Get the local (kit's) Bluetooth MAC address.
+
+    The kit should always return a valid MAC address in the proper format:
+    12 digits with colons between each pair, like so: '00:06:66:75:A9:6F'
 
     The RN-42 kit returns a raw address like '00066675A96F'.
     It is converted to something like '00:06:66:75:A9:6F'.
 
     Returns:
-      the bluetooth mac address of the kit
+      The Bluetooth MAC address of the kit, None if the kit has no MAC address
+      The RN-42 should always return a MAC address, though.
     """
     raw_address = self.SerialSendReceive(self.CMD_GET_RN42_BLUETOOTH_MAC,
                                          msg='getting local bluetooth address')
@@ -683,20 +578,21 @@ class RN42(object):
       return ':'.join([raw_address[i:i+2]
                        for i in range(0, len(raw_address), 2)])
     else:
-      # It is the caller's responsibility to check if the address format
-      # is correct.
       logging.error('RN42 bluetooth address is invalid: %s', raw_address)
-      return raw_address
+      return None
 
   def GetConnectionStatus(self):
     """Get the connection status.
+
+    This indicates that the kit is connected to a remote device,
+    usually the DUT.
 
     the connection status returned from the kit could be
     '0,0,0': not connected
     '1,0,0': connected
 
     Returns:
-      Ture if RN-42 is connected.
+      True if the kit is connected to a remote device.
     """
     result = self.SerialSendReceive(self.CMD_GET_CONNECTION_STATUS,
                                     msg='getting connection status')
@@ -705,6 +601,8 @@ class RN42(object):
 
   def EnableConnectionStatusMessage(self):
     """Enable the connection status message.
+
+    On the RN-42, this is required to use connection-related methods.
 
     If this is enabled, a connection status message shows
       '...CONNECT...' when connected and
@@ -734,90 +632,86 @@ class RN42(object):
     return True
 
   def GetRemoteConnectedBluetoothAddress(self):
-    """Get the bluetooth mac address of the current connected remote host.
+    """Get the Bluetooth MAC address of the current connected remote host.
+
+    The RN-42 kit returns a raw address like '00066675A96F'.
+    It is converted to something like '00:06:66:75:A9:6F'.
 
     Returns:
-      the bluetooth mac address of the remote connected device if applicable,
-      or None if there is no remote connected device.
+      The Bluetooth MAC address of the remote connected device if applicable,
+      or None if there is no remote connected device. If not none, this will
+      be properly formatted as a 12-digit MAC address with colons.
     """
     result = self.SerialSendReceive(self.CMD_GET_REMOTE_CONNECTED_BLUETOOTH_MAC,
                                     msg='getting local bluetooth address')
-    #  result is '000000000000' if there is no remote connected device
-    return None if result == '000000000000' else result
+    # result is '000000000000' if there is no remote connected device
+    if result == '000000000000':
+      return None
+    if len(result) == 12:
+      return ':'.join([result[i:i+2]
+                       for i in range(0, len(result), 2)])
+    else:
+      logging.error('remote bluetooth address is invalid: %s', result)
+      return None
 
   def GetHIDDeviceType(self):
     """Get the HID device type.
 
     Returns:
-      a string representing the HID device type
+      A string representing the HID device type (from PeripheralKit)
     """
     result = self.SerialSendReceive(self.CMD_GET_HID,
                                     msg='getting HID device type')
     return self.HID_DEVICE_TYPE.get(result)
 
-  def SetHIDKeyboard(self):
-    """Set keyboard as the HID device.
+  def SetHIDType(self, device_type):
+    """Set HID type to the specified device type.
+
+    Args:
+      device_type: the HID type to emulate, from PeripheralKit
 
     Returns:
-      True if setting keyboard as the HID device successfully.
+      True if successful
+
+    Raises:
+      A kit-specific exception if that device type is not supported.
     """
-    self.SerialSendReceive(self.CMD_SET_HID_KEYBOARD,
-                           expect=self.AOK,
-                           msg='setting keyboard as HID device')
-    return True
-
-  def SetHIDGamepad(self):
-    """Set game pad as the HID device.
-
-    Returns:
-      True if setting game pad as the HID device successfully.
-    """
-    self.SerialSendReceive(self.CMD_SET_HID_GAMEPAD,
-                           expect=self.AOK,
-                           msg='setting gamepad as HID device')
-    return True
-
-  def SetHIDMouse(self):
-    """Set mouse as the HID device.
-
-    Returns:
-      True if setting mouse as the HID device successfully.
-    """
-    self.SerialSendReceive(self.CMD_SET_HID_MOUSE,
-                           expect=self.AOK,
-                           msg='setting mouse as HID device')
-    return True
-
-  def SetHIDCombo(self):
-    """Set combo as the HID device.
-
-    Returns:
-      True if setting combo as the HID device successfully.
-    """
-    self.SerialSendReceive(self.CMD_SET_HID_COMBO,
-                           expect=self.AOK,
-                           msg='setting combo as HID device')
-    return True
-
-  def SetHIDJoystick(self):
-    """Set joystick as the HID device.
-
-    Returns:
-      True if setting joystick as the HID device successfully.
-    """
-    self.SerialSendReceive(self.CMD_SET_HID_JOYSTICK,
-                           expect=self.AOK,
-                           msg='setting joystick as HID device')
+    if device_type == self.KEYBOARD:
+      self.SerialSendReceive(self.CMD_SET_HID_KEYBOARD,
+                             expect=self.AOK,
+                             msg='setting keyboard as HID type')
+    elif device_type == self.GAMEPAD:
+      self.SerialSendReceive(self.CMD_SET_HID_GAMEPAD,
+                             expect=self.AOK,
+                             msg='setting gamepad as HID type')
+    elif device_type == self.MOUSE:
+      self.SerialSendReceive(self.CMD_SET_HID_MOUSE,
+                             expect=self.AOK,
+                             msg='setting mouse as HID type')
+    elif device_type == self.COMBO:
+      self.SerialSendReceive(self.CMD_SET_HID_COMBO,
+                             expect=self.AOK,
+                             msg='setting combo as HID type')
+    elif device_type == self.JOYSTICK:
+      self.SerialSendReceive(self.CMD_SET_HID_JOYSTICK,
+                             expect=self.AOK,
+                             msg='setting joystick as HID type')
+    else:
+      msg = "Failed to set HID type, not supported: %s" % device_type
+      logging.error(msg)
+      raise RN42Exception(msg)
     return True
 
   def GetClassOfService(self):
     """Get the class of service.
 
-    The chip uses a hexadeciaml string to represent the class of service.
-    It is converted to a decimal number as the return value.
+    Usually, a hexadeciaml string is used to represent the class of service,
+    which usually uses certain numbers assigned by the Bluetooth SIG.
+    In this case, it is provided as decimal.
+    Supported on BR/EDR with RN-42.
 
     Returns:
-      a decimal integer representing the class of service
+      A decimal integer representing the class of service.
     """
     result = self.SerialSendReceive(self.CMD_GET_CLASS_OF_SERVICE,
                                     msg='getting class of service')
@@ -839,30 +733,31 @@ class RN42(object):
   def SetClassOfService(self, class_of_service):
     """Set the class of service.
 
+    The class of service is a number usually assigned by the Bluetooth SIG.
+    Supported on BR/EDR with RN-42.
+
+    Args:
+      class_of_service: A decimal integer representing the class of service.
+
     Returns:
-      True if setting the class of service successfully.
+      True if the class of service was set successfully, or if this action is
+      not supported.
     """
     result = self.SerialSendReceive(
         self.CMD_SET_CLASS_OF_SERVICE + self._To4DigitHex(class_of_service),
         msg='setting class of service')
     return result
 
-  def SetDefaultClassOfService(self):
-    """Set the default class of service.
-
-    Returns:
-      True if setting the default class of service successfully.
-    """
-    return self.SetClassOfService(self.DEFAULT_CLASS_OF_SERVICE)
-
   def GetClassOfDevice(self):
     """Get the class of device.
 
     The chip uses a hexadeciaml string to represent the class of device.
     It is converted to a decimal number as the return value.
+    The class of device is a number usually assigned by the Bluetooth SIG.
+    Supported on RN-42 with BR/EDR.
 
     Returns:
-      a decimal integer representing the class of device
+      A decimal integer representing the class of device.
     """
     result = self.SerialSendReceive(self.CMD_GET_CLASS_OF_DEVICE,
                                     msg='getting class of device')
@@ -880,10 +775,17 @@ class RN42(object):
     return result
 
   def SetClassOfDevice(self, device_type):
-    """Set the class of device as keyboard.
+    """Set the class of device.
+
+    The class of device is a number usually assigned by the Bluetooth SIG.
+    Supported on RN-42 with BR/EDR.
+
+    Args:
+      device_type: A decimal integer representing the class of device.
 
     Returns:
-      True if setting the class of device successfully.
+      True if the class of device was set successfully, or if this action is
+      not supported.
     """
     if device_type in self.CLASS_OF_DEVICE:
       return self._SetClassOfDevice(self.CLASS_OF_DEVICE.get(device_type))
@@ -892,38 +794,43 @@ class RN42(object):
       return False
 
   def SetRemoteAddress(self, remote_address):
-    """Set the remote bluetooth address.
+    """Set the remote Bluetooth address.
+
+    (Usually this will be the device under test that we want to connect with,
+    where the kit starts the connection.)
 
     Args:
-      remote_address: the remote bluetooth address such as '0029951AD46F'
-                      when given '00:29:95:1A:D4:6F', it will be
-                      converted to '0029951AD46F' automatically.
+      remote_address: the remote Bluetooth MAC address, which must be given as
+                      12 hex digits with colons between each pair.
+                      For reference: '00:29:95:1A:D4:6F'
 
     Returns:
-      True if setting the remote address successfully.
-    """
-    reduced_remote_address = remote_address.replace(':', '')
-    if len(reduced_remote_address) != 12:
-      raise RN42Exception('"%s" is not a valid bluetooth address.' %
-                          remote_address)
+      True if the remote address was set successfully.
 
-    self.SerialSendReceive(self.CMD_SET_REMOTE_ADDRESS + reduced_remote_address,
+    Raises:
+      PeripheralKitException if the given address was malformed.
+    """
+    reduced_address = remote_address.replace(':', '')
+    self.SerialSendReceive(self.CMD_SET_REMOTE_ADDRESS + reduced_address,
                            expect=self.AOK,
-                           msg='setting a remote address ' + remote_address)
+                           msg='setting a remote address ' + reduced_address)
     return True
 
   def Connect(self):
     """Connect to the stored remote bluetooth address.
 
-    When a connection command is issued, it first returns a response 'TRYING'.
-    If the connection is successful, it returns something like
-    '...%CONNECT,6C29951AD46F,0'  where '6C29951AD46F' is the remote_address
-    after a few seconds.
+    In the case of a timeout (or a failure causing an exception), the caller
+    is responsible for retrying when appropriate.
 
     Returns:
-      True if connecting to the stored remote address successfully, and
+      True if connecting to the stored remote address successfully, or
       False if a timeout occurs.
     """
+    # When a connection command is issued, it first returns a response 'TRYING'.
+    # If the connection is successful, it returns something like
+    # '...%CONNECT,6C29951AD46F,0'  where '6C29951AD46F' is the remote_address
+    # after a few seconds.
+
     # Expect an immediately 'TRYING' response.
     self.SerialSendReceive(self.CMD_CONNECT_REMOTE_ADDRESS,
                            expect='TRYING',
@@ -947,36 +854,23 @@ class RN42(object):
       logging.error('RN42 failed to connect.')
       return False
 
-  def ConnectToRemoteAddress(self, remote_address):
-    """Connect to the remote address.
-
-    This is performed by the following steps:
-    1. Set the remote address to connect.
-    2. Connect to the remote address.
-
-    Args:
-      remote_address: the remote bluetooth address such as '0029951AD46F'
-                      when given '00:29:95:1A:D4:6F', it will be
-                      converted to '0029951AD46F' automatically.
-
-    Returns:
-      True if connecting to the remote address successfully; otherwise, False.
-    """
-    return self.SetRemoteAddress(remote_address) and self.Connect()
-
   def Disconnect(self):
     """Disconnect from the remote device.
 
-    This is done by sending a 0x0.
-    A '%DISCONNECT' string would be received as a response.
+    Specifically, this causes the peripheral emulation kit to disconnect from
+    the remote connected device, usually the DUT.
 
     Returns:
       True if disconnecting from the remote device successfully.
     """
+    # This is done by sending a 0x0.
+    # A '%DISCONNECT' string would be received as a response.
     self.SerialSendReceive(self.CMD_DISCONNECT_REMOTE_ADDRESS,
                            expect_in='DISCONNECT',
                            msg='disconnecting from the remote device')
     return True
+
+  # TODO(alent): Refactor this part of the API, it's too RN-42-specific!
 
   def _CheckValidModifiers(self, modifiers):
     invalid_modifiers = [m for m in modifiers if m not in self.MODIFIERS]
@@ -1135,24 +1029,5 @@ class RN42(object):
     """
     return chr(self.UART_INPUT_SHORTHAND_MODE) + chr(0x0)
 
-
-def GetRN42Info():
-  """A simple demo of getting RN-42 information."""
-  rn42 = RN42()
-  print 'enter command mode:', rn42.EnterCommandMode()
-  print 'chip name:', rn42.GetChipName()
-  print 'firmware version:', rn42.GetFirmwareVersion()
-  print 'operation mode:', rn42.GetOperationMode()
-  print 'authentication mode:', rn42.GetAuthenticationMode()
-  print 'service profile:', rn42.GetServiceProfile()
-  print 'local bluetooth address:', rn42.GetLocalBluetoothAddress()
-  print 'connection status:', rn42.GetConnectionStatus()
-  print 'remote bluetooth address:', rn42.GetRemoteConnectedBluetoothAddress()
-  print 'HID device type:', rn42.GetHIDDeviceType()
-  print 'Class of service:', hex(rn42.GetClassOfService())
-  print 'Class of device:', hex(rn42.GetClassOfDevice())
-  print 'leave command mode:', rn42.LeaveCommandMode()
-
-
 if __name__ == '__main__':
-  GetRN42Info()
+  GetKitInfo(RN42)

@@ -8,8 +8,8 @@ import logging
 from chameleond.devices import chameleon_device
 from chameleond.utils import common
 from chameleond.utils import serial_utils
-from chameleond.utils.bluetooth_hid import BluetoothHID
 from chameleond.utils.bluetooth_hid import BluetoothHIDMouse
+from chameleond.utils.bluetooth_peripheral_kit import PeripheralKit
 from chameleond.utils.bluetooth_rn42 import RN42
 
 
@@ -51,7 +51,8 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     # We enable the driver in IsDetected (instead of in InitDevice),
     # initialize a TTY, and report detecting it instead of a driver.
     # (Other USB flows simulate Plug/Unplug by Enabling/Diabling the driver.)
-    # To Disable the driver, we could use use: self._usb_ctrl.DisableDriver()
+    # To Disable the driver, these flows use: self._usb_ctrl.DisableDriver()
+    # TODO(alent): When adding driver detection, investigate plug/unplug.
     try:
       common.WaitForCondition(
           lambda: bool(serial_utils.FindTtyByDriver(self.SERIAL_DRIVER)),
@@ -125,4 +126,7 @@ class BluetoothHIDMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
       usb_ctrl: a USBController object that BluetoothHIDFlow references to.
     """
     BluetoothHIDFlow.__init__(self, port_id, 'ClassicBluetoothMouse', usb_ctrl)
-    BluetoothHIDMouse.__init__(self, BluetoothHID.PIN_CODE_MODE, RN42)
+    # TODO(josephsih): Ideally constants at this level of Bluetooth abstraction
+    # should be in BluetoothHID*, but that doesn't currently work due to cyclic
+    # imports. Remove this when constants are moved to BluetoothHID.
+    BluetoothHIDMouse.__init__(self, PeripheralKit.PIN_CODE_MODE, RN42)

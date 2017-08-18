@@ -9,8 +9,9 @@ import logging
 import sys
 import time
 
-from bluetooth_rn42 import RN42, RN42Exception
-# TODO(josephsih): Remove import when references to RN42* are no longer used
+from bluetooth_peripheral_kit import PeripheralKit
+from bluetooth_rn42 import RN42
+from bluetooth_rn42 import RN42Exception
 
 
 class BluetoothHIDException(Exception):
@@ -26,24 +27,7 @@ class BluetoothHID(object):
         return False or Raise an exception otherwise.
   """
 
-  # the authentication mode
-  OPEN_MODE = RN42.OPEN_MODE
-  SSP_KEYBOARD_MODE = RN42.SSP_KEYBOARD_MODE
-  SSP_JUST_WORK_MODE = RN42.SSP_JUST_WORK_MODE
-  PIN_CODE_MODE = RN42.PIN_CODE_MODE
-  AUTHENTICATION_MODE = RN42.AUTHENTICATION_MODE
-
-  # Supported device types
-  KEYBOARD = RN42.KEYBOARD
-  GAMEPAD = RN42.GAMEPAD
-  MOUSE = RN42.MOUSE
-  COMBO = RN42.COMBO
-  JOYSTICK = RN42.JOYSTICK
-
-  # TODO(alent): The above constants are redirected to RN42 to allow
-  # other classes to pass these options on instantiation. Deduplication will
-  # be addressed by the second phase of the refactor. Remove this comment then.
-
+  # TODO(josephsih): Find better way to use constants other than PeripheralKit
   TMP_PIN_CODE = '0000'     # A temporary pin code
 
   SEND_DELAY_SECS = 0.2     # Need to sleep for a short while otherwise
@@ -97,69 +81,52 @@ class BluetoothHID(object):
     """
     # Create a new serial device every time since the serial driver
     # on chameleon board is not very stable.
-    self.CreateSerialDevice()
+    result = self.CreateSerialDevice()
 
     if factory_reset:
       # Enter command mode to issue commands.
       # This must happen first, so that other commands work
-      self.EnterCommandMode()
+      result = self.EnterCommandMode() and result
 
       # Do a factory reset to make sure it is in a known initial state.
       # Do the factory reset before proceeding to set parameters below.
-      self.FactoryReset()
+      result = self.FactoryReset() and result
 
       # Set HID as the service profile.
-      self.SetServiceProfileHID()
+      result = self.SetServiceProfileHID() and result
 
       # Set the HID device type.
-      self.SetHIDDevice(self.device_type)
+      result = self.SetHIDType(self.device_type) and result
 
       # Set the default class of service.
-      self.SetDefaultClassOfService()
+      result = self.SetDefaultClassOfService() and result
 
       # Set the class of device (CoD) according to the hid device type.
-      self.SetClassOfDevice(self.device_type)
+      result = self.SetClassOfDevice(self.device_type) and result
 
       # Set authentication to the specified mode.
-      self.SetAuthenticationMode(self.authentication_mode)
+      result = self.SetAuthenticationMode(self.authentication_mode) and result
 
       # Set RN-42 to work as a slave.
-      self.SetSlaveMode()
+      result = self.SetSlaveMode() and result
 
       # Enable the connection status message so that we could get the message
       # of connection/disconnection status.
-      self.EnableConnectionStatusMessage()
+      result = self.EnableConnectionStatusMessage() and result
 
       # Set a temporary pin code for testing purpose.
-      self.SetPinCode(self.TMP_PIN_CODE)
+      result = self.SetPinCode(self.TMP_PIN_CODE) and result
 
       # Reboot so that the configurations above take effect.
-      self.Reboot()
+      result = self.Reboot() and result
 
       # Enter command mode again after reboot.
-      self.EnterCommandMode()
+      result = self.EnterCommandMode() and result
 
       time.sleep(self.INIT_SLEEP_SECS)
 
     logging.info('A bluetooth HID "%s" device is connected.', self.device_type)
-    return True
-
-  def SetHIDDevice(self, device_type):
-    """Set HID device to the specified device type.
-
-    Args:
-      device_type: the HID device type to emulate
-    """
-    if device_type == self.KEYBOARD:
-      self.SetHIDKeyboard()
-    elif device_type == self.GAMEPAD:
-      self.SetHIDGamepad()
-    elif device_type == self.MOUSE:
-      self.SetHIDMouse()
-    elif device_type == self.COMBO:
-      self.SetHIDCombo()
-    elif device_type == self.JOYSTICK:
-      self.SetHIDJoystick()
+    return result
 
 
 class BluetoothHIDKeyboard(BluetoothHID):
@@ -173,7 +140,7 @@ class BluetoothHIDKeyboard(BluetoothHID):
       kit_impl: the implementation of a Bluetooth HID peripheral kit to use
     """
     super(BluetoothHIDKeyboard, self).__init__(
-        BluetoothHID.KEYBOARD, authentication_mode, kit_impl)
+        PeripheralKit.KEYBOARD, authentication_mode, kit_impl)
 
   def Send(self, data):
     """Send data to the remote host.
@@ -224,36 +191,25 @@ class BluetoothHIDMouse(BluetoothHID):
       kit_impl: the implementation of a Bluetooth HID peripheral kit to use
     """
     super(BluetoothHIDMouse, self).__init__(
-        BluetoothHID.MOUSE, authentication_mode, kit_impl)
+        PeripheralKit.MOUSE, authentication_mode, kit_impl)
 
-  def _Move(self, buttons=0, delta_x=0, delta_y=0):
+  def Move(self, delta_x=0, delta_y=0, buttons=0):
     """Move the mouse (delta_x, delta_y) pixels with buttons status.
 
     Args:
-      buttons: the press/release status of buttons
       delta_x: the pixels to move horizontally
                positive values: moving right; max value = 127.
                negative values: moving left; max value = -127.
       delta_y: the pixels to move vertically
                positive values: moving down; max value = 127.
                negative values: moving up; max value = -127.
+      buttons: the press/release status of buttons
     """
     if delta_x or delta_y:
       mouse_codes = self.RawMouseCodes(buttons=buttons,
                                        x_stop=delta_x, y_stop=delta_y)
       self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse.Move')
       time.sleep(self.send_delay)
-
-  def Move(self, delta_x=0, delta_y=0):
-    """Move the mouse (delta_x, delta_y) pixels.
-
-    Pure cursor movement without changing any button status.
-
-    Args:
-      delta_x: the pixels to move horizontally
-      delta_y: the pixels to move vertically
-    """
-    self._Move(delta_x=delta_x, delta_y=delta_y)
 
   def _PressButtons(self, buttons):
     """Press down the specified buttons
@@ -307,7 +263,7 @@ class BluetoothHIDMouse(BluetoothHID):
     """
     self.PressLeftButton()
     # Keep the left button pressed while moving.
-    self._Move(buttons=self.LEFT_BUTTON, delta_x=delta_x, delta_y=delta_y)
+    self.Move(delta_x=delta_x, delta_y=delta_y, buttons=self.LEFT_BUTTON)
     self.ReleaseLeftButton()
 
   def Scroll(self, wheel):
@@ -342,7 +298,8 @@ def DemoBluetoothHIDKeyboard(remote_address, chars):
     chars: the characters to send
   """
   print 'Creating an emulated bluetooth keyboard...'
-  keyboard = BluetoothHIDKeyboard(BluetoothHID.PIN_CODE_MODE, RN42)
+  # TODO(josephsih): Refactor test code to remove need for RN42 import
+  keyboard = BluetoothHIDKeyboard(PeripheralKit.PIN_CODE_MODE, RN42)
   keyboard.Init()
 
   print 'Connecting to the remote address %s...' % remote_address
@@ -391,7 +348,8 @@ def DemoBluetoothHIDMouse(remote_address):
     remote_address: the bluetooth address of the target remote device
   """
   print 'Creating an emulated bluetooth mouse...'
-  mouse = BluetoothHIDMouse(BluetoothHID.PIN_CODE_MODE, RN42)
+  # TODO(josephsih): Refactor test code to remove need for RN42 import
+  mouse = BluetoothHIDMouse(PeripheralKit.PIN_CODE_MODE, RN42)
   mouse.Init()
 
   connected = False
@@ -441,6 +399,7 @@ def DemoBluetoothHIDMouse(remote_address):
       print 'Disconnecting...'
       try:
         mouse.Disconnect()
+      # TODO(josephsih): Refactor test code to remove need for RN42 import
       except RN42Exception:
         # RN-42 may have already disconnected.
         pass
