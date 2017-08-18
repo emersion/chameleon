@@ -110,12 +110,14 @@ class BluetoothHID(object):
       # Set RN-42 to work as a slave.
       result = self.SetSlaveMode() and result
 
+      # Set a temporary pin code for testing purpose.
+      # Only do this when we want to use a pin code.
+      if self.authentication_mode == PeripheralKit.PIN_CODE_MODE:
+        result = self.SetPinCode(self.TMP_PIN_CODE) and result
+
       # Enable the connection status message so that we could get the message
       # of connection/disconnection status.
       result = self.EnableConnectionStatusMessage() and result
-
-      # Set a temporary pin code for testing purpose.
-      result = self.SetPinCode(self.TMP_PIN_CODE) and result
 
       # Reboot so that the configurations above take effect.
       result = self.Reboot() and result

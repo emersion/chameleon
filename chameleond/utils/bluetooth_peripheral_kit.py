@@ -17,7 +17,12 @@ class PeripheralKitException(Exception):
 
 
 class PeripheralKit(object):
-  """A generalized abstraction of a Bluetooth peripheral emulation kit"""
+  """A generalized abstraction of a Bluetooth peripheral emulation kit
+
+  Note: every public member method should
+        return True or a non-None object if successful;
+        return False or Raise an exception (preferable) otherwise.
+  """
 
   # Serial port settings
   # Kit implementations should set these constants appropriately.
@@ -218,6 +223,9 @@ class PeripheralKit(object):
 
     Returns:
       True if the kit rebooted successfully.
+
+    Raises:
+      A kit-specifc exception if something goes wrong.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -227,8 +235,7 @@ class PeripheralKit(object):
     Returns:
       a string representing the serial port.
     """
-    # TODO(josephsih): Give better info without storing
-    # and returning the port.
+    # TODO(josephsih): Give better info without storing and returning the port.
     return self._port
 
   def FactoryReset(self):
@@ -238,6 +245,9 @@ class PeripheralKit(object):
 
     Returns:
       True if the kit is reset successfully.
+
+    Raises:
+      A kit-specifc exception if something goes wrong.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -280,8 +290,9 @@ class PeripheralKit(object):
 
     Returns:
       True if master/central mode was set successfully.
-      False if the kit does not support master/central mode. The client
-      should adjust accordingly.
+
+    Raises:
+      A kit-specific exception if master/central mode is unsupported.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -290,8 +301,9 @@ class PeripheralKit(object):
 
     Returns:
       True if slave/peripheral mode was set successfully.
-      False if the kit does not support slave/peripheral mode. The client
-      should adjust accordingly.
+
+    Raises:
+      A kit-specific exception if slave/peripheral mode is unsupported.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -318,7 +330,9 @@ class PeripheralKit(object):
 
     Returns:
       True if the mode was set successfully,
-      False if the mode is not supported.
+
+    Raises:
+      A kit-specific exception if given mode is not supported.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -336,7 +350,9 @@ class PeripheralKit(object):
 
     Returns:
       True if the pin code is set successfully,
-      False if the pin code is invalid.
+
+    Raises:
+      A kit-specifc exception if the pin code is invalid.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -362,6 +378,9 @@ class PeripheralKit(object):
 
     Returns:
       True if the service profile was set to SPP successfully.
+
+    Raises:
+      A kit-specifc exception if unsuppported.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -387,8 +406,8 @@ class PeripheralKit(object):
   def GetConnectionStatus(self):
     """Get the connection status.
 
-    This indicates that the kit is connected to a remote device,
-    usually the DUT.
+    This indicates that the kit is connected to a remote device, usually the
+    DUT.
 
     Returns:
       True if the kit is connected to a remote device.
@@ -419,7 +438,7 @@ class PeripheralKit(object):
 
     Returns:
       The Bluetooth MAC address of the remote connected device if applicable,
-      or None if there is no remote connected device. If not none, this will
+      or None if there is no remote connected device. If not None, this will
       be properly formatted as a 12-digit MAC address with colons.
     """
     raise NotImplementedError("Not Implemented")
@@ -476,6 +495,9 @@ class PeripheralKit(object):
     Returns:
       True if the class of service was set successfully, or if this action is
       not supported.
+
+    Raises:
+      A kit-specific expection if the class of service is not supported.
     """
     raise NotImplementedError("Not Implemented")
 
@@ -516,11 +538,14 @@ class PeripheralKit(object):
     Returns:
       True if the class of device was set successfully, or if this action is
       not supported.
+
+    Raises:
+      A kit-specific expection if the class of device is not supported.
     """
     raise NotImplementedError("Not Implemented")
 
   # TODO(alent): How to handle not supported by kit in the API?
-  # TODO(alent): Implement/require validation logic
+  # TODO(alent): Implement/require validation logic?
   def SetRemoteAddress(self, remote_address):
     """Set the remote Bluetooth address.
 
@@ -540,6 +565,7 @@ class PeripheralKit(object):
     """
     raise NotImplementedError("Not Implemented")
 
+  # TODO(alent): API consistency with False vs exception
   def Connect(self):
     """Connect to the stored remote bluetooth address.
 
@@ -547,7 +573,7 @@ class PeripheralKit(object):
     is responsible for retrying when appropriate.
 
     Returns:
-      True if connecting to the stored remote address successfully, or
+      True if connecting to the stored remote address succeeded, or
       False if a timeout occurs.
     """
     raise NotImplementedError("Not implemented")
@@ -565,7 +591,7 @@ class PeripheralKit(object):
                       For reference: '00:29:95:1A:D4:6F'
 
     Returns:
-      True if connecting to the remote address successfully; otherwise, False.
+      True if connecting to the remote address succeeded
     """
     return self.SetRemoteAddress(remote_address) and self.Connect()
 
@@ -576,7 +602,7 @@ class PeripheralKit(object):
     the remote connected device, usually the DUT.
 
     Returns:
-      True if disconnecting from the remote device successfully.
+      True if disconnecting from the remote device succeeded.
     """
     raise NotImplementedError("Not implemented")
 

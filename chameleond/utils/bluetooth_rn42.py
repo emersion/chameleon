@@ -25,10 +25,6 @@ class RN42(PeripheralKit):
   configure it to use the HID protocol to emulate a keyboard, a mouse,
   or a combo of both.
 
-  Note: every public member method should
-        return True or a non-None object if successful;
-        return False or Raise an exception otherwise.
-
   For user guide about serial control of the kit, refer to
   http://ww1.microchip.com/downloads/en/DeviceDoc/50002325A.pdf
 
@@ -441,8 +437,6 @@ class RN42(PeripheralKit):
 
     Returns:
       True if master mode was set successfully.
-      False if the kit does not support master mode. The client
-      should adjust accordingly.
     """
     self.SerialSendReceive(self.CMD_SET_MASTER_MODE,
                            expect=self.AOK,
@@ -454,8 +448,6 @@ class RN42(PeripheralKit):
 
     Returns:
       True if slave mode was set successfully.
-      False if the kit does not support slave mode. The client
-      should adjust accordingly.
     """
     self.SerialSendReceive(self.CMD_SET_SLAVE_MODE,
                            expect=self.AOK,
@@ -486,10 +478,14 @@ class RN42(PeripheralKit):
 
     Returns:
       True if the mode was set successfully,
-      False if the mode is not supported.
+
+    Raises:
+      A kit-specific Exception if something goes wrong.
     """
     if mode not in self.AUTHENTICATION_MODE:
-      return False
+      error_msg = 'Unsupported Authentication mode: %s' % mode
+      logging.error(error_msg)
+      raise RN42Exception(error_msg)
 
     digit_mode = self.AUTHENTICATION_MODE.get(mode)
 
@@ -515,12 +511,15 @@ class RN42(PeripheralKit):
 
     Returns:
       True if the pin code is set successfully,
-      False if the pin code is invalid.
+
+    Raises:
+      A kit-specifc exception if the pin code is invalid.
     """
     if len(pin) > self.MAX_PIN_LEN:
-      logging.warn('The pin code "%s" is longer than max length (%d).',
-                   pin, self.MAX_PIN_LEN)
-      return False
+      vals = (pin, self.MAX_PIN_LEN)
+      msg = 'The pin code "%s" is longer than max length (%d).' % vals
+      logging.warn(msg)
+      raise RN42Exception(msg)
 
     result = self.SerialSendReceive(self.CMD_SET_PIN_CODE + pin,
                                     msg='setting pin code')
@@ -584,8 +583,8 @@ class RN42(PeripheralKit):
   def GetConnectionStatus(self):
     """Get the connection status.
 
-    This indicates that the kit is connected to a remote device,
-    usually the DUT.
+    This indicates that the kit is connected to a remote device, usually the
+    DUT.
 
     the connection status returned from the kit could be
     '0,0,0': not connected
@@ -639,7 +638,7 @@ class RN42(PeripheralKit):
 
     Returns:
       The Bluetooth MAC address of the remote connected device if applicable,
-      or None if there is no remote connected device. If not none, this will
+      or None if there is no remote connected device. If not None, this will
       be properly formatted as a 12-digit MAC address with colons.
     """
     result = self.SerialSendReceive(self.CMD_GET_REMOTE_CONNECTED_BLUETOOTH_MAC,
@@ -742,6 +741,9 @@ class RN42(PeripheralKit):
     Returns:
       True if the class of service was set successfully, or if this action is
       not supported.
+
+    Raises:
+      A kit-specific expection if the class of service is not supported.
     """
     result = self.SerialSendReceive(
         self.CMD_SET_CLASS_OF_SERVICE + self._To4DigitHex(class_of_service),
@@ -786,12 +788,16 @@ class RN42(PeripheralKit):
     Returns:
       True if the class of device was set successfully, or if this action is
       not supported.
+
+    Raises:
+      A kit-specific expection if the class of device is not supported.
     """
     if device_type in self.CLASS_OF_DEVICE:
       return self._SetClassOfDevice(self.CLASS_OF_DEVICE.get(device_type))
     else:
-      logging.error('device type is not supported: %s', device_type)
-      return False
+      error_msg = 'device type is not supported: %s' % device_type
+      logging.error(error_msg)
+      raise RN42Exception(error_msg)
 
   def SetRemoteAddress(self, remote_address):
     """Set the remote Bluetooth address.
@@ -822,15 +828,15 @@ class RN42(PeripheralKit):
     In the case of a timeout (or a failure causing an exception), the caller
     is responsible for retrying when appropriate.
 
+    When a connection command is issued, it first returns a response 'TRYING'.
+    If the connection is successful, it returns something like
+    '...%CONNECT,6C29951AD46F,0'  where '6C29951AD46F' is the remote_address
+    after a few seconds.
+
     Returns:
-      True if connecting to the stored remote address successfully, or
+      True if connecting to the stored remote address succeeded, or
       False if a timeout occurs.
     """
-    # When a connection command is issued, it first returns a response 'TRYING'.
-    # If the connection is successful, it returns something like
-    # '...%CONNECT,6C29951AD46F,0'  where '6C29951AD46F' is the remote_address
-    # after a few seconds.
-
     # Expect an immediately 'TRYING' response.
     self.SerialSendReceive(self.CMD_CONNECT_REMOTE_ADDRESS,
                            expect='TRYING',
@@ -861,7 +867,7 @@ class RN42(PeripheralKit):
     the remote connected device, usually the DUT.
 
     Returns:
-      True if disconnecting from the remote device successfully.
+      True if disconnecting from the remote device succeeded.
     """
     # This is done by sending a 0x0.
     # A '%DISCONNECT' string would be received as a response.
@@ -1028,6 +1034,7 @@ class RN42(PeripheralKit):
       a special shorthand code string to release any pressed keys.
     """
     return chr(self.UART_INPUT_SHORTHAND_MODE) + chr(0x0)
+
 
 if __name__ == '__main__':
   GetKitInfo(RN42)
