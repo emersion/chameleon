@@ -100,12 +100,13 @@ class BluetoothHID(object):
     self.CreateSerialDevice()
 
     if factory_reset:
+      # Enter command mode to issue commands.
+      # This must happen first, so that other commands work
+      self.EnterCommandMode()
+
       # Do a factory reset to make sure it is in a known initial state.
       # Do the factory reset before proceeding to set parameters below.
       self.FactoryReset()
-
-      # Enter command mode to issue commands.
-      self.EnterCommandMode()
 
       # Set HID as the service profile.
       self.SetServiceProfileHID()
