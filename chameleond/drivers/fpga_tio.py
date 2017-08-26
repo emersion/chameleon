@@ -79,8 +79,10 @@ class ChameleondDriver(ChameleondInterface):
     fpga_ctrl = fpga.FpgaController()
     usb_audio_ctrl = usb.USBAudioController()
     usb_hid_ctrl = usb.USBController('g_hid')
-    bluetooth_hid_ctrl = usb.USBController('ftdi_sio')
-    # TODO(alent): Need a different controller for dual BT USB kits?
+    bluetooth_hid_ctrl = usb.USBController(
+        bluetooth_hid_flow.BluetoothHIDMouseFlow.DRIVER)
+    bluetooth_hog_ctrl = usb.USBController(
+        bluetooth_hid_flow.BluetoothHOGMouseFlow.DRIVER)
 
     self._devices = {
         ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
@@ -103,7 +105,7 @@ class ChameleondDriver(ChameleondInterface):
         ids.BLUETOOTH_HID_MOUSE: bluetooth_hid_flow.BluetoothHIDMouseFlow(
             ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
         ids.BLUETOOTH_HOG_MOUSE: bluetooth_hid_flow.BluetoothHOGMouseFlow(
-            ids.BLUETOOTH_HOG_MOUSE, bluetooth_hid_ctrl),
+            ids.BLUETOOTH_HOG_MOUSE, bluetooth_hog_ctrl),
         ids.AVSYNC_PROBE: avsync_probe.AVSyncProbe(ids.AVSYNC_PROBE),
         ids.AUDIO_BOARD: audio_board.AudioBoard(ext_board_bus),
         ids.MOTOR_BOARD: motor_board.MotorBoard(ext_board_bus)

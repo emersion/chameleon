@@ -49,8 +49,8 @@ class BluetoothHID(object):
     self.authentication_mode = authentication_mode
     self.send_delay = send_delay
 
-  # TODO(josephsih): Remove the use of __getattr__ after a refactor of the
-  # Chameleon-Autotest interface to eliminate kit-specific commands in tests.
+  # TODO(crbug.com/764055): Remove the use of __getattr__ after a refactor of
+  # this class to only expose kit APIs explicitly.
   def __getattr__(self, name):
     """Gets the attribute of name from the owned peripheral kit instance
 

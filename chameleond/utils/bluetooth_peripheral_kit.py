@@ -28,12 +28,14 @@ class PeripheralKit(object):
   # Kit implementations should set these constants appropriately.
   # Use only the kit's default settings, to allow kits to be factory reset.
   # Default settings common to all current kits have been provided,
-  # with the exception of baud rate
-  DRIVER = 'ftdi_sio'
+  # with the exception of driver, baud rate, and VID/PID
+  DRIVER = None # The name of the kernel driver. Ex: 'ftdi_sio'
   BAUDRATE = None # The default baud rate of a kit's serial interface
   BYTESIZE = serial.EIGHTBITS
   PARITY = serial.PARITY_NONE
   STOPBITS = serial.STOPBITS_ONE
+  USB_VID = None # The USB VID (Vendor ID) of the kit, as a hexadecimal string
+  USB_PID = None # The USB PID (Product ID) of the kit, as a hexadecimal string
 
   # Timing settings
   # Serial commands will retry (RETRY + 1) times,
@@ -72,7 +74,7 @@ class PeripheralKit(object):
     self._command_mode = False
     self._closed = False
     self._serial = None
-    self._port = None
+    self._tty = None
 
   def __del__(self):
     self.Close()
@@ -140,12 +142,14 @@ class PeripheralKit(object):
 
     try:
       self._serial.Connect(driver=self.DRIVER,
+                           usb_vid=self.USB_VID,
+                           usb_pid=self.USB_PID,
                            baudrate=self.BAUDRATE,
                            bytesize=self.BYTESIZE,
                            parity=self.PARITY,
                            stopbits=self.STOPBITS)
-      self._port = self._serial.port
-      logging.info('Connected to the serial port successfully: %s', self._port)
+      self._tty = self._serial.port
+      logging.info('Connected to the serial port successfully: %s', self._tty)
       return True
     except Exception as e:
       msg = 'Failed to connect to the serial device: %s' % e
@@ -171,9 +175,21 @@ class PeripheralKit(object):
 
   def CheckSerialConnection(self):
     """Check the USB serial connection between to the kit."""
-    port = serial_utils.FindTtyByDriver(self.DRIVER)
-    logging.info('CheckSerialConnection: port is %s', port)
-    return bool(port)
+    tty = serial_utils.FindTtyByUsbVidPid(self.USB_VID, self.USB_PID,
+                                          driver_name=self.DRIVER)
+    logging.info('CheckSerialConnection: port is %s', tty)
+    if tty != self._tty:
+      logging.warn('CheckSerialConnection: Port %s is not current port %s',
+                   tty, self._tty)
+    return bool(tty)
+
+  def GetPort(self):
+    """Get the tty device path of the serial port.
+
+    Returns:
+      A string representing the tty device path of the serial port.
+    """
+    return self._tty
 
   def EnterCommandMode(self):
     """Make the kit enter command mode.
@@ -228,15 +244,6 @@ class PeripheralKit(object):
       A kit-specifc exception if something goes wrong.
     """
     raise NotImplementedError("Not Implemented")
-
-  def GetPort(self):
-    """Get the serial port.
-
-    Returns:
-      a string representing the serial port.
-    """
-    # TODO(josephsih): Give better info without storing and returning the port.
-    return self._port
 
   def FactoryReset(self):
     """Factory reset the chip.

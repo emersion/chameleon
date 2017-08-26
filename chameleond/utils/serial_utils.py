@@ -120,6 +120,59 @@ def FindTtyByPortIndex(port_index, driver_name=None):
   return None
 
 
+def FindTtyByUsbVidPid(usb_vid, usb_pid, driver_name=None):
+  """Finds the tty for the usb device with given vid, pid, and driver.
+
+  This is more useful than port index or driver alone, but only works if your
+  devices have different VID/PID/(optionally driver) values.
+  Otherwise, it won't help, and you'll have to probe something else.
+
+  Args:
+    usb_vid: The USB VID (Vendor ID) as a hexadecimal string
+    usb_pid: The USB PID (Product ID) as a hexadecimal string
+    driver_name: String for serial connection driver.
+
+  Returns:
+    matched /dev/tty path. Return None if no port has been detected.
+  """
+  for candidate in glob.glob('/dev/tty*'):
+    device_path = '/sys/class/tty/%s/device' % os.path.basename(candidate)
+    driver_path = os.path.realpath(os.path.join(device_path, 'driver'))
+
+    # If driver_name is given, check if driver_name exists at the tail of
+    # driver_path.
+    if driver_name and not driver_path.endswith(driver_name):
+      continue
+
+    real_device_path = os.path.realpath(device_path)
+    vid_path = os.path.join(real_device_path, '../../idVendor')
+    found_vid = ReadSysfsFile(vid_path)
+    pid_path = os.path.join(real_device_path, '../../idProduct')
+    found_pid = ReadSysfsFile(pid_path)
+    if found_vid == usb_vid and found_pid == usb_pid:
+      logging.info('Found USB serial tty: %s', candidate)
+      return candidate
+  return None
+
+def ReadSysfsFile(path):
+  """Extracts the contents of the given sysfs file.
+
+  Intended for use on the one-line files in sysfs that contain small amounts of
+  data we want to know.
+
+  Args:
+    path: The path to the sysfs file to read.
+
+  Returns:
+    The file if found else ''
+  """
+  try:
+    with open(path) as f:
+      return f.read().strip()
+  except IOError:
+    return ''
+
+
 def DeviceInterfaceProtocol(device_path):
   """Extracts the interface protocol of the specified device path.
 
@@ -181,14 +234,21 @@ class SerialDevice(object):
   def __del__(self):
     self.Disconnect()
 
-  def Connect(self, driver=None, port=None,
+  def Connect(self, driver=None, port=None, usb_vid=None, usb_pid=None,
               baudrate=9600, bytesize=serial.EIGHTBITS,
               parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
               timeout=0.5, writeTimeout=0.5):
-    """Opens a serial connection by port or by device driver name.
+    """Opens a serial connection by port, by device driver name, or by VID/PID.
+
+    All three of driver, usb_vid, and usb_pid must be specified to lookup by
+    VID/PID.
 
     Args:
-      driver: driver name of the target serial connection. Used to look up port
+      driver: driver name of the target serial connection. used to look up port
+          if port is not specified.
+      usb_vid: USB VID of the target serial connection. used to look up port
+          if port is not specified.
+      usb_pid: USB PID of the target serial connection. used to look up port
           if port is not specified.
       port: See serial.Serial().
       baudrate: See serial.Serial().
@@ -202,7 +262,10 @@ class SerialDevice(object):
       SerialException on errors.
     """
     if driver and not port:
-      port = FindTtyByDriver(driver)
+      if usb_vid and usb_pid:
+        port = FindTtyByUsbVidPid(usb_vid, usb_pid, driver_name=driver)
+      else:
+        port = FindTtyByDriver(driver)
 
     if not port:
       raise serial.SerialException(

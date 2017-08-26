@@ -37,9 +37,12 @@ class BluefruitLE(PeripheralKit):
   """
 
   # Serial port settings (override)
+  # TODO(josephsih): Future versions of this chip have a different driver?
+  DRIVER = 'ftdi_sio'
   # TODO(alent): Target: 115200, but every factory reset drops to 9600
   BAUDRATE = 9600
-  # TODO(josephsih): Future versions of this chip have a different driver?
+  USB_VID = '0403'
+  USB_PID = '6015'
 
   # Timing info
   RESET_SLEEP_SECONDS = 3

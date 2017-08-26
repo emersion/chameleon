@@ -33,7 +33,10 @@ class RN42(PeripheralKit):
   """
 
   # Serial port settings (override)
+  DRIVER = 'ftdi_sio'
   BAUDRATE = 115200
+  USB_VID = '0403'
+  USB_PID = '6001'
 
   CHIP_NAME = 'RNBT'
   MAX_PIN_LEN = 16
