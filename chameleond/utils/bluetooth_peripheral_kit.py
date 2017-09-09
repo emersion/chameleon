@@ -63,6 +63,19 @@ class PeripheralKit(object):
   SSP_JUST_WORK_MODE = 'SSP_JUST_WORK'
   PIN_CODE_MODE = 'PIN_CODE'
 
+  # Capability strings
+  # NOTE: Strings updated here must be kept in sync with Autotest.
+  # A list of supported transports, from TRANSPORT_* below.
+  CAP_TRANSPORTS = "CAP_TRANSPORTS"
+  # Strings representing supported transports.
+  # A dual device would have ["TRANSPORT_LE","TRANSPORT_BREDR"]
+  TRANSPORT_LE = "TRANSPORT_LE"
+  TRANSPORT_BREDR = "TRANSPORT_BREDR"
+  # True if gettigng a PIN code is allowed & meaningful.
+  CAP_HAS_PIN = "CAP_HAS_PIN"
+  # True if the kit can initiate a connection (esp. to a paired device)
+  CAP_INIT_CONNECT = "CAP_INIT_CONNECT"
+
   # Kit implementations should set these values if the generic methods that
   # use them are a desired part of the implementation
   # The default class of service
@@ -191,6 +204,15 @@ class PeripheralKit(object):
     """
     return self._tty
 
+  def GetCapabilities(self):
+    """What can this kit do/not do that tests need to adjust for?
+
+    Returns:
+      A dictionary from PeripheralKit.CAP_* strings to an appropriate value.
+      See above (CAP_*) for details.
+    """
+    raise NotImplementedError("Not Implemented")
+
   def EnterCommandMode(self):
     """Make the kit enter command mode.
 
@@ -231,7 +253,7 @@ class PeripheralKit(object):
     raise NotImplementedError("Not Implemented")
 
   def Reboot(self):
-    """Reboot (or partially reset) the chip.
+    """Reboot (or partially reset) the kit.
 
     Rebooting or resetting the kit is required to make some settings take
     effect after they are changed. On some kits, like the Bluefruit LE Friend,
@@ -246,9 +268,9 @@ class PeripheralKit(object):
     raise NotImplementedError("Not Implemented")
 
   def FactoryReset(self):
-    """Factory reset the chip.
+    """Factory reset the kit.
 
-    Reset the chip to the factory defaults.
+    Reset the kit to the factory defaults.
 
     Returns:
       True if the kit is reset successfully.
@@ -258,9 +280,7 @@ class PeripheralKit(object):
     """
     raise NotImplementedError("Not Implemented")
 
-  # TODO(alent): This API is deceptive, let's change it to GetAdvertisedName
-  # TODO(alent): Changing name requires updating all calls sites!
-  def GetChipName(self):
+  def GetAdvertisedName(self):
     """Get the name advertised by the kit.
 
     Returns:
@@ -522,7 +542,7 @@ class PeripheralKit(object):
   def GetClassOfDevice(self):
     """Get the class of device, if supported.
 
-    The chip uses a hexadeciaml string to represent the class of device.
+    The kit uses a hexadeciaml string to represent the class of device.
     It is converted to a decimal number as the return value.
     The class of device is a number usually assigned by the Bluetooth SIG.
     Usually supported only on BR/EDR kits.
@@ -637,7 +657,7 @@ def GetKitInfo(kit, connect_separately=False, test_reset=False):
   print 'enter command mode:', kit_instance.EnterCommandMode()
   if test_reset:
     print 'factory reset: ', kit_instance.FactoryReset()
-  print 'chip name:', kit_instance.GetChipName()
+  print 'advertised name:', kit_instance.GetAdvertisedName()
   print 'firmware version:', kit_instance.GetFirmwareVersion()
   print 'operation mode:', kit_instance.GetOperationMode()
   print 'authentication mode:', kit_instance.GetAuthenticationMode()

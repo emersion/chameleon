@@ -37,9 +37,8 @@ class BluefruitLE(PeripheralKit):
   """
 
   # Serial port settings (override)
-  # TODO(josephsih): Future versions of this chip have a different driver?
+  # NOTE: Versions v3 and higher of this kit have a different driver. We use v2.
   DRIVER = 'ftdi_sio'
-  # TODO(alent): Target: 115200, but every factory reset drops to 9600
   BAUDRATE = 9600
   USB_VID = '0403'
   USB_PID = '6015'
@@ -143,6 +142,17 @@ class BluefruitLE(PeripheralKit):
     # Note it's Appearance value is (apparently always a keyboard like this?)
     self._hid_fake_type = None
 
+  def GetCapabilities(self):
+    """What can this kit do/not do that tests need to adjust for?
+
+    Returns:
+      A dictionary from PeripheralKit.CAP_* strings to an appropriate value.
+      See PeripheralKit for details.
+    """
+    return {PeripheralKit.CAP_TRANSPORTS: [PeripheralKit.TRANSPORT_LE],
+            PeripheralKit.CAP_HAS_PIN: False,
+            PeripheralKit.CAP_INIT_CONNECT: False}
+
   # TODO(alent): Run AT+MODESWITCHEN=local,0 to disable mode switch. (This would
   # prevent us from leaving command mode if we get +++, w/o escaping + to \+.)
   # TODO(alent): Way to detect mode switch or mode is wrong?
@@ -191,7 +201,7 @@ class BluefruitLE(PeripheralKit):
     return True
 
   def Reboot(self):
-    """Reboot (or partially reset) the chip.
+    """Reboot (or partially reset) the kit.
 
     Rebooting or resetting the kit is required to make some settings take
     effect after they are changed.
@@ -211,9 +221,9 @@ class BluefruitLE(PeripheralKit):
     return self._ValidateAndExtractResult(command, result, True, message)
 
   def FactoryReset(self):
-    """Factory reset the chip.
+    """Factory reset the kit.
 
-    Reset the chip to the factory defaults.
+    Reset the kit to the factory defaults.
 
     Returns:
       True if the kit is reset successfully.
@@ -228,7 +238,7 @@ class BluefruitLE(PeripheralKit):
     time.sleep(self.RESET_SLEEP_SECONDS)
     return self._ValidateAndExtractResult(command, result, True, message)
 
-  def GetChipName(self):
+  def GetAdvertisedName(self):
     """Get the name advertised by the kit.
 
     Returns:

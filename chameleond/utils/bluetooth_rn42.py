@@ -59,7 +59,7 @@ class RN42(PeripheralKit):
   CMD_FACTORY_RESET = 'SF,1'
 
   # chip basic information
-  CMD_GET_CHIP_NAME = 'GN'
+  CMD_GET_ADVERTISED_NAME = 'GN'
   CMD_GET_FIRMWARE_VERSION = 'V'
 
   # operation modes: master or slave
@@ -295,6 +295,17 @@ class RN42(PeripheralKit):
   # Map abstract authentication mode to decimal number
   REV_AUTHENTICATION_MODE = {v: k for k, v in AUTHENTICATION_MODE.iteritems()}
 
+  def GetCapabilities(self):
+    """What can this kit do/not do that tests need to adjust for?
+
+    Returns:
+      A dictionary from PeripheralKit.CAP_* strings to an appropriate value.
+      See PeripheralKit for details.
+    """
+    return {PeripheralKit.CAP_TRANSPORTS: [PeripheralKit.TRANSPORT_BREDR],
+            PeripheralKit.CAP_HAS_PIN: True,
+            PeripheralKit.CAP_INIT_CONNECT: True}
+
   def EnterCommandMode(self):
     """Make the kit enter command mode.
 
@@ -333,18 +344,18 @@ class RN42(PeripheralKit):
       self.SerialSendReceive('')
       # Now, try to check if we are in command mode by reading a config value.
       try:
-        chip_name = self.GetChipName()
-        if chip_name.startswith(self.CHIP_NAME):
-          msg = 'Correct chip name when entering command mode: %s'
-          logging.info(msg, chip_name)
+        advertised_name = self.GetAdvertisedName()
+        if advertised_name.startswith(self.CHIP_NAME):
+          msg = 'Correct advertised name when entering command mode: %s'
+          logging.info(msg, advertised_name)
           self._command_mode = True
           return True
         else:
-          msg = 'Incorrect chip name when entering command mode: %s'
-          logging.error(msg, chip_name)
-          raise RN42Exception(msg % chip_name)
+          msg = 'Incorrect advertised name when entering command mode: %s'
+          logging.error(msg, advertised_name)
+          raise RN42Exception(msg % advertised_name)
       except Exception as e:
-        msg = 'Failure to get chip name in entering command mode: %s.' % e
+        msg = 'Failure to get advertised name in entering command mode: %s.' % e
         logging.error(msg)
         raise RN42Exception(msg)
 
@@ -395,7 +406,7 @@ class RN42(PeripheralKit):
     time.sleep(self.RESET_SLEEP_SECS)
     return True
 
-  def GetChipName(self):
+  def GetAdvertisedName(self):
     """Get the name advertised by the kit.
 
     The chip returns something like 'RNBT-A955\\r\\n'
@@ -405,9 +416,9 @@ class RN42(PeripheralKit):
     Returns:
       The name that the kit advertises to other Bluetooth devices.
     """
-    return self.SerialSendReceive(self.CMD_GET_CHIP_NAME,
+    return self.SerialSendReceive(self.CMD_GET_ADVERTISED_NAME,
                                   expect_in='RNBT',
-                                  msg='getting chip name')
+                                  msg='getting advertised name')
 
   def GetFirmwareVersion(self):
     """Get the firmware version of the kit.
