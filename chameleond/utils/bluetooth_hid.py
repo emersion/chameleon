@@ -68,6 +68,9 @@ class BluetoothHID(object):
       AttributeError if the attribute is not found.
       (This is the default behavior and kits should follow it.)
     """
+    if name.startswith("Mouse"):
+      error = "Kit API is not public. Use public API from BluetoothHIDMouse."
+      raise AttributeError(error)
     return getattr(self._kit, name)
 
   def Init(self, factory_reset=True):
@@ -180,10 +183,9 @@ class BluetoothHIDKeyboard(BluetoothHID):
 class BluetoothHIDMouse(BluetoothHID):
   """A bluetooth HID mouse emulator class."""
 
-  # Definitions of buttons
-  BUTTONS_RELEASED = 0x0
-  LEFT_BUTTON = 0x01
-  RIGHT_BUTTON = 0x02
+  # Max and min values for HID mouse report values
+  HID_MAX_REPORT_VALUE = 127
+  HID_MIN_REPORT_VALUE = -127
 
   def __init__(self, authentication_mode, kit_impl):
     """Initialization of BluetoothHIDMouse
@@ -195,91 +197,102 @@ class BluetoothHIDMouse(BluetoothHID):
     super(BluetoothHIDMouse, self).__init__(
         PeripheralKit.MOUSE, authentication_mode, kit_impl)
 
-  def Move(self, delta_x=0, delta_y=0, buttons=0):
-    """Move the mouse (delta_x, delta_y) pixels with buttons status.
+  def _EnsureHIDValueInRange(self, value):
+    """Ensures given value is in the range [-127,127] (inclusive).
 
     Args:
-      delta_x: the pixels to move horizontally
-               positive values: moving right; max value = 127.
-               negative values: moving left; max value = -127.
-      delta_y: the pixels to move vertically
-               positive values: moving down; max value = 127.
-               negative values: moving up; max value = -127.
-      buttons: the press/release status of buttons
-    """
-    if delta_x or delta_y:
-      mouse_codes = self.RawMouseCodes(buttons=buttons,
-                                       x_stop=delta_x, y_stop=delta_y)
-      self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse.Move')
-      time.sleep(self.send_delay)
+      value: The value that should be checked.
 
-  def _PressButtons(self, buttons):
-    """Press down the specified buttons
+    Raises:
+      BluetoothHIDException if value is outside of the acceptable range.
+    """
+    if value < self.HID_MIN_REPORT_VALUE or value > self.HID_MAX_REPORT_VALUE:
+      error = "Value %s is outside of acceptable range [-127,127]." % value
+      logging.error(error)
+      raise BluetoothHIDException(error)
+
+  def Move(self, delta_x=0, delta_y=0):
+    """Move the mouse (delta_x, delta_y) steps.
+
+    If buttons are being pressed, they will stay pressed during this operation.
+    This move is relative to the current position by the HID standard.
+    Valid step values must be in the range [-127,127].
 
     Args:
-      buttons: the buttons to press
-    """
-    if buttons:
-      mouse_codes = self.RawMouseCodes(buttons=buttons)
-      self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse._PressButtons')
-      time.sleep(self.send_delay)
+      delta_x: The number of steps to move horizontally.
+               Negative values move left, positive values move right.
+      delta_y: The number of steps to move vertically.
+               Negative values move up, positive values move down.
 
-  def _ReleaseButtons(self):
-    """Release buttons."""
-    mouse_codes = self.RawMouseCodes(buttons=self.BUTTONS_RELEASED)
-    self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse._ReleaseButtons')
+    Raises:
+      BluetoothHIDException if a given delta is not in [-127,127].
+    """
+    self._EnsureHIDValueInRange(delta_x)
+    self._EnsureHIDValueInRange(delta_y)
+    self._kit.MouseMove(delta_x, delta_y)
     time.sleep(self.send_delay)
 
-  def PressLeftButton(self):
-    """Press the left button."""
-    self._PressButtons(self.LEFT_BUTTON)
+  def _PressLeftButton(self):
+    """Press the left button"""
+    self._kit.MousePressButtons({PeripheralKit.MOUSE_BUTTON_LEFT})
+    time.sleep(self.send_delay)
 
-  def ReleaseLeftButton(self):
-    """Release the left button."""
-    self._ReleaseButtons()
+  def _PressRightButton(self):
+    """Press the right button"""
+    self._kit.MousePressButtons({PeripheralKit.MOUSE_BUTTON_RIGHT})
+    time.sleep(self.send_delay)
 
-  def PressRightButton(self):
-    """Press the right button."""
-    self._PressButtons(self.RIGHT_BUTTON)
-
-  def ReleaseRightButton(self):
-    """Release the right button."""
-    self._ReleaseButtons()
+  def _ReleaseAllButtons(self):
+    """Press the right button"""
+    self._kit.MouseReleaseAllButtons()
+    time.sleep(self.send_delay)
 
   def LeftClick(self):
     """Make a left click."""
-    self.PressLeftButton()
-    self.ReleaseLeftButton()
+    self._PressLeftButton()
+    self._ReleaseAllButtons()
 
   def RightClick(self):
     """Make a right click."""
-    self.PressRightButton()
-    self.ReleaseRightButton()
+    self._PressRightButton()
+    self._ReleaseAllButtons()
 
   def ClickAndDrag(self, delta_x=0, delta_y=0):
-    """Click and drag (delta_x, delta_y)
+    """Left click, drag (delta_x, delta_y) steps, and release.
+
+    This move is relative to the current position by the HID standard.
+    Valid step values must be in the range [-127,127].
 
     Args:
-      delta_x: the pixels to move horizontally
-      delta_y: the pixels to move vertically
-    """
-    self.PressLeftButton()
-    # Keep the left button pressed while moving.
-    self.Move(delta_x=delta_x, delta_y=delta_y, buttons=self.LEFT_BUTTON)
-    self.ReleaseLeftButton()
+      delta_x: The number of steps to move horizontally.
+               Negative values move left, positive values move right.
+      delta_y: The number of steps to move vertically.
+               Negative values move up, positive values move down.
 
-  def Scroll(self, wheel):
-    """Scroll the wheel.
+    Raises:
+      BluetoothHIDException if a given delta is not in [-127,127].
+    """
+    self._EnsureHIDValueInRange(delta_x)
+    self._EnsureHIDValueInRange(delta_y)
+    self._PressLeftButton()
+    self.Move(delta_x, delta_y)
+    self._ReleaseAllButtons()
+
+  def Scroll(self, steps):
+    """Scroll the mouse wheel steps number of steps.
+
+    Buttons currently pressed will stay pressed during this operation.
+    Valid step values must be in the range [-127,127].
 
     Args:
-      wheel: the steps to scroll
-             The scroll direction depends on which scroll method is employed,
-             traditional scrolling or Australian scrolling.
+      steps: The number of steps to scroll the wheel.
+             With traditional scrolling:
+               Negative values scroll down, positive values scroll up.
+             With reversed (formerly "Australian") scrolling this is reversed.
     """
-    if wheel:
-      mouse_codes = self.RawMouseCodes(wheel=wheel)
-      self.SerialSendReceive(mouse_codes, msg='BluetoothHIDMouse.Scroll')
-      time.sleep(self.send_delay)
+    self._EnsureHIDValueInRange(steps)
+    self._kit.MouseScroll(steps)
+    time.sleep(self.send_delay)
 
 
 def DemoBluetoothHIDKeyboard(remote_address, chars):

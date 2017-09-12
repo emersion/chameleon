@@ -26,7 +26,6 @@ class BluefruitLEException(PeripheralKitException):
   pass
 
 
-# pylint: disable=abstract-method
 class BluefruitLE(PeripheralKit):
   """This is an abstraction of the Adafruit Bluefruit LE Friend kit.
 

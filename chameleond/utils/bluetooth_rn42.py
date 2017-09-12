@@ -126,6 +126,11 @@ class RN42(PeripheralKit):
   RAW_REPORT_FORMAT_MOUSE_LENGTH = 5
   RAW_REPORT_FORMAT_MOUSE_DESCRIPTOR = 2
 
+  # Definitions of mouse button HID encodings
+  RAW_HID_BUTTONS_RELEASED = 0x0
+  RAW_HID_LEFT_BUTTON = 0x01
+  RAW_HID_RIGHT_BUTTON = 0x02
+
   # TODO(alent): Move std scan codes to PeripheralKit when Keyboard implemented
   # modifiers
   LEFT_CTRL = 0x01
@@ -956,7 +961,79 @@ class RN42(PeripheralKit):
             ''.join(real_scan_codes) +
             padding_0s)
 
-  def RawMouseCodes(self, buttons=0, x_stop=0, y_stop=0, wheel=0):
+  def _MouseButtonsRawHidValues(self):
+    """Gives the raw HID values for whatever buttons are pressed."""
+    currently_pressed = 0x0
+    for button in self._buttons_pressed:
+      if button == PeripheralKit.MOUSE_BUTTON_LEFT:
+        currently_pressed |= self.RAW_HID_LEFT_BUTTON
+      elif button == PeripheralKit.MOUSE_BUTTON_RIGHT:
+        currently_pressed |= self.RAW_HID_RIGHT_BUTTON
+      else:
+        error = "Unknown mouse button in state: %s" % button
+        logging.error(error)
+        raise RN42Exception(error)
+    return currently_pressed
+
+  def MouseMove(self, delta_x, delta_y):
+    """Move the mouse (delta_x, delta_y) steps.
+
+    If buttons are being pressed, they will stay pressed during this operation.
+    This move is relative to the current position by the HID standard.
+    Valid step values must be in the range [-127,127].
+
+    Args:
+      delta_x: The number of steps to move horizontally.
+               Negative values move left, positive values move right.
+      delta_y: The number of steps to move vertically.
+               Negative values move up, positive values move down.
+    """
+    raw_buttons = self._MouseButtonsRawHidValues()
+    if delta_x or delta_y:
+      mouse_codes = self._RawMouseCodes(buttons=raw_buttons, x_stop=delta_x,
+                                        y_stop=delta_y)
+      self.SerialSendReceive(mouse_codes, msg='RN42: MouseMove')
+
+  def MouseScroll(self, steps):
+    """Scroll the mouse wheel steps number of steps.
+
+    Buttons currently pressed will stay pressed during this operation.
+    Valid step values must be in the range [-127,127].
+
+    Args:
+      steps: The number of steps to scroll the wheel.
+             With traditional scrolling:
+               Negative values scroll down, positive values scroll up.
+             With reversed (formerly "Australian") scrolling this is reversed.
+    """
+    raw_buttons = self._MouseButtonsRawHidValues()
+    if steps:
+      mouse_codes = self._RawMouseCodes(buttons=raw_buttons, wheel=steps)
+      self.SerialSendReceive(mouse_codes, msg='RN42: MouseScroll')
+
+  def MousePressButtons(self, buttons):
+    """Press the specified mouse buttons.
+
+    The kit will continue to press these buttons until otherwise instructed, or
+    until its state has been reset.
+
+    Args:
+      buttons: A set of buttons, as PeripheralKit MOUSE_BUTTON_* values, that
+               will be pressed (and held down).
+    """
+    self._MouseButtonStateUnion(buttons)
+    raw_buttons = self._MouseButtonsRawHidValues()
+    if raw_buttons:
+      mouse_codes = self._RawMouseCodes(buttons=raw_buttons)
+      self.SerialSendReceive(mouse_codes, msg='RN42: MousePressButtons')
+
+  def MouseReleaseAllButtons(self):
+    """Release all mouse buttons."""
+    self._MouseButtonStateClear()
+    mouse_codes = self._RawMouseCodes(buttons=self.RAW_HID_BUTTONS_RELEASED)
+    self.SerialSendReceive(mouse_codes, msg='RN42: MouseReleaseAllButtons')
+
+  def _RawMouseCodes(self, buttons=0, x_stop=0, y_stop=0, wheel=0):
     """Generate the codes in mouse raw report format.
 
     This method sends data in the raw report mode. The first start
@@ -965,7 +1042,7 @@ class RN42(PeripheralKit):
 
     For example, generate the codes of moving cursor 100 pixels left
     and 50 pixels down:
-      codes = RawMouseCodes(x_stop=-100, y_stop=50)
+      codes = _RawMouseCodes(x_stop=-100, y_stop=50)
 
     Args:
       buttons: the buttons to press and release
@@ -979,23 +1056,17 @@ class RN42(PeripheralKit):
     def SignedChar(value):
       """Converted the value to a legitimate signed character value.
 
+      Given value must be in [-127,127], or odd things will happen.
+
       Args:
         value: a signed integer
 
       Returns:
         a signed character value
       """
-      if value <= -127:
-        # If the negative value is too small, limit it to -127.
-        # Then perform two's complement: -127 + 256 = 129
-        return 129
-      elif value < 0:
+      if value < 0:
         # Perform two's complement.
         return value + 256
-      elif value > 127:
-        # If the positive value is too large, limit it to 127
-        # to prevent it from becoming negative.
-        return 127
       return value
 
     return (chr(self.UART_INPUT_RAW_MODE) +

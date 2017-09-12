@@ -83,11 +83,18 @@ class PeripheralKit(object):
   # The default PIN code
   DEFAULT_PIN_CODE = None
 
+  # Mouse constants
+  MOUSE_VALUE_MIN = -127
+  MOUSE_VALUE_MAX = 127
+  MOUSE_BUTTON_LEFT = "MOUSE_BUTTON_LEFT"
+  MOUSE_BUTTON_RIGHT = "MOUSE_BUTTON_RIGHT"
+
   def __init__(self):
     self._command_mode = False
     self._closed = False
     self._serial = None
     self._tty = None
+    self._buttons_pressed = set()
 
   def __del__(self):
     self.Close()
@@ -633,18 +640,74 @@ class PeripheralKit(object):
     """
     raise NotImplementedError("Not implemented")
 
-  # TODO(alent): Refactor this part of the API, it's too RN-42-specific!
+  # Helper methods for implementing a system that remembers button state
+  def _MouseButtonStateUnion(self, buttons_to_press):
+    """Add to the current set of pressed buttons.
 
-  def RawKeyCodes(self, modifiers=None, keys=None):
+    Args:
+      buttons_to_press: A set of buttons, as PeripheralKit MOUSE_BUTTON_*
+                        values, that will stay pressed.
+    """
+    self._buttons_pressed = self._buttons_pressed.union(buttons_to_press)
+
+  def _MouseButtonStateSubtract(self, buttons_to_release):
+    """Remove from the current set of pressed buttons.
+
+    Args:
+      buttons_to_release: A set of buttons, as PeripheralKit MOUSE_BUTTON_*
+                          values, that will be released.
+    """
+    self._buttons_pressed = self._buttons_pressed.difference(buttons_to_release)
+
+  def _MouseButtonStateClear(self):
+    """Clear the mouse button pressed state."""
+    self._buttons_pressed = set()
+
+  # Methods starting with "Mouse" should not be exposed to Autotest directly,
+  # especially those dealing with button sets.
+  def MouseMove(self, delta_x, delta_y):
+    """Move the mouse (delta_x, delta_y) steps.
+
+    If buttons are being pressed, they will stay pressed during this operation.
+    This move is relative to the current position by the HID standard.
+    Valid step values must be in the range [-127,127].
+
+    Args:
+      delta_x: The number of steps to move horizontally.
+               Negative values move left, positive values move right.
+      delta_y: The number of steps to move vertically.
+               Negative values move up, positive values move down.
+    """
     raise NotImplementedError("Not implemented")
 
-  def RawMouseCodes(self, buttons=0, x_stop=0, y_stop=0, wheel=0):
+  def MouseScroll(self, steps):
+    """Scroll the mouse wheel steps number of steps.
+
+    Buttons currently pressed will stay pressed during this operation.
+    Valid step values must be in the range [-127,127].
+
+    Args:
+      steps: The number of steps to scroll the wheel.
+             With traditional scrolling:
+               Negative values scroll down, positive values scroll up.
+             With reversed (formerly "Australian") scrolling this is reversed.
+    """
     raise NotImplementedError("Not implemented")
 
-  def PressShorthandCodes(self, modifiers=None, keys=None):
+  def MousePressButtons(self, buttons):
+    """Press the specified mouse buttons.
+
+    The kit will continue to press these buttons until otherwise instructed, or
+    until its state has been reset.
+
+    Args:
+      buttons: A set of buttons, as PeripheralKit MOUSE_BUTTON_* values, that
+               will be pressed (and held down).
+    """
     raise NotImplementedError("Not implemented")
 
-  def ReleaseShorthandCodes(self):
+  def MouseReleaseAllButtons(self):
+    """Release all mouse buttons."""
     raise NotImplementedError("Not implemented")
 
 
