@@ -59,6 +59,9 @@ class BluefruitLE(PeripheralKit):
   RESULT_ERROR = 'ERROR'
   SUFFIX_EXISTS = '?'
   SUFFIX_ENABLE = '=1'
+  SUFFIX_DISABLE = '=0'
+  PART_EQUALS = '='
+  PART_COMMA = ','
 
   # Specific Commands
   CMD_FACTORY_RESET = '+FACTORYRESET'
@@ -71,6 +74,9 @@ class BluefruitLE(PeripheralKit):
   CMD_DISCONNECT = '+GAPDISCONNECT'
   CMD_BLE_HID_ENABLE = '+BLEHIDEN'
   CMD_BLE_HID_GAMEPAD_ENABLE = '+BLEHIDGAMEPADEN'
+  CMD_BLE_HID_MOUSE_MOVE = '+BLEHIDMOUSEMOVE'
+  CMD_BLE_HID_MOUSE_BUTTON = '+BLEHIDMOUSEBUTTON'
+  SUBCMD_PRESS = 'PRESS'
 
   def _ValidateAndExtractResult(self, command, result, validate_only, message):
     """Validate Bluefruit LE command result, and extract return value.
@@ -665,6 +671,100 @@ class BluefruitLE(PeripheralKit):
     """
     command = self.AT + self.CMD_DISCONNECT
     message = 'disconnecting from the remote device (probably the DUT)'
+    result = self.SerialSendReceive(command, msg=message)
+    return self._ValidateAndExtractResult(command, result, True, message)
+
+  def MouseMove(self, delta_x, delta_y):
+    """Move the mouse (delta_x, delta_y) steps.
+
+    Buttons currently pressed will stay pressed during this operation.
+    This move is relative to the current position by the HID standard.
+    Valid step values must be in the range [-127,127].
+
+    Args:
+      delta_x: The number of steps to move horizontally.
+               Negative values move left, positive values move right.
+      delta_y: The number of steps to move vertically.
+               Negative values move up, positive values move down.
+
+    Returns:
+      True if successful.
+    """
+    command = self.AT + self.CMD_BLE_HID_MOUSE_MOVE + self.PART_EQUALS
+    command += str(delta_x) + self.PART_COMMA + str(delta_y)
+    message = 'moving BLE HOG mouse'
+    result = self.SerialSendReceive(command, msg=message)
+    return self._ValidateAndExtractResult(command, result, True, message)
+
+  def MouseScroll(self, steps):
+    """Scroll the mouse wheel steps number of steps.
+
+    Buttons currently pressed will stay pressed during this operation.
+    Valid step values must be in the range [-127,127].
+
+    Args:
+      steps: The number of steps to scroll the wheel.
+             With traditional scrolling:
+               Negative values scroll down, positive values scroll up.
+             With reversed (formerly "Australian") scrolling this is reversed.
+
+    Returns:
+      True if successful.
+    """
+    command = self.AT + self.CMD_BLE_HID_MOUSE_MOVE + self.PART_EQUALS
+    command += self.PART_COMMA + self.PART_COMMA + str(steps)
+    message = 'scrolling BLE HOG mouse'
+    result = self.SerialSendReceive(command, msg=message)
+    return self._ValidateAndExtractResult(command, result, True, message)
+
+  def _MouseButtonCodes(self):
+    """Gives the letter codes for whatever buttons are pressed.
+
+    Returns:
+      A properly-formatted sting of letter representing pressed buttons.
+    """
+    currently_pressed = ""
+    for button in self._buttons_pressed:
+      if button == PeripheralKit.MOUSE_BUTTON_LEFT:
+        currently_pressed += "L"
+      elif button == PeripheralKit.MOUSE_BUTTON_RIGHT:
+        currently_pressed += "R"
+      else:
+        error = "Unknown mouse button in state: %s" % button
+        logging.error(error)
+        raise BluefruitLEException(error)
+    return currently_pressed
+
+  def MousePressButtons(self, buttons):
+    """Press the specified mouse buttons.
+
+    The kit will continue to press these buttons until otherwise instructed, or
+    until its state has been reset.
+
+    Args:
+      buttons: A set of buttons, as PeripheralKit MOUSE_BUTTON_* values, that
+               will be pressed (and held down).
+
+    Returns:
+      True if successful.
+    """
+    self._MouseButtonStateUnion(buttons)
+    button_codes = self._MouseButtonCodes()
+    command = self.AT + self.CMD_BLE_HID_MOUSE_BUTTON + self.PART_EQUALS
+    command += button_codes + self.PART_COMMA + self.SUBCMD_PRESS
+    message = 'pressing BLE HOG mouse buttons'
+    result = self.SerialSendReceive(command, msg=message)
+    return self._ValidateAndExtractResult(command, result, True, message)
+
+  def MouseReleaseAllButtons(self):
+    """Release all mouse buttons.
+
+    Returns:
+      True if successful.
+    """
+    self._MouseButtonStateClear()
+    command = self.AT + self.CMD_BLE_HID_MOUSE_BUTTON + self.SUFFIX_DISABLE
+    message = 'releasing all BLE HOG mouse buttons'
     result = self.SerialSendReceive(command, msg=message)
     return self._ValidateAndExtractResult(command, result, True, message)
 
