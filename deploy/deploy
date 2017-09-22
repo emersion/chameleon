@@ -13,7 +13,10 @@ DISPLAYD_NAME='displayd'
 STREAM_SERVER_NAME='stream_server'
 SCHEDULER_NAME='scheduler'
 UPDATER_NAME='chameleon-updater'
+LIGHTTPD_NAME='lighttpd'
 
+# We do not want lighttpd and chameleon-updater to run on startup.
+update-rc.d -f ${LIGHTTPD_NAME} remove
 update-rc.d -f ${UPDATER_NAME} remove
 
 install_daemon_and_config () {
@@ -107,4 +110,5 @@ else
     "${INITD_DIR}/${DISPLAYD_NAME}" restart
     "${INITD_DIR}/${STREAM_SERVER_NAME}" restart
     "${INITD_DIR}/${SCHEDULER_NAME}" restart
+    "${INITD_DIR}/${LIGHTTPD_NAME}" stop
 fi
