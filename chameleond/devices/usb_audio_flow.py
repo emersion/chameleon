@@ -10,6 +10,7 @@ import tempfile
 import chameleon_common  # pylint: disable=W0611
 from chameleond.devices import chameleon_device
 from chameleond.utils import audio
+from chameleond.utils import serial_utils
 from chameleond.utils import system_tools
 
 
@@ -30,6 +31,7 @@ class USBAudioFlow(chameleon_device.Flow):
   """
 
   _USB_HOST_MODE_TAG = '/etc/default/.usb_host_mode'
+  _SERIAL_DRIVER_NAME = 'ftdi_sio'
   _VALID_AUDIO_FILE_TYPES = ['wav', 'raw']
 
   def __init__(self, port_id, usb_ctrl):
@@ -62,7 +64,8 @@ class USBAudioFlow(chameleon_device.Flow):
     can enumerate this USB device. Detail in crbug.com/737277.
     """
     self._usb_ctrl.EnableUSBOTGDriver()
-    if os.path.exists(self._USB_HOST_MODE_TAG):
+    if (os.path.exists(self._USB_HOST_MODE_TAG) or
+        bool(serial_utils.FindTtyByDriver(self._SERIAL_DRIVER_NAME))):
       logging.info('By default, USB should work in host mode.')
     else:
       self.InitForDeviceMode()
