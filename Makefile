@@ -25,7 +25,7 @@ directories:
 	@mkdir -p $(BINDIR)
 
 BINARIES = $(BINDIR)/histogram $(BINDIR)/hpd_control $(BINDIR)/pixeldump \
-	  $(BINDIR)/avsync $(BINDIR)/stream_server
+	  $(BINDIR)/avsync $(BINDIR)/stream_server $(BINDIR)/printer
 
 .PHONY: binaries
 binaries: $(BINARIES)
