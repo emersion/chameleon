@@ -5,7 +5,7 @@
 #include <sys/ioctl.h>
 #include <linux/usb/g_printer.h>
 
-#define PRINTER_FILE                    "/dev/g_printer"
+#define PRINTER_FILE                    "/dev/g_printer0"
 #define BUF_SIZE                        512
 
 
