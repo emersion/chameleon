@@ -21,7 +21,11 @@ install_standard_python_modules() {
 }
 
 install_pip() {
-    python "${PIP_DIR}/${PIP_BOOTSTRAP}"
+    python "${PIP_DIR}/${PIP_BOOTSTRAP}" --no-setuptools
+}
+
+install_setuptools() {
+    pip install setuptools==24.0.2
 }
 
 uninstall_old_chameleond_from_pip() {
@@ -44,6 +48,7 @@ set_time
 # Install the missing standard python modules needed to install pip.
 install_standard_python_modules
 install_pip
+install_setuptools
 
 # Uninstall old chameleond package from pip
 uninstall_old_chameleond_from_pip
