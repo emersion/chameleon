@@ -77,8 +77,10 @@ remote-install:
 	@echo "Set board to $(CHAMELEON_BOARD)"
 	@echo "Current host time: $(HOST_NOW)"
 ifdef CHAMELEON_HOST
-	@scp $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
-	@ssh $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
+	@scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+	    $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
+	@ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+	    $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
 	    "cd /tmp && rm -rf $(BUNDLEDIR) && tar zxf $(BUNDLE) &&" \
 	    "cd $(BUNDLEDIR) && find -exec touch -c {} \; &&" \
 	    "make install " \
