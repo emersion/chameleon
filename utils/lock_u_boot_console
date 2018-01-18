@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+# Copyright 2018 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Lock/unlock the u-boot console."""
+
+import argparse
+import binascii
+import logging
+import mmap
+import os
+import struct
+
+
+SD_PATH = '/dev/mmcblk0'
+BOOTDELAY = 'bootdelay'
+ENV_OFFSET = 0x200
+LOCK = '0'
+UNLOCK = '5'
+
+
+def main():
+  """The Main program."""
+  parser = argparse.ArgumentParser(
+      description='Lock/unlock the u-boot console',
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  parser.add_argument('-l', '--lock', dest='lock', action='store_true',
+                      help='lock the u-boot console')
+  parser.add_argument('-u', '--unlock', dest='unlock', action='store_true',
+                      help='unlock the u-boot console')
+  parser.add_argument('-v', '--verbose', action='count', dest='verbose',
+                      help='increase message verbosity')
+
+  options = parser.parse_args()
+  verbosity_map = {0: logging.INFO, 1: logging.DEBUG}
+  verbosity = verbosity_map.get(options.verbose or 0, logging.NOTSET)
+  log_format = '%(asctime)s %(levelname)s '
+  if options.verbose > 0:
+    log_format += '(%(filename)s:%(lineno)d) '
+  log_format += '%(message)s'
+
+  log_config = {'level': verbosity,
+                'format': log_format}
+  logging.basicConfig(**log_config)
+
+  if options.lock and options.unlock:
+    logging.error('Lock and unlock at the same time?')
+    exit(1)
+
+  # Mmap the SD card image, for the first 5K area.
+  # The u-boot environment variables are stored at 0x200, size: 4K.
+  fd = os.open(SD_PATH, os.O_RDWR)
+  mm = mmap.mmap(fd, 5 * 1024, access=mmap.ACCESS_WRITE)
+
+  # Find bootdelay, i.e. how long to wait to skip u-boot console.
+  pattern = BOOTDELAY + '='
+  index = mm.find(pattern, ENV_OFFSET)
+  logging.debug('index found: %d', index)
+  if index == -1:
+    logging.error('Pattern %s not found', pattern)
+    exit(2)
+  index += len(pattern)
+
+  is_changed = False
+  value = mm[index]
+  if value not in (LOCK, UNLOCK):
+    logging.error('The boot_delay value not expected: %r', value)
+    exit(3)
+
+  # Original bootdelay value is 5, meaning unlocked. Change it to 0 for
+  # locking the console.
+  logging.debug('original value: %d', int(value))
+  if options.unlock:
+    if value != UNLOCK:
+      mm[index] = UNLOCK
+      logging.info('Unlocked the u-boot console')
+      is_changed = True
+    else:
+      logging.info('Already in unlocked state; nothing to do')
+  elif options.lock:
+    if value != LOCK:
+      mm[index] = LOCK
+      logging.info('Locked the u-boot console')
+      is_changed = True
+    else:
+      logging.info('Already in locked state; nothing to do')
+  else:
+    logging.info('Current lock state: %s',
+                 'locked' if value == LOCK else 'unlocked')
+
+  if is_changed:
+    value = mm[index]
+    logging.debug('new value: %d', int(value))
+    # Update the crc32 of the data, starting from the 0x204 to the end
+    # (0x200+4K), and keep it in 0x200.
+    crc = binascii.crc32(mm[ENV_OFFSET+4:ENV_OFFSET+4096])
+    mm[ENV_OFFSET:ENV_OFFSET+4] = struct.pack('<i', crc)
+
+
+if __name__ == '__main__':
+  main()
