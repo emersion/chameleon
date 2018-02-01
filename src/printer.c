@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <linux/poll.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/poll.h>
 #include <sys/ioctl.h>
 #include <linux/usb/g_printer.h>
 
