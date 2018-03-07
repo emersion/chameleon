@@ -28,6 +28,7 @@ BLUETOOTH_HOG_GAMEPAD = 21
 BLUETOOTH_HOG_MOUSE = 22
 BLUETOOTH_HOG_COMBO = 23
 BLUETOOTH_HOG_JOYSTICK = 24
+USB_PRINTER = 25
 
 # device names
 DEVICE_NAMES = {
@@ -54,7 +55,8 @@ DEVICE_NAMES = {
     BLUETOOTH_HOG_GAMEPAD: 'bluetooth_hog_gamepad',
     BLUETOOTH_HOG_MOUSE: 'bluetooth_hog_mouse',
     BLUETOOTH_HOG_COMBO: 'bluetooth_hog_combo',
-    BLUETOOTH_HOG_JOYSTICK: 'bluetooth_hog_joystick'
+    BLUETOOTH_HOG_JOYSTICK: 'bluetooth_hog_joystick',
+    USB_PRINTER: 'usb_printer',
 }
 
 

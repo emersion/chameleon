@@ -20,6 +20,7 @@ from chameleond.devices import input_flow
 from chameleond.devices import motor_board
 from chameleond.devices import usb_audio_flow
 from chameleond.devices import usb_hid_flow
+from chameleond.devices import usb_printer_device
 from chameleond.utils import caching_server
 from chameleond.utils import device_manager
 from chameleond.utils import fpga
@@ -28,6 +29,7 @@ from chameleond.utils import i2c
 from chameleond.utils import ids
 from chameleond.utils import system_tools
 from chameleond.utils import usb
+from chameleond.utils import usb_printer_control
 
 
 class DriverError(Exception):
@@ -79,6 +81,7 @@ class ChameleondDriver(ChameleondInterface):
     fpga_ctrl = fpga.FpgaController()
     usb_audio_ctrl = usb.USBAudioController()
     usb_hid_ctrl = usb.USBController('g_hid')
+    usb_printer_ctrl = usb_printer_control.USBPrinterController()
     bluetooth_hid_ctrl = usb.USBController(
         bluetooth_hid_flow.BluetoothHIDMouseFlow.DRIVER)
     bluetooth_hog_ctrl = usb.USBController(
@@ -108,7 +111,8 @@ class ChameleondDriver(ChameleondInterface):
             ids.BLUETOOTH_HOG_MOUSE, bluetooth_hog_ctrl),
         ids.AVSYNC_PROBE: avsync_probe.AVSyncProbe(ids.AVSYNC_PROBE),
         ids.AUDIO_BOARD: audio_board.AudioBoard(ext_board_bus),
-        ids.MOTOR_BOARD: motor_board.MotorBoard(ext_board_bus)
+        ids.MOTOR_BOARD: motor_board.MotorBoard(ext_board_bus),
+        ids.USB_PRINTER: usb_printer_device.USBPrinter(usb_printer_ctrl),
     }
 
     self._device_manager = device_manager.DeviceManager(self._devices)
@@ -125,6 +129,7 @@ class ChameleondDriver(ChameleondInterface):
     self.avsync_probe = self._device_manager.GetChameleonDevice(
         ids.AVSYNC_PROBE)
     self.motor_board = self._device_manager.GetChameleonDevice(ids.MOTOR_BOARD)
+    self.printer = self._device_manager.GetChameleonDevice(ids.USB_PRINTER)
 
     self._flow_manager = flow_manager.FlowManager(self._flows)
 
@@ -137,6 +142,7 @@ class ChameleondDriver(ChameleondInterface):
     self._device_manager.Reset()
 
     self._ClearAudioFiles()
+    self._ClearPrinterFiles()
     caching_server.ClearCachedDir()
 
   def Reboot(self):
@@ -912,6 +918,15 @@ class ChameleondDriver(ChameleondInterface):
       port_id: The ID of the output connector.
     """
     self._flow_manager.StopPlayingAudio(port_id)
+
+  def _ClearPrinterFiles(self):
+    """Clears temporary printer files.
+
+    Chameleon board does not reboot very often. We should clear the temporary
+    printer files used in capturing printer data.
+    """
+    for path in glob.glob('/tmp/printer_*'):
+      os.unlink(path)
 
   def _ClearAudioFiles(self):
     """Clears temporary audio files.
