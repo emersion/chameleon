@@ -28,6 +28,7 @@ class _SystemTools(object):
       'reboot': '/sbin/reboot',
       'histogram': '/usr/bin/histogram',
       'pixeldump': '/usr/bin/pixeldump',
+      'printer': '/usr/bin/printer',
       'wget': '/usr/bin/wget',
   }
 
@@ -106,10 +107,24 @@ class _SystemTools(object):
     Returns:
       process: The subprocess spawned for the command.
     """
+    return self.RunInSubprocessOutputToFile(name, subprocess.PIPE, *args)
+
+
+  def RunInSubprocessOutputToFile(self, name, handle, *args):
+    """Calls the tool and run it in a separate process, and outputs to a file.
+
+    Args:
+      name: The name of the tool.
+      handle: The file handle to output stdout and stderr.
+      *args: The arguments of the tool.
+
+    Returns:
+      process: The subprocess spawned for the command.
+    """
     command = self._MakeCommand(name, args)
     process = subprocess.Popen(command,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+                               stdout=handle,
+                               stderr=handle)
     return process
 
   def GetSubprocessOutput(self, process):
