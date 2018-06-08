@@ -116,10 +116,12 @@ class USBPrinter(object):
     """Resets USBPrinter.
 
     Stops capturing. Set printer model to the default model.
+    Then, unplug printer.
     """
     if self.is_capturing_printer_data:
       self.StopCapturingPrinterData()
     self._usb_ctrl.ResetPrinterModel()
+    self.Unplug()
 
   def IsPlugged(self):
     """Returns a Boolean value reflecting the status of USB printer driver.
