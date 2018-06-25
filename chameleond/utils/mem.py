@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -14,6 +15,9 @@ Usage:
 
 import ctypes
 import time
+
+import chameleon_common  # pylint: disable=W0611
+from chameleond.utils.common import lazy
 
 
 class _Memory(object):
@@ -156,7 +160,10 @@ _MMAP_SIZE_DUMPER = 0x3c000000
 _MMAP_START_HPS = 0xfc000000
 _MMAP_SIZE_HPS = 0x4000000
 
-# Singleton
-MemoryForController = _Memory(_MMAP_START_CONTROLLER, _MMAP_SIZE_CONTROLLER)
-MemoryForDumper = _Memory(_MMAP_START_DUMPER, _MMAP_SIZE_DUMPER)
-MemoryForHPS = _Memory(_MMAP_START_HPS, _MMAP_SIZE_HPS)
+
+# Lazy instantiation of the memory singletons since they are not supported
+# on a platform such as chromeos.
+MemoryForController = lazy(_Memory)(
+    _MMAP_START_CONTROLLER, _MMAP_SIZE_CONTROLLER)
+MemoryForDumper = lazy(_Memory)(_MMAP_START_DUMPER, _MMAP_SIZE_DUMPER)
+MemoryForHPS = lazy(_Memory)(_MMAP_START_HPS, _MMAP_SIZE_HPS)

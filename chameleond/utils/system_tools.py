@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
 # Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """System tools required for Chameleond execution."""
 
+import logging
 import os
 import subprocess
 import threading
@@ -17,16 +19,17 @@ class _SystemTools(object):
       'avsync': '/usr/bin/avsync',
       'chameleond': '/etc/init.d/chameleond',
       'date': '/bin/date',
+      'histogram': '/usr/bin/histogram',
+      'hpd_control': '/usr/bin/hpd_control',
       'i2cdump': '/usr/local/sbin/i2cdump',
       'i2cget': '/usr/local/sbin/i2cget',
       'i2cset': '/usr/local/sbin/i2cset',
-      'hpd_control': '/usr/bin/hpd_control',
       'lsmod': '/sbin/lsmod',
+      'lspci': 'lspci',
       'memtool': '/usr/bin/memtool',
       'modinfo': '/sbin/modinfo',
       'modprobe': '/sbin/modprobe',
       'reboot': '/sbin/reboot',
-      'histogram': '/usr/bin/histogram',
       'pixeldump': '/usr/bin/pixeldump',
       'printer': '/usr/bin/printer',
       'wget': '/usr/bin/wget',
@@ -44,7 +47,8 @@ class _SystemTools(object):
     """
     for path in self._TOOL_PATHS.itervalues():
       if not os.path.isfile(path):
-        raise IOError('Required tool %s not existed' % path)
+        # It is okay that some tools may not exist in a particular platform.
+        logging.warning('IOError: Required tool %s not existed', path)
 
   def _MakeCommand(self, name, args):
     """Combines the system tool and its parameters into a list.

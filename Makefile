@@ -11,9 +11,13 @@ DESTDIR := /usr/bin
 BINDIR := ./bin
 SRCDIR := ./src
 DISTDIR := ./dist
+CONFDIR := /etc/init
+INITDIR := ./deploy/init
 EGGDIR := ./chameleond.egg-info
 STREAM_SRCS = $(wildcard $(SRCDIR)/stream_server/*.c)
 STREAM_OBJS = $(patsubst $(SRCDIR)/stream_server/*.c,$(BINDIR)/%.o,$(STREAM_SRCS))
+CONFFILES = chameleond.conf
+IDENTITY_FILE := ~/trunk/src/scripts/mod_for_test_scripts/ssh_keys/testing_rsa
 
 TARGETS = directories chameleond
 
@@ -52,6 +56,11 @@ CHAMELEON_BOARD ?= 'fpga_tio'
 # Get current time from the host.
 HOST_NOW := `date "+%Y-%m-%d %H:%M:%S"`
 
+# Check if this is a Chrome OS platform.
+# The '$' symbol in awk has to be doubled in Makefile.
+PLATFORM = $(shell awk -F= '/CHROMEOS_RELEASE_NAME/ {print $$2}' \
+	     /etc/lsb-release 2>/dev/null)
+
 .PHONY: install
 install:
 	@mkdir -p $(DESTDIR)
@@ -64,8 +73,16 @@ else
 	@NOW="`chameleond/utils/server_time`" deploy/deploy_pip
 endif
 	@python setup.py install -f
+
+ifeq ($(PLATFORM), Chrome OS)
+	@cp -f $(INITDIR)/$(CONFFILES) $(CONFDIR)
+	@echo Installing chameleon package on chrome os platform is completed.
+	@echo Please do \"\$ start chameleond\" or \"\$ restart chameleond\".
+else
 	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \
-	    deploy/deploy
+	deploy/deploy
+	@echo Installing chameleon package on fpga platform is completed.
+endif
 
 CHAMELEON_USER ?= root
 BUNDLE = chameleond-$(VERSION).tar.gz
@@ -78,8 +95,10 @@ remote-install:
 	@echo "Current host time: $(HOST_NOW)"
 ifdef CHAMELEON_HOST
 	@scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+	    -i $(IDENTITY_FILE) \
 	    $(DISTDIR)/$(BUNDLE) $(CHAMELEON_USER)@$(CHAMELEON_HOST):/tmp
 	@ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+	    -i $(IDENTITY_FILE) \
 	    $(CHAMELEON_USER)@$(CHAMELEON_HOST) \
 	    "cd /tmp && rm -rf $(BUNDLEDIR) && tar zxf $(BUNDLE) &&" \
 	    "cd $(BUNDLEDIR) && find -exec touch -c {} \; &&" \

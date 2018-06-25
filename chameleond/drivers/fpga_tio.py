@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -30,6 +31,7 @@ from chameleond.utils import ids
 from chameleond.utils import system_tools
 from chameleond.utils import usb
 from chameleond.utils import usb_printer_control
+from chameleond.utils.common import lazy
 
 
 class DriverError(Exception):
@@ -72,55 +74,41 @@ class ChameleondDriver(ChameleondInterface):
 
   def __init__(self, *args, **kwargs):
     super(ChameleondDriver, self).__init__(*args, **kwargs)
+
+    # The default platform is 'fpga', and could be 'chromeos' if specified.
+    platform = kwargs.get('platform', 'fpga')
     self._captured_params = {}
     self._process = None
 
-    main_bus = i2c.I2cBus(self._I2C_BUS_MAIN)
-    ext_board_bus = i2c.I2cBus(self._I2C_BUS_EXT_BOARD)
-    audio_codec_bus = i2c.I2cBus(self._I2C_BUS_AUDIO_CODEC)
-    fpga_ctrl = fpga.FpgaController()
-    usb_audio_ctrl = usb.USBAudioController()
-    usb_hid_ctrl = usb.USBController('g_hid')
-    usb_printer_ctrl = usb_printer_control.USBPrinterController()
-    bluetooth_hid_ctrl = usb.USBController(
+    logging.info("platform: %s", platform)
+
+    # waihong@chromium.org suggests to use a lazy wrapper which instantiates
+    # the following control objects when requested at the first time.
+    self._main_bus = lazy(i2c.I2cBus)(self._I2C_BUS_MAIN)
+    self._ext_board_bus = lazy(i2c.I2cBus)(self._I2C_BUS_EXT_BOARD)
+    self._audio_codec_bus = lazy(i2c.I2cBus)(self._I2C_BUS_AUDIO_CODEC)
+    self._fpga_ctrl = lazy(fpga.FpgaController)()
+    self._usb_audio_ctrl = lazy(usb.USBAudioController)()
+    self._usb_hid_ctrl = lazy(usb.USBController)('g_hid')
+    self._usb_printer_ctrl = lazy(usb_printer_control.USBPrinterController)()
+    self._bluetooth_hid_ctrl = lazy(usb.USBController)(
         bluetooth_hid_flow.BluetoothHIDMouseFlow.DRIVER)
-    bluetooth_hog_ctrl = usb.USBController(
+    self._bluetooth_hog_ctrl = lazy(usb.USBController)(
         bluetooth_hid_flow.BluetoothHOGMouseFlow.DRIVER)
 
-    self._devices = {
-        ids.DP1: input_flow.DpInputFlow(ids.DP1, main_bus, fpga_ctrl),
-        ids.DP2: input_flow.DpInputFlow(ids.DP2, main_bus, fpga_ctrl),
-        ids.HDMI: input_flow.HdmiInputFlow(ids.HDMI, main_bus, fpga_ctrl),
-        ids.VGA: input_flow.VgaInputFlow(ids.VGA, main_bus, fpga_ctrl),
-        ids.MIC: codec_flow.InputCodecFlow(ids.MIC, audio_codec_bus, fpga_ctrl),
-        ids.LINEIN: codec_flow.InputCodecFlow(
-            ids.LINEIN, audio_codec_bus, fpga_ctrl),
-        ids.LINEOUT: codec_flow.OutputCodecFlow(
-            ids.LINEOUT, audio_codec_bus, fpga_ctrl),
-        ids.USB_AUDIO_IN: usb_audio_flow.InputUSBAudioFlow(
-            ids.USB_AUDIO_IN, usb_audio_ctrl),
-        ids.USB_AUDIO_OUT: usb_audio_flow.OutputUSBAudioFlow(
-            ids.USB_AUDIO_OUT, usb_audio_ctrl),
-        ids.USB_KEYBOARD: usb_hid_flow.KeyboardUSBHIDFlow(
-            ids.USB_KEYBOARD, usb_hid_ctrl),
-        ids.USB_TOUCH: usb_hid_flow.TouchUSBHIDFlow(
-            ids.USB_TOUCH, usb_hid_ctrl),
-        ids.BLUETOOTH_HID_MOUSE: bluetooth_hid_flow.BluetoothHIDMouseFlow(
-            ids.BLUETOOTH_HID_MOUSE, bluetooth_hid_ctrl),
-        ids.BLUETOOTH_HOG_MOUSE: bluetooth_hid_flow.BluetoothHOGMouseFlow(
-            ids.BLUETOOTH_HOG_MOUSE, bluetooth_hog_ctrl),
-        ids.AVSYNC_PROBE: avsync_probe.AVSyncProbe(ids.AVSYNC_PROBE),
-        ids.AUDIO_BOARD: audio_board.AudioBoard(ext_board_bus),
-        ids.MOTOR_BOARD: motor_board.MotorBoard(ext_board_bus),
-        ids.USB_PRINTER: usb_printer_device.USBPrinter(usb_printer_ctrl),
-    }
+    if platform == 'chromeos':
+      self._devices = self.init_devices_for_chromeos()
+    else:
+      self._devices = self.init_devices_for_fpga()
 
     self._device_manager = device_manager.DeviceManager(self._devices)
     self._device_manager.Init()
     self._flows = self._device_manager.GetDetectedFlows()
 
-    # Allow to accees the methods through object.
+    # Allow to access the methods through object.
     # Hence, there is no need to export the methods in ChameleondDriver.
+    # An object in the following would be None if it is not instantiated
+    # in self._devices above.
     self.audio_board = self._device_manager.GetChameleonDevice(ids.AUDIO_BOARD)
     self.bluetooth_mouse = self._device_manager.GetChameleonDevice(
         ids.BLUETOOTH_HID_MOUSE)
@@ -134,6 +122,51 @@ class ChameleondDriver(ChameleondInterface):
     self._flow_manager = flow_manager.FlowManager(self._flows)
 
     self.Reset()
+
+  def init_devices_for_chromeos(self):
+    devices = {
+        ids.BLUETOOTH_HID_MOUSE:
+            bluetooth_hid_flow.BluetoothHIDMouseFlow(
+                ids.BLUETOOTH_HID_MOUSE, self._bluetooth_hid_ctrl),
+        ids.BLUETOOTH_HOG_MOUSE:
+            bluetooth_hid_flow.BluetoothHOGMouseFlow(
+                ids.BLUETOOTH_HOG_MOUSE, self._bluetooth_hog_ctrl),
+    }
+    return devices
+
+  def init_devices_for_fpga(self):
+    devices = {
+        ids.DP1: input_flow.DpInputFlow(
+            ids.DP1, self._main_bus, self._fpga_ctrl),
+        ids.DP2: input_flow.DpInputFlow(
+            ids.DP2, self._main_bus, self._fpga_ctrl),
+        ids.HDMI: input_flow.HdmiInputFlow(
+            ids.HDMI, self._main_bus, self._fpga_ctrl),
+        ids.VGA: input_flow.VgaInputFlow(
+            ids.VGA, self._main_bus, self._fpga_ctrl),
+        ids.MIC: codec_flow.InputCodecFlow(
+            ids.MIC, self._audio_codec_bus, self._fpga_ctrl),
+        ids.LINEIN: codec_flow.InputCodecFlow(
+            ids.LINEIN, self._audio_codec_bus, self._fpga_ctrl),
+        ids.LINEOUT: codec_flow.OutputCodecFlow(
+            ids.LINEOUT, self._audio_codec_bus, self._fpga_ctrl),
+        ids.USB_AUDIO_IN: usb_audio_flow.InputUSBAudioFlow(
+            ids.USB_AUDIO_IN, self._usb_audio_ctrl),
+        ids.USB_AUDIO_OUT: usb_audio_flow.OutputUSBAudioFlow(
+            ids.USB_AUDIO_OUT, self._usb_audio_ctrl),
+        ids.USB_KEYBOARD: usb_hid_flow.KeyboardUSBHIDFlow(
+            ids.USB_KEYBOARD, self._usb_hid_ctrl),
+        ids.USB_TOUCH: usb_hid_flow.TouchUSBHIDFlow(
+            ids.USB_TOUCH, self._usb_hid_ctrl),
+        ids.AVSYNC_PROBE: avsync_probe.AVSyncProbe(ids.AVSYNC_PROBE),
+        ids.AUDIO_BOARD: audio_board.AudioBoard(self._ext_board_bus),
+        ids.MOTOR_BOARD: motor_board.MotorBoard(self._ext_board_bus),
+        ids.USB_PRINTER: usb_printer_device.USBPrinter(self._usb_printer_ctrl),
+    }
+
+    # The fpga board also supports all devices of chrome os.
+    devices.update(self.init_devices_for_chromeos())
+    return devices
 
   def Reset(self):
     """Resets Chameleon board."""

@@ -3,6 +3,7 @@ include *.txt
 include bin/*
 include deploy/deploy
 include deploy/deploy_pip
+include deploy/init/chameleond.conf
 include deploy/init.d/chameleond
 include deploy/init.d/displayd
 include deploy/init.d/scheduler

@@ -1,13 +1,16 @@
+# -*- coding: utf-8 -*-
 # Copyright 2016 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """The control interface of Bluetooth HID flow module driver."""
 
 import logging
+import subprocess
 
 from chameleond.devices import chameleon_device
 from chameleond.utils import common
 from chameleond.utils import serial_utils
+from chameleond.utils import system_tools
 from chameleond.utils.bluetooth_bluefruitle import BluefruitLE
 from chameleond.utils.bluetooth_hid import BluetoothHIDMouse
 from chameleond.utils.bluetooth_peripheral_kit import PeripheralKit
@@ -55,14 +58,34 @@ class BluetoothHIDFlow(chameleon_device.Flow):
                                                 driver_name=self.DRIVER)
     return self._tty
 
+  def IsUSBHostMode(self):
+    """Check if the platform is in USB host mode.
+
+    Returns:
+      True if the platform is in USB host mode; otherwise, False.
+    """
+    try:
+      pci_info = system_tools.SystemTools.Output('lspci', '-v')
+    except subprocess.CalledProcessError:
+      logging.info('Failed to use lspci')
+      return False
+
+    for line in pci_info.splitlines():
+      if 'xhci_hcd' in line:
+        logging.info('USB host mode: %s', line)
+        return True
+
+    logging.info('Not in USB host mode')
+    return False
 
   def IsDetected(self):
     """Returns if the device can be detected."""
 
     # Enables Bluetooth HID port controller.
-    # Enables USB port device mode controller so USB host on the other side will
-    # not get confused when trying to enumerate this USB device.
-    self._usb_ctrl.EnableUSBOTGDriver()
+    # If the platform is 'chromeos' which always acts in the USB host mode,
+    # there is no need to enable the USB OTG driver.
+    if not self.IsUSBHostMode():
+      self._usb_ctrl.EnableUSBOTGDriver()
     self._usb_ctrl.EnableDriver()
     # Our Bluetooth HID flow differs substantially from other flows.
     # Everything needed for IsDetected does the job of InitDevice:
