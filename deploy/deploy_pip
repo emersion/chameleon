@@ -45,6 +45,12 @@ uninstall_old_chameleond_from_pip() {
 # Set the correct time. Otherwise, installation of pip may fail.
 set_time
 
+pip -V
+if [ $? -eq 0 ]; then
+    echo PIP is already installed. Skip installing it again.
+    exit 0
+fi
+
 # Install the missing standard python modules needed to install pip.
 install_standard_python_modules
 install_pip
