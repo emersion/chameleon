@@ -5,7 +5,7 @@
 SHELL := bash
 VERSION := 0.0.2
 CC := armv7a-cros-linux-gnueabi-gcc
-CFLAGS := -g -Wall -O2
+CFLAGS := -g -Wall -O2 -Wl,--no-experimental-use-relr
 INCLUDES := -Iinclude
 DESTDIR := /usr/bin
 BINDIR := ./bin
