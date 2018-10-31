@@ -56,6 +56,7 @@ class PeripheralKit(object):
   MOUSE = 'MOUSE'
   COMBO = 'COMBO'
   JOYSTICK = 'JOYSTICK'
+  A2DP_SINK = 'A2DP_SINK'
 
   # Authentication modes (currently references SSP, which is BR/EDR only)
   OPEN_MODE = 'OPEN'
@@ -170,7 +171,6 @@ class PeripheralKit(object):
                            stopbits=self.STOPBITS)
       self._tty = self._serial.port
       logging.info('Connected to the serial port successfully: %s', self._tty)
-      return True
     except Exception as e:
       msg = 'Failed to connect to the serial device: %s' % e
       logging.error(msg)
@@ -188,6 +188,8 @@ class PeripheralKit(object):
         # case, do not expect any response from the kit.
         self.LeaveCommandMode(force=True)
         self._serial.Disconnect()
+        # Ensure serial port is re-created on next run
+        self._serial = None
       except Exception as e:
         logging.warn('The serial device was probably already closed: %s', e)
       self._closed = True
@@ -709,38 +711,3 @@ class PeripheralKit(object):
   def MouseReleaseAllButtons(self):
     """Release all mouse buttons."""
     raise NotImplementedError("Not implemented")
-
-
-def GetKitInfo(kit, connect_separately=False, test_reset=False):
-  """A simple demo of getting kit information."""
-  # TODO(josephsih): This compatability test is very, very basic
-  kit_instance = kit()
-  if connect_separately:
-    print 'create serial device: ', kit_instance.CreateSerialDevice()
-  print 'enter command mode:', kit_instance.EnterCommandMode()
-  if test_reset:
-    print 'factory reset: ', kit_instance.FactoryReset()
-  print 'advertised name:', kit_instance.GetAdvertisedName()
-  print 'firmware version:', kit_instance.GetFirmwareVersion()
-  print 'operation mode:', kit_instance.GetOperationMode()
-  print 'authentication mode:', kit_instance.GetAuthenticationMode()
-  print 'service profile:', kit_instance.GetServiceProfile()
-  print 'local bluetooth address:', kit_instance.GetLocalBluetoothAddress()
-  print 'connection status:', kit_instance.GetConnectionStatus()
-  remote_addr = kit_instance.GetRemoteConnectedBluetoothAddress()
-  print 'remote bluetooth address:', remote_addr
-  print 'HID device type:', kit_instance.GetHIDDeviceType()
-  # The class of service/device is None for LE kits (it is BR/EDR-only)
-  class_of_service = kit_instance.GetClassOfService()
-  try:
-    class_of_service = hex(class_of_service)
-  except TypeError:
-    pass
-  print 'Class of service:', class_of_service
-  class_of_device = kit_instance.GetClassOfDevice()
-  try:
-    class_of_device = hex(class_of_device)
-  except TypeError:
-    pass
-  print 'Class of device:', class_of_device
-  print 'leave command mode:', kit_instance.LeaveCommandMode()

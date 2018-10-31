@@ -8,7 +8,6 @@ import logging
 import time
 
 import common
-from bluetooth_peripheral_kit import GetKitInfo
 from bluetooth_peripheral_kit import PeripheralKit
 from bluetooth_peripheral_kit import PeripheralKitException
 
@@ -1120,6 +1119,40 @@ class RN42(PeripheralKit):
     """
     return chr(self.UART_INPUT_SHORTHAND_MODE) + chr(0x0)
 
+  def GetKitInfo(self, connect_separately=False, test_reset=False):
+    """A simple demo of getting kit information."""
+    # TODO(josephsih): This compatability test is very, very basic
+    if connect_separately:
+      print 'create serial device: ', self.CreateSerialDevice()
+      print 'enter command mode:', self.EnterCommandMode()
+    if test_reset:
+        print 'factory reset: ', self.FactoryReset()
+    print 'advertised name:', self.GetAdvertisedName()
+    print 'firmware version:', self.GetFirmwareVersion()
+    print 'operation mode:', self.GetOperationMode()
+    print 'authentication mode:', self.GetAuthenticationMode()
+    print 'service profile:', self.GetServiceProfile()
+    print 'local bluetooth address:', self.GetLocalBluetoothAddress()
+    print 'connection status:', self.GetConnectionStatus()
+    remote_addr = self.GetRemoteConnectedBluetoothAddress()
+    print 'remote bluetooth address:', remote_addr
+    print 'HID device type:', self.GetHIDDeviceType()
+    # The class of service/device is None for LE kits (it is BR/EDR-only)
+    class_of_service = self.GetClassOfService()
+    try:
+      class_of_service = hex(class_of_service)
+    except TypeError:
+      pass
+    print 'Class of service:', class_of_service
+    class_of_device = self.GetClassOfDevice()
+    try:
+      class_of_device = hex(class_of_device)
+    except TypeError:
+      pass
+    print 'Class of device:', class_of_device
+    print 'leave command mode:', self.LeaveCommandMode()
+
 
 if __name__ == '__main__':
-  GetKitInfo(RN42)
+  kit_instance = RN42()
+  kit_instance.GetKitInfo()

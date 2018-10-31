@@ -32,7 +32,7 @@ from chameleond.utils import system_tools
 from chameleond.utils import usb
 from chameleond.utils import usb_printer_control
 from chameleond.utils.common import lazy
-
+from chameleond.utils import bluetooth_a2dp
 
 class DriverError(Exception):
   """Exception raised when any error on FPGA driver."""
@@ -95,6 +95,8 @@ class ChameleondDriver(ChameleondInterface):
         bluetooth_hid_flow.BluetoothHIDMouseFlow.DRIVER)
     self._bluetooth_hog_ctrl = lazy(usb.USBController)(
         bluetooth_hid_flow.BluetoothHOGMouseFlow.DRIVER)
+    self._bluetooth_a2dp_sink_ctrl = lazy(usb.USBController)(
+        bluetooth_a2dp.BluetoothA2DPSinkFlow.DRIVER)
 
     if platform == 'chromeos':
       self._devices = self.init_devices_for_chromeos()
@@ -118,7 +120,8 @@ class ChameleondDriver(ChameleondInterface):
         ids.AVSYNC_PROBE)
     self.motor_board = self._device_manager.GetChameleonDevice(ids.MOTOR_BOARD)
     self.printer = self._device_manager.GetChameleonDevice(ids.USB_PRINTER)
-
+    self.bluetooth_a2dp_sink = self._device_manager.GetChameleonDevice(
+        ids.BLUETOOTH_A2DP_SINK)
     self._flow_manager = flow_manager.FlowManager(self._flows)
 
     self.Reset()
@@ -131,6 +134,9 @@ class ChameleondDriver(ChameleondInterface):
         ids.BLUETOOTH_HOG_MOUSE:
             bluetooth_hid_flow.BluetoothHOGMouseFlow(
                 ids.BLUETOOTH_HOG_MOUSE, self._bluetooth_hog_ctrl),
+        ids.BLUETOOTH_A2DP_SINK:
+            bluetooth_a2dp.BluetoothA2DPSinkFlow(
+                ids.BLUETOOTH_A2DP_SINK, self._bluetooth_a2dp_sink_ctrl),
     }
     return devices
 
@@ -1134,3 +1140,22 @@ class ChameleondDriver(ChameleondInterface):
       Returns as event function if applicable.
     """
     return self._flow_manager.SendHIDEvent(port_id, event_type, *args, **kwargs)
+
+  def ResetBluetoothRef(self):
+    """Reset BTREF"""
+    # Reloads serial port driver if needed
+    self._bluetooth_a2dp_sink_ctrl.EnableDriver()
+    # Reads peripheral configuration settings
+    self.bluetooth_a2dp_sink.GetBasicSettings()
+
+  def EnableBluetoothRef(self):
+    """Enable BTREF"""
+    self._bluetooth_a2dp_sink_ctrl.EnableDriver()
+
+  def DisableBluetoothRef(self):
+    """Disable BTREF"""
+    self.bluetooth_a2dp_sink.Close()
+
+  def IsBluetoothRefDisabled(self):
+    """Check if BTREF is enabled"""
+    raise NotImplementedError('IsBluetoothRefDisabled')

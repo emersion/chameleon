@@ -705,3 +705,15 @@ class ChameleondInterface(object):
   def GetMacAddress(self):
     """Gets the MAC address of this Chameleon."""
     raise NotImplementedError('GetMacAddress')
+
+  def ResetBluetoothRef(self):
+    """Reset BTREF"""
+    raise NotImplementedError('ResetBluetoothRef')
+
+  def DisableBluetoothRef(self):
+    """Disable BTREF"""
+    raise NotImplementedError('DisableBluetoothRef')
+
+  def IsBluetoothRefDisabled(self):
+    """Check if BTREF is enabled"""
+    raise NotImplementedError('IsBluetoothRefDisabled')
