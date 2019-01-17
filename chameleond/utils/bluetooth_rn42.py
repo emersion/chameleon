@@ -1124,7 +1124,7 @@ class RN42(PeripheralKit):
     # TODO(josephsih): This compatability test is very, very basic
     if connect_separately:
       print 'create serial device: ', self.CreateSerialDevice()
-      print 'enter command mode:', self.EnterCommandMode()
+    print 'enter command mode:', self.EnterCommandMode()
     if test_reset:
         print 'factory reset: ', self.FactoryReset()
     print 'advertised name:', self.GetAdvertisedName()
