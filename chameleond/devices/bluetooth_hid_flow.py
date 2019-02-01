@@ -15,6 +15,7 @@ from chameleond.utils.bluetooth_bluefruitle import BluefruitLE
 from chameleond.utils.bluetooth_hid import BluetoothHIDMouse
 from chameleond.utils.bluetooth_peripheral_kit import PeripheralKit
 from chameleond.utils.bluetooth_rn42 import RN42
+from chameleond.utils.bluetooth_nrf52 import nRF52
 
 
 class BluetoothHIDFlow(chameleon_device.Flow):
@@ -210,3 +211,21 @@ class BluetoothHOGMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
                               BluefruitLE.USB_VID, BluefruitLE.USB_PID)
     BluetoothHIDMouse.__init__(self, PeripheralKit.SSP_JUST_WORK_MODE,
                                BluefruitLE)
+
+
+class BleHIDMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
+  """A flow object that emulates a BLE mouse device."""
+
+  DRIVER = nRF52.DRIVER
+  DRIVER_MODULE = nRF52.DRIVER_MODULE # See explanation in bluetooth_nrf52.py
+
+  def __init__(self, port_id, usb_ctrl):
+    """Initializes a BleHIDMouseFlow object.
+
+    Args:
+      port_id: the port id that represents the type of port used.
+      usb_ctrl: a USBController object that BluetoothHIDFlow references to.
+    """
+    BluetoothHIDFlow.__init__(self, port_id, 'BleMouse', usb_ctrl,
+                              nRF52.USB_VID, nRF52.USB_PID)
+    BluetoothHIDMouse.__init__(self, PeripheralKit.PIN_CODE_MODE, nRF52)

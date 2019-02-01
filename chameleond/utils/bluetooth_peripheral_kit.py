@@ -10,7 +10,6 @@ import time
 
 import serial_utils
 
-
 class PeripheralKitException(Exception):
   """A dummpy exception class for the PeripheralKit class."""
   pass

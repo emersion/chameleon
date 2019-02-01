@@ -97,6 +97,9 @@ class ChameleondDriver(ChameleondInterface):
         bluetooth_hid_flow.BluetoothHOGMouseFlow.DRIVER)
     self._bluetooth_a2dp_sink_ctrl = lazy(usb.USBController)(
         bluetooth_a2dp.BluetoothA2DPSinkFlow.DRIVER)
+    # See explanation for using DRIVER_MODULE in bluetooth_nrf52.py
+    self._ble_hid_ctrl = lazy(usb.USBController)(
+        bluetooth_hid_flow.BleHIDMouseFlow.DRIVER_MODULE)
 
     if platform == 'chromeos':
       self._devices = self.init_devices_for_chromeos()
@@ -122,6 +125,8 @@ class ChameleondDriver(ChameleondInterface):
     self.printer = self._device_manager.GetChameleonDevice(ids.USB_PRINTER)
     self.bluetooth_a2dp_sink = self._device_manager.GetChameleonDevice(
         ids.BLUETOOTH_A2DP_SINK)
+    self.ble_mouse = self._device_manager.GetChameleonDevice(
+        ids.BLE_MOUSE)
     self._flow_manager = flow_manager.FlowManager(self._flows)
 
     self.Reset()
@@ -137,6 +142,9 @@ class ChameleondDriver(ChameleondInterface):
         ids.BLUETOOTH_A2DP_SINK:
             bluetooth_a2dp.BluetoothA2DPSinkFlow(
                 ids.BLUETOOTH_A2DP_SINK, self._bluetooth_a2dp_sink_ctrl),
+        ids.BLE_MOUSE:
+            bluetooth_hid_flow.BleHIDMouseFlow(
+                ids.BLE_MOUSE, self._ble_hid_ctrl),
     }
     return devices
 

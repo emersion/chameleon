@@ -6,6 +6,7 @@
 import copy
 import logging
 import re
+import subprocess
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.utils import system_tools
@@ -28,6 +29,9 @@ class USBController(object):
   MODPROBE_NO_ACTION = 1  # command is redundant and no error occurred
   MODPROBE_DUPLICATED = 2  # module is already inserted/removed from the kernel
 
+  # List of builtin drivers
+  _builtins = ''
+
   def __init__(self, module):
     """Initializes a USBAudioController object.
 
@@ -35,7 +39,17 @@ class USBController(object):
     the module is not in kernel at initialization.
     """
     self._module = module
-    system_tools.SystemTools.Call('modprobe', '-r', self._module)
+    # Trying to remove a builtin module will result in an error.
+    # So check for builtins with "cat /lib/modules/`uname -r`/modules.builtin"
+    linux_ver = subprocess.check_output('uname -r',
+                                        stderr=subprocess.STDOUT,
+                                        shell=True).strip('\n')
+    checkforbuiltins_cmd = 'cat /lib/modules/' + linux_ver + '/modules.builtin'
+    self._builtins = subprocess.check_output(checkforbuiltins_cmd,
+                                             stderr=subprocess.STDOUT,
+                                             shell=True)
+    if self._module not in self._builtins:
+      system_tools.SystemTools.Call('modprobe', '-r', self._module)
 
   @property
   def _is_modprobed(self):
@@ -70,6 +84,11 @@ class USBController(object):
     Returns:
       The status code of modprobe result.
     """
+
+    # Check for builtin driver before calling modprobe to install
+    if self._module in self._builtins:
+      return
+
     args_list = self._MakeArgsForInsertModule()
     process = system_tools.SystemTools.RunInSubprocess('modprobe', *args_list)
     logging.info('Modprobe command is run with arguments: %s', str(args_list))
