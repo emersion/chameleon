@@ -10,8 +10,10 @@ import logging
 import time
 
 import common
+import sys
 from bluetooth_peripheral_kit import PeripheralKit
 from bluetooth_peripheral_kit import PeripheralKitException
+from ids import RN52_SET
 
 class RN52Exception(PeripheralKitException):
   """A dummpy exception class for RN52 class."""
@@ -39,6 +41,7 @@ class RN52(PeripheralKit):
   USB_VID = '0403'
   USB_PID = '6001'
 
+  KNOWN_DEVICE_SET = RN52_SET   # Set of known RN52 serial numbers
   CHIP_NAME = 'RNBT'
   MAX_PIN_LEN = 20
   DEFAULT_PIN_CODE = '1234'     # The default factory pin code.
@@ -127,9 +130,9 @@ class RN52(PeripheralKit):
       True if successfully connected to serial device and _settings{} populated
     """
     if self._serial is None:
-        self.CreateSerialDevice()
-        if not self._serial._serial.isOpen():
-          self._serial._
+      self.CreateSerialDevice()
+      if not self._serial._serial.isOpen():
+        raise serial.SerialException('Failed to open serial: %r' % port)
     if not self._settings:
       self._settings = (dict(setting.split('=') for setting in
                              self.SerialSendReceive(
@@ -448,3 +451,7 @@ class RN52(PeripheralKit):
 if __name__ == '__main__':
   kit_instance = RN52()
   kit_instance.GetKitInfo()
+  if len(sys.argv) > 1 and sys.argv[1] == '--list':
+    print("\nKnown device serial numbers:")
+    for device in kit_instance.KNOWN_DEVICE_SET:
+      print("%s" % device)

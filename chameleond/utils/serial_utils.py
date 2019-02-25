@@ -20,7 +20,7 @@ import re
 # site-packages: dev-python/pyserial
 import serial
 import time
-
+import pyudev
 
 def OpenSerial(**kwargs):
   """Tries to open a serial port.
@@ -154,6 +154,44 @@ def FindTtyByUsbVidPid(usb_vid, usb_pid, driver_name=None):
       return candidate
   return None
 
+
+def FindTtyListByUsbVidPid(usb_vid, usb_pid):
+  """Returns list of TTYs matching vid/pid and driver (if provided).
+
+  There may be more than one attached serial peripheral with matching
+  {vid,pid,driver}. To distinguish between peripherals in this case,
+  give caller an opportunity to select specific port to connect on.
+
+  Args:
+    usb_vid: The USB VID (Vendor ID) as a hexadecimal string
+    usb_pid: The USB PID (Product ID) as a hexadecimal string
+    driver_name: String for serial connection driver.
+
+  Returns:
+  List of serial devices with additional attributes
+  """
+  serial_devices = []
+  context = pyudev.Context()
+  for device in context.list_devices(subsystem='tty'):
+    if 'ID_VENDOR' not in device:
+      continue
+    if usb_vid is not None:
+      if device['ID_VENDOR_ID'] != usb_vid:
+        continue
+    if usb_pid is not None:
+      if device['ID_MODEL_ID'] != usb_pid:
+        continue
+    if 'ID_SERIAL_SHORT' not in device:
+      continue
+      # (vid,pid) match. Append device to list for caller to validate
+      # serial number.
+    serial_devices.append({'vid'    : device['ID_VENDOR_ID'],
+                           'pid'    : device['ID_MODEL_ID'],
+                           'serial' : device['ID_SERIAL_SHORT'],
+                           'port'   : device.device_node})
+  return serial_devices
+
+
 def ReadSysfsFile(path):
   """Extracts the contents of the given sysfs file.
 
@@ -235,6 +273,7 @@ class SerialDevice(object):
     self.Disconnect()
 
   def Connect(self, driver=None, port=None, usb_vid=None, usb_pid=None,
+              known_device_set=None,
               baudrate=9600, bytesize=serial.EIGHTBITS,
               parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE,
               timeout=0.5, writeTimeout=0.5):
@@ -263,7 +302,14 @@ class SerialDevice(object):
     """
     if driver and not port:
       if usb_vid and usb_pid:
-        port = FindTtyByUsbVidPid(usb_vid, usb_pid, driver_name=driver)
+        if known_device_set:
+          devices = FindTtyListByUsbVidPid(usb_vid, usb_pid)
+          for device in devices:
+            if device['serial'] in known_device_set:
+              port = device['port']
+              break
+        else:
+          port = FindTtyByUsbVidPid(usb_vid, usb_pid, driver_name=driver)
       else:
         port = FindTtyByDriver(driver)
 

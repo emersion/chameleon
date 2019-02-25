@@ -103,3 +103,16 @@ IsBluetoothHOGPort = lambda port_id: port_id in BLUETOOTH_HOG_PORTS
 # IDs of EDIDs
 EDID_ID_DEFAULT = 0
 EDID_ID_DISABLE = -1
+
+# List of known RN42 serial numbers
+RN42_SET = frozenset([
+      'A9054Z4Q',
+      #Add new RN42 serial numbers above this line
+])
+
+# List of known RN52 serial numbers
+RN52_SET = frozenset([
+    'AK0557CM',
+    'AK0557AI',
+    #Add new RN52 serial numbers above this line
+])

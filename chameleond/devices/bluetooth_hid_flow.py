@@ -33,7 +33,7 @@ class BluetoothHIDFlow(chameleon_device.Flow):
   DETECT_INTERVAL_SECS = 1  # the time to wait before retrying in detection
 
   def __init__(self, port_id, connector_type, usb_ctrl, kit_vid_hex,
-               kit_pid_hex):
+               kit_pid_hex, known_device_set=None):
     """Initializes a BluetoothHIDFlow object.
 
     Args:
@@ -43,6 +43,7 @@ class BluetoothHIDFlow(chameleon_device.Flow):
       serial_driver: the serial driver name for the kit
       kit_vid_hex: The USB VID (Vendor ID) of the kit, as a hexadecimal string
       kit_pid_hex: The USB PID (Product ID) of the kit, as a hexadecimal string
+      known_device_set: List of serial nums of child device type (RN42 or RN52)
     """
     self._port_id = port_id
     self._connector_type = connector_type
@@ -50,12 +51,21 @@ class BluetoothHIDFlow(chameleon_device.Flow):
     self._tty = None
     self._kit_vid_hex = kit_vid_hex
     self._kit_pid_hex = kit_pid_hex
+    self._known_device_set = known_device_set
     super(BluetoothHIDFlow, self).__init__()
 
   def _FindAndSetTty(self):
-    self._tty = serial_utils.FindTtyByUsbVidPid(self._kit_vid_hex,
-                                                self._kit_pid_hex,
-                                                driver_name=self.DRIVER)
+    if self._known_device_set:
+      devices = serial_utils.FindTtyListByUsbVidPid(self._kit_vid_hex,
+                                                    self._kit_pid_hex)
+      for device in devices:
+        if device['serial'] in self._known_device_set:
+          self._tty = device['port']
+          break
+    else:
+      self._tty = serial_utils.FindTtyByUsbVidPid(self._kit_vid_hex,
+                                                  self._kit_pid_hex,
+                                                  driver_name=self.DRIVER)
     return self._tty
 
   def IsUSBHostMode(self):
@@ -175,7 +185,7 @@ class BluetoothHIDMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
       usb_ctrl: a USBController object that BluetoothHIDFlow references to.
     """
     BluetoothHIDFlow.__init__(self, port_id, 'BluetoothBR/EDR', usb_ctrl,
-                              RN42.USB_VID, RN42.USB_PID)
+                              RN42.USB_VID, RN42.USB_PID, RN42.KNOWN_DEVICE_SET)
     # TODO(josephsih): Ideally constants at this level of Bluetooth abstraction
     # should be in BluetoothHID*, but that doesn't currently work due to cyclic
     # imports. Remove this when constants are moved to BluetoothHID.

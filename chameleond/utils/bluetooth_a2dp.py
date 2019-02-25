@@ -50,4 +50,4 @@ class BluetoothA2DPSinkFlow(
     BluetoothA2DPSink.__init__(self, PeripheralKit.SSP_JUST_WORK_MODE, RN52)
     bluetooth_hid_flow.BluetoothHIDFlow.__init__(
         self, port_id, 'BluetoothBR/EDR', usb_ctrl,
-        RN52.USB_VID, RN52.USB_PID)
+        RN52.USB_VID, RN52.USB_PID, RN52.KNOWN_DEVICE_SET)

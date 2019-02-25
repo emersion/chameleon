@@ -8,9 +8,10 @@ import logging
 import time
 
 import common
+import sys
 from bluetooth_peripheral_kit import PeripheralKit
 from bluetooth_peripheral_kit import PeripheralKitException
-
+from ids import RN42_SET
 
 class RN42Exception(PeripheralKitException):
   """A dummpy exception class for RN42 class."""
@@ -37,6 +38,7 @@ class RN42(PeripheralKit):
   USB_VID = '0403'
   USB_PID = '6001'
 
+  KNOWN_DEVICE_SET = RN42_SET   # Set of known RN42 serial numbers
   CHIP_NAME = 'RNBT'
   MAX_PIN_LEN = 16
   DEFAULT_PIN_CODE = '1234'     # The default factory pin code.
@@ -1126,7 +1128,7 @@ class RN42(PeripheralKit):
       print 'create serial device: ', self.CreateSerialDevice()
     print 'enter command mode:', self.EnterCommandMode()
     if test_reset:
-        print 'factory reset: ', self.FactoryReset()
+      print 'factory reset: ', self.FactoryReset()
     print 'advertised name:', self.GetAdvertisedName()
     print 'firmware version:', self.GetFirmwareVersion()
     print 'operation mode:', self.GetOperationMode()
@@ -1156,3 +1158,7 @@ class RN42(PeripheralKit):
 if __name__ == '__main__':
   kit_instance = RN42()
   kit_instance.GetKitInfo()
+  if len(sys.argv) > 1 and sys.argv[1] == '--list':
+    print("\nKnown device serial numbers:")
+    for device in kit_instance.KNOWN_DEVICE_SET:
+      print("%s" % device)

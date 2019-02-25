@@ -165,6 +165,7 @@ class PeripheralKit(object):
       self._serial.Connect(driver=self.DRIVER,
                            usb_vid=self.USB_VID,
                            usb_pid=self.USB_PID,
+                           known_device_set=self.KNOWN_DEVICE_SET,
                            baudrate=self.BAUDRATE,
                            bytesize=self.BYTESIZE,
                            parity=self.PARITY,
@@ -197,8 +198,15 @@ class PeripheralKit(object):
 
   def CheckSerialConnection(self):
     """Check the USB serial connection between to the kit."""
-    tty = serial_utils.FindTtyByUsbVidPid(self.USB_VID, self.USB_PID,
-                                          driver_name=self.DRIVER)
+    if self.KNOWN_DEVICE_SET:
+      devices = serial_utils.FindTtyListByUsbVidPid(self.USB_VID, self.USB_PID)
+      for device in devices:
+        if device['serial'] in self.KNOWN_DEVICE_SET:
+          tty = device['port']
+          break
+    else:
+      tty = serial_utils.FindTtyByUsbVidPid(self.USB_VID, self.USB_PID,
+                                            driver_name=self.DRIVER)
     logging.info('CheckSerialConnection: port is %s', tty)
     if tty != self._tty:
       logging.warn('CheckSerialConnection: Port %s is not current port %s',
