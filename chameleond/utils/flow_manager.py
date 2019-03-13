@@ -432,6 +432,16 @@ class FlowManager(object):
     return self.flows[port_id].Unplug()
 
   @_FlowMethod
+  def UnplugHPD(self, port_id):
+    """Only deassert HPD line to low on a video port.
+
+    Args:
+      port_id: The ID of the input/output port.
+    """
+    logging.info('UnplugHPD port #%d', port_id)
+    return self.flows[port_id].UnplugHPD()
+
+  @_FlowMethod
   @_VideoMethod
   def FireHpdPulse(self, port_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1,

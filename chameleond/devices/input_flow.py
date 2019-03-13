@@ -535,6 +535,10 @@ class DpInputFlow(FpgaInputFlow):
     """Deasserts HPD line to low, emulating unplug."""
     self._edid.Disable()
     self._DisableDdc()
+    self.UnplugHPD()
+
+  def UnplugHPD(self):
+    """Only deasserts HPD line to low"""
     self._fpga.hpd.Unplug(self._input_id)
 
   def FireHpdPulse(
@@ -763,6 +767,10 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
     """Deasserts HPD line to low, emulating unplug."""
     self._edid.Disable()
     self._DisableDdc()
+    self.UnplugHPD()
+
+  def UnplugHPD(self):
+    """Only deasserts HPD line to low"""
     self._fpga.hpd.Unplug(self._input_id)
 
   def FireHpdPulse(
@@ -973,6 +981,10 @@ class VgaInputFlow(FpgaInputFlow):
     """Deasserts HPD line to low, emulating unplug."""
     self._edid.Disable()
     self._DisableDdc()
+    self.UnplugHPD()
+
+  def UnplugHPD(self):
+    """Only deasserts HPD line to low"""
     # For VGA, block the RGB source to emulate unplug.
     self._mux_io.SetOutputMask(io.MuxIo.MASK_VGA_BLOCK_SOURCE)
 

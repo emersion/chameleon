@@ -429,6 +429,14 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._flow_manager.Unplug(port_id)
 
+  def UnplugHPD(self, port_id):
+    """Only deassert HPD line to low on a video port.
+
+    Args:
+      port_id: The ID of the input/output port.
+    """
+    return self._flow_manager.UnplugHPD(port_id)
+
   def FireHpdPulse(self, port_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1,
                    end_level=1):

@@ -251,6 +251,14 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('Unplug')
 
+  def UnplugHPD(self, port_id):
+    """Only deassert HPD line to low on a video port.
+
+    Args:
+      port_id: The ID of the input/output port.
+    """
+    raise NotImplementedError('UnplugHPD')
+
   def FireHpdPulse(self, port_id, deassert_interval_usec,
                    assert_interval_usec=None, repeat_count=1,
                    end_level=1):
