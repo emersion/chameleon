@@ -483,7 +483,7 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
     self._audio_route_manager.ResetRouteToDumper()
 
 
-class DpInputFlow(FpgaInputFlow):
+class DpInputFlow(FpgaInputFlowWithAudio):
   """An abstraction of the entire flow for DisplayPort."""
 
   _DEVICE_NAME = 'DP'
@@ -714,8 +714,7 @@ class DpInputFlow(FpgaInputFlow):
     raise NotImplementedError('IsVideoInputEncrypted')
 
   def _ResetAudioLogic(self):
-    """Resets audio logic."""
-    raise NotImplementedError('_ResetAudioLogic')
+    pass # No workaround needed
 
 
 class HdmiInputFlow(FpgaInputFlowWithAudio):
