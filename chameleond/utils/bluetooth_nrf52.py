@@ -51,6 +51,7 @@ class nRF52(PeripheralKit):
   # Supported device types
   MOUSE = 'MOUSE'
   KEYBOARD = 'KEYBOARD'
+  KNOWN_DEVICE_SET = None
 
   RESET_SLEEP_SECS = 1
 
