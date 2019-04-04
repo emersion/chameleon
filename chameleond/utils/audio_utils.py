@@ -50,7 +50,12 @@ class AudioCaptureManager(object):
 
     Args:
       file_path: The target file for audio capturing. None for no target file.
+
+    Raises:
+      AudioCaptureManagerError: If StartCapturingAudio has already been called.
     """
+    if self.is_capturing:
+      raise AudioCaptureManagerError('Start capturing audio twice')
     self._file_path = file_path
     self._adump.StartDumpingToMemory()
     self._mem_dumper = None
@@ -67,6 +72,7 @@ class AudioCaptureManager(object):
         of utils.audio.AudioDataFormat for detail.
 
     Raises:
+      AudioCaptureManagerError: If StartCapturingAudio hasn't been called.
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
