@@ -32,10 +32,12 @@ class DpRx(i2c.I2cSlave):
 
   _REG_INPUT_STATUS = 0x11
   _BIT_VIDEO_STABLE = 1 << 4
+  _BIT_AUDIO_STABLE = 1 << 5
 
   _REG_FUNC_RESET = 0xEA
   _REG_PLL_RESET = 0xB3  # This is at bank 1
-  _BIT_RESET_VIDEO = 0x02
+  _BIT_RESET_VIDEO = 1 << 1
+  _BIT_RESET_AUDIO = 1 << 2
 
   _REG_HACTIVE_H = 0x9C
   _REG_HACTIVE_L = 0x9B
@@ -105,6 +107,11 @@ class DpRx(i2c.I2cSlave):
     input_status = self.Get(self._REG_INPUT_STATUS)
     return bool(input_status & self._BIT_VIDEO_STABLE)
 
+  def IsAudioInputStable(self):
+    """Returns whether the audio input is stable."""
+    input_status = self.Get(self._REG_INPUT_STATUS)
+    return bool(input_status & self._BIT_AUDIO_STABLE)
+
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout.
 
@@ -158,6 +165,20 @@ class DpRx(i2c.I2cSlave):
     field_per_frame = 2 if self.IsInterlaced() else 1
     (width, height) = self.GetFieldResolution()
     return (width, height * field_per_frame)
+
+  def ResetAudioLogic(self):
+    """Resets audio logic.
+
+    In some situations, the receiver will enter an error state when the audio
+    signal stops. Once it's in this state the receiver won't dump audio data
+    anymore. Resetting the audio logic allows the receiver to start over and
+    dump audio data again.
+    """
+    logging.info('Reset DP audio logic')
+    if self.IsAudioInputStable():
+      return
+    self.SetAndClear(self._REG_FUNC_RESET, self._BIT_RESET_AUDIO,
+                     self._AUDIO_RESET_DELAY)
 
 
 class HdmiRx(i2c.I2cSlave):

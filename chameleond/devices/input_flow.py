@@ -714,7 +714,7 @@ class DpInputFlow(FpgaInputFlowWithAudio):
     raise NotImplementedError('IsVideoInputEncrypted')
 
   def _ResetAudioLogic(self):
-    pass # No workaround needed
+    self._rx.ResetAudioLogic()
 
 
 class HdmiInputFlow(FpgaInputFlowWithAudio):
