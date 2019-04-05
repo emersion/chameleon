@@ -12,7 +12,7 @@ import time
 from bluetooth_peripheral_kit import PeripheralKit
 from bluetooth_rn42 import RN42
 from bluetooth_rn42 import RN42Exception
-
+from chameleond.utils.bluetooth_nrf52 import nRF52
 
 class BluetoothHIDException(Exception):
   """A dummpy exception class for Bluetooth HID class."""
@@ -108,7 +108,9 @@ class BluetoothHID(object):
       result = self.SetClassOfDevice(self.device_type) and result
 
       # Set authentication to the specified mode.
-      result = self.SetAuthenticationMode(self.authentication_mode) and result
+      if self.authentication_mode != PeripheralKit.OPEN_MODE:
+        result = self.SetAuthenticationMode(self.authentication_mode)\
+          and result
 
       # Set RN-42 to work as a slave.
       result = self.SetSlaveMode() and result
@@ -122,12 +124,12 @@ class BluetoothHID(object):
       # of connection/disconnection status.
       result = self.EnableConnectionStatusMessage() and result
 
-      # Reboot so that the configurations above take effect.
-      result = self.Reboot() and result
+      if not isinstance(self._kit, nRF52):
+        # Reboot so that the configurations above take effect.
+        result = self.Reboot() and result
 
-      # Enter command mode again after reboot.
-      result = self.EnterCommandMode() and result
-
+        # Enter command mode again after reboot.
+        result = self.EnterCommandMode() and result
       time.sleep(self.INIT_SLEEP_SECS)
 
     logging.info('A bluetooth HID "%s" device is connected.', self.device_type)

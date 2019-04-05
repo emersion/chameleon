@@ -228,4 +228,4 @@ class BleHIDMouseFlow(BluetoothHIDFlow, BluetoothHIDMouse):
     """
     BluetoothHIDFlow.__init__(self, port_id, 'BleMouse', usb_ctrl,
                               nRF52.USB_VID, nRF52.USB_PID)
-    BluetoothHIDMouse.__init__(self, PeripheralKit.PIN_CODE_MODE, nRF52)
+    BluetoothHIDMouse.__init__(self, PeripheralKit.OPEN_MODE, nRF52)
