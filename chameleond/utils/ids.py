@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -108,13 +109,17 @@ EDID_ID_DISABLE = -1
 
 # List of known RN42 serial numbers
 RN42_SET = frozenset([
-      'A9054Z4Q',
-      #Add new RN42 serial numbers above this line
+    'A9054Z4Q',
+    'A600CXAC', # chromeos1-dev-host1-chameleon
+    'A600YVZB', # shijinabraham@'s desk
+    #Add new RN42 serial numbers and location above this line
 ])
 
 # List of known RN52 serial numbers
 RN52_SET = frozenset([
     'AK0557CM',
     'AK0557AI',
-    #Add new RN52 serial numbers above this line
+    'A5043N39', # chromeos-dev-host1-chamelon
+    'AH03PZDC', # shijinabraham@'s desk
+    #Add new RN52 serial numbers and location above this line
 ])
