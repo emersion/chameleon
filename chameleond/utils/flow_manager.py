@@ -693,7 +693,7 @@ class FlowManager(object):
     """
     if self._selected_input != port_id:
       raise FlowManagerError(
-          'The input is selected to %r not %r', self._selected_input, port_id)
+          'The input is selected to %r not %r' % (self._selected_input, port_id))
     path, data_format = self.flows[port_id].StopCapturingAudio()
     logging.info('Stopped capturing audio from port #%d', port_id)
     # If there is no path, set it to empty string. Because XMLRPC doesn't
@@ -788,7 +788,7 @@ class FlowManager(object):
     """
     if self._selected_output != port_id:
       raise FlowManagerError(
-          'The output is selected to %r not %r', self._selected_output, port_id)
+          'The output is selected to %r not %r' % (self._selected_output, port_id))
     logging.info('Stop playing audio from port #%d', port_id)
     self.flows[port_id].StopPlayingAudio()
 
