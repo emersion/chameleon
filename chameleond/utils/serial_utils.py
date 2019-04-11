@@ -20,7 +20,6 @@ import re
 # site-packages: dev-python/pyserial
 import serial
 import time
-import pyudev
 
 def OpenSerial(**kwargs):
   """Tries to open a serial port.
@@ -171,6 +170,16 @@ def FindTtyListByUsbVidPid(usb_vid, usb_pid):
   List of serial devices with additional attributes
   """
   serial_devices = []
+
+  # TODO(yuhsuan): There is no pyudev package in chameleon and pip is broken
+  # now. Add a handler here to avoid chameleon crash until we get new image of
+  # chameleon. (crbug.com/951703)
+  try:
+    import pyudev
+  except ImportError:
+    logging.error("Failed to import pyudev")
+    return serial_devices
+
   context = pyudev.Context()
   for device in context.list_devices(subsystem='tty'):
     if 'ID_VENDOR' not in device:
