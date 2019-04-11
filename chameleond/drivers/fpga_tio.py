@@ -178,8 +178,6 @@ class ChameleondDriver(ChameleondInterface):
         ids.USB_PRINTER: usb_printer_device.USBPrinter(self._usb_printer_ctrl),
     }
 
-    # The fpga board also supports all devices of chrome os.
-    devices.update(self.init_devices_for_chromeos())
     return devices
 
   def Reset(self):
