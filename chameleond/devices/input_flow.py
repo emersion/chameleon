@@ -12,6 +12,7 @@ from abc import ABCMeta
 
 import chameleon_common  # pylint: disable=W0611
 from chameleond.devices import chameleon_device
+from chameleond.utils import audio
 from chameleond.utils import audio_utils
 from chameleond.utils import common
 from chameleond.utils import edid
@@ -452,6 +453,14 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
       mapping[i] = -1
     return mapping
 
+  def GetAudioFormat(self):
+    """Gets the format currently used by audio capture.
+
+    Returns:
+      An audio.AudioDataFormat object.
+    """
+    raise NotImplementedError('GetAudioFormat')
+
   def StartCapturingAudio(self, has_file):
     """Starts capturing audio.
 
@@ -735,6 +744,15 @@ class DpInputFlow(FpgaInputFlowWithAudio):
     """Returns the number of received audio channels."""
     return self._rx.GetAudioChannels()
 
+  def GetAudioFormat(self):
+    """Gets the format currently used by audio capture.
+
+    Returns:
+      An audio.AudioDataFormat object.
+    """
+    return audio.AudioDataFormat(file_type='raw', sample_format='S32_LE',
+        channel=8, rate=self._rx.GetAudioRate())
+
 
 class HdmiInputFlow(FpgaInputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
@@ -951,6 +969,15 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
   def GetAudioChannels(self):
     """Returns the number of received audio channels."""
     return self._rx.GetAudioChannels()
+
+  def GetAudioFormat(self):
+    """Gets the format currently used by audio capture.
+
+    Returns:
+      An audio.AudioDataFormat object.
+    """
+    return audio.AudioDataFormat(file_type='raw', sample_format='S32_LE',
+        channel=8, rate=self._rx.GetAudioRate())
 
 
 class VgaInputFlow(FpgaInputFlow):

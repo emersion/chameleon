@@ -550,6 +550,25 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetAudioChannelMapping')
 
+  def GetAudioFormat(self, port_id):
+    """Gets the format currently used by audio capture.
+
+    Args:
+      port_id: The ID of the audio input port.
+
+    Returns:
+      A dict containing the format properties. The keys are:
+      file_type: 'raw' or 'wav'
+      sample_format: 'S32_LE' for 32-bit signed integers in little-endian. See
+        aplay(1) for more formats.
+      channel: number of channels
+      rate: sampling rate in Hz (or zero if unknown)
+
+    Raises:
+      FlowManagerError: no audio capture in progress
+    """
+    raise NotImplementedError('GetAudioFormat')
+
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 
@@ -571,10 +590,9 @@ class ChameleondInterface(object):
     Returns:
       A tuple (path, format).
       path: The path to the captured audio data.
-      format: The dict representation of AudioDataFormat. Refer to docstring
-        of utils.audio.AudioDataFormat for detail.
-        Currently, the data format supported is
-        dict(file_type='raw', sample_format='S32_LE', channel=8, rate=48000)
+      format: The format of the captured data. See GetAudioFormat. Note that
+        the returned audio frequency may not be correct, for this reason
+        calling GetAudioFormat during the capture is preferred.
 
     Raises:
       DriverError: Input is selected to port other than port_id.

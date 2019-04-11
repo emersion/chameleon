@@ -679,6 +679,25 @@ class FlowManager(object):
 
   @_FlowMethod
   @_AudioMethod(input_only=True)
+  def GetAudioFormat(self, port_id):
+    """Gets the format currently used by audio capture.
+
+    Args:
+      port_id: The ID of the audio input port.
+
+    Returns:
+      An audio.AudioDataFormat object.
+
+    Raises:
+      FlowManagerError: no audio capture in progress
+    """
+    if self._selected_input != port_id:
+      raise FlowManagerError(
+          'The input is selected to %r not %r' % (self._selected_input, port_id))
+    return self.flows[port_id].GetAudioFormat()
+
+  @_FlowMethod
+  @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 

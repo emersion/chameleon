@@ -53,6 +53,20 @@ class DpRx(i2c.I2cSlave):
   _REG_CHANNELS = 0x89
   _MASK_CHANNELS = 0b111
 
+  _REG_SAMPLE_RATE = 0xFB
+  _MASK_SAMPLE_RATE = 0b1111
+  _SAMPLE_RATES = {
+    0b0000: 44100,
+    0b1000: 88200,
+    0b1100: 176400,
+    0b0110: 24000,
+    0b0010: 48000,
+    0b1010: 96000,
+    0b1110: 192000,
+    0b0011: 32000,
+    0b0000: 0, # Not indicated
+  }
+
   def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
     logging.info('Initialize DisplayPort RX chip.')
@@ -192,6 +206,13 @@ class DpRx(i2c.I2cSlave):
         self._DELAY_AUDIO_STABLE_PROBE, self._TIMEOUT_AUDIO_STABLE_PROBE)
     return (self.Get(self._REG_CHANNELS) & self._MASK_CHANNELS) + 1
 
+  def GetAudioRate(self):
+    """Gets the audio rate in Hz."""
+    common.WaitForCondition(self.IsAudioInputStable, True,
+        self._DELAY_AUDIO_STABLE_PROBE, self._TIMEOUT_AUDIO_STABLE_PROBE)
+    rate_id = self.Get(self._REG_SAMPLE_RATE) & self._MASK_SAMPLE_RATE
+    return self._SAMPLE_RATES[rate_id]
+
 
 class HdmiRx(i2c.I2cSlave):
   """A class to control ITE IT6803 HDMI Receiver."""
@@ -200,6 +221,9 @@ class HdmiRx(i2c.I2cSlave):
 
   _DELAY_VIDEO_MODE_PROBE = 0.1
   _TIMEOUT_VIDEO_STABLE_PROBE = 10
+
+  _DELAY_AUDIO_STABLE_PROBE = 0.5
+  _TIMEOUT_AUDIO_STABLE_PROBE = 5
 
   _AUDIO_RESET_DELAY = 0.001
 
@@ -253,6 +277,20 @@ class HdmiRx(i2c.I2cSlave):
   _REG_VACTIVE_L = 0xa5
 
   _DELAY_SOFTWARE_RESET = 0.3
+
+  _REG_SAMPLE_RATE = 0xAE
+  _MASK_SAMPLE_RATE = 0b1111
+  _SAMPLE_RATES = {
+    0b0000: 44100,
+    0b1000: 88200,
+    0b1100: 176400,
+    0b0110: 24000,
+    0b0010: 48000,
+    0b1010: 96000,
+    0b1110: 192000,
+    0b0011: 32000,
+    0b0000: 0, # Not indicated
+  }
 
   def __init__(self, i2c_bus, slave):
     """Constructs a HdmiRx object.
@@ -503,6 +541,13 @@ class HdmiRx(i2c.I2cSlave):
     """Returns the number of received audio channels."""
     # Unfortunately the receiver doesn't expose the number of channels
     return 8
+
+  def GetAudioRate(self):
+    """Gets the audio rate in Hz."""
+    common.WaitForCondition(self.IsAudioInputStable, True,
+        self._DELAY_AUDIO_STABLE_PROBE, self._TIMEOUT_AUDIO_STABLE_PROBE)
+    rate_id = self.Get(self._REG_SAMPLE_RATE) & self._MASK_SAMPLE_RATE
+    return self._SAMPLE_RATES[rate_id]
 
 
 class VgaRx(i2c.I2cSlave):

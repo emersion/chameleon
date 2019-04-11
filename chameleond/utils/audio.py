@@ -12,7 +12,7 @@ class AudioDataFormat(object):
     sample_format: 'S32_LE' for 32-bit signed integer in little-endian.
       Refer to aplay manpage for other formats.
     channel: channel number.
-    rate: sampling rate.
+    rate: sampling rate in Hz.
   """
   def __init__(self, file_type, sample_format, channel, rate):
     """Initializes an AudioDataFormat object.
@@ -22,7 +22,7 @@ class AudioDataFormat(object):
       sample_format: 'S32_LE' for 32-bit signed integer in little-endian.
         Refer to aplay manpage for other formats.
       channel: channel number.
-      rate: sampling rate.
+      rate: sampling rate in Hz.
     """
     self.file_type = file_type
     self.sample_format = sample_format
