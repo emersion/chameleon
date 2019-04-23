@@ -211,7 +211,7 @@ class HdmiRx(i2c.I2cSlave):
   _BIT_P0_PWR5V_DET = 1 << 0
 
   _REG_AUDIO_VIDEO_RESET = 0x10
-  _BIT_REG_AUDIO_RESET = 1 << 1
+  _BIT_AUDIO_RESET = 1 << 1
 
   _REG_P0_RESET = 0x11
   _BIT_P0_SWRST = 1 << 0
@@ -239,6 +239,9 @@ class HdmiRx(i2c.I2cSlave):
   _REG_VIDEO_MODE = 0x99
   _BIT_VIDEO_STABLE = 1 << 3
   _BIT_INTERLACED = 1 << 1
+
+  _REG_AUDIO_STATUS = 0xAA
+  _BIT_AUDIO_ON = 1 << 7
 
   _REG_PIXEL_CLOCK_DIV = 0x9A
   _REG_CLK_CONFIG = 0x54
@@ -383,6 +386,11 @@ class HdmiRx(i2c.I2cSlave):
     video_mode = self.Get(self._REG_VIDEO_MODE)
     return bool(video_mode & self._BIT_VIDEO_STABLE)
 
+  def IsAudioInputStable(self):
+    """Returns whether the audio input is stable."""
+    status = self.Get(self._REG_AUDIO_STATUS)
+    return bool(status & self._BIT_AUDIO_ON)
+
   def WaitVideoInputStable(self, timeout=None):
     """Waits the video input stable or timeout.
 
@@ -484,9 +492,12 @@ class HdmiRx(i2c.I2cSlave):
     In error state, receiver does not dump data anymore. Reset audio logic so
     receiver can dump new data.
     """
-    self.SetMask(self._REG_AUDIO_VIDEO_RESET, self._BIT_REG_AUDIO_RESET)
-    time.sleep(self._AUDIO_RESET_DELAY)
-    self.ClearMask(self._REG_AUDIO_VIDEO_RESET, self._BIT_REG_AUDIO_RESET)
+    if self.IsAudioInputStable():
+      return
+    logging.info('Reset HDMI audio logic')
+    self._ClearInterrupt()
+    self.SetAndClear(self._REG_AUDIO_VIDEO_RESET, self._BIT_AUDIO_RESET,
+                     self._AUDIO_RESET_DELAY)
 
   def GetAudioChannels(self):
     """Returns the number of received audio channels."""
