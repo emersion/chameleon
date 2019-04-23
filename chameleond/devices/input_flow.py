@@ -437,6 +437,21 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
     """Is input flow capturing audio?"""
     return self._audio_capture_manager.is_capturing
 
+  def GetAudioChannels(self):
+    """Returns the number of received audio channels.
+
+    Returns:
+      An integer.
+    """
+    raise NotImplementedError('GetAudioChannels')
+
+  def GetAudioChannelMapping(self):
+    """Obtains the channel mapping."""
+    mapping = [1, 0, 2, 3, 4, 5, 6, 7]
+    for i in range(self.GetAudioChannels(), len(mapping)):
+      mapping[i] = -1
+    return mapping
+
   def StartCapturingAudio(self, has_file):
     """Starts capturing audio.
 
@@ -716,6 +731,10 @@ class DpInputFlow(FpgaInputFlowWithAudio):
   def _ResetAudioLogic(self):
     self._rx.ResetAudioLogic()
 
+  def GetAudioChannels(self):
+    """Returns the number of received audio channels."""
+    return self._rx.GetAudioChannels()
+
 
 class HdmiInputFlow(FpgaInputFlowWithAudio):
   """An abstraction of the entire flow for HDMI."""
@@ -928,6 +947,10 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
   def _ResetAudioLogic(self):
     """Reset audio logic so receiver can resume from error state."""
     self._rx.ResetAudioLogic()
+
+  def GetAudioChannels(self):
+    """Returns the number of received audio channels."""
+    return self._rx.GetAudioChannels()
 
 
 class VgaInputFlow(FpgaInputFlow):

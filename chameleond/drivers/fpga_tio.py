@@ -884,6 +884,24 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._device_manager.GetChameleonDevice(device_id) is not None
 
+  def GetAudioChannelMapping(self, port_id):
+    """Obtains the channel mapping for an audio port.
+
+    Args:
+      port_id: The ID of the audio port.
+
+    Returns:
+      An array of integers. There is one element per Chameleon channel.
+      For audio input ports, each element indicates which input channel the
+      capture channel is mapped to. For audio output ports, each element
+      indicates which output channel the playback channel is mapped to. As a
+      special case, -1 means the channel isn't mapped.
+
+    Raises:
+      FlowManagerError: no audio capture in progress
+    """
+    return self._flow_manager.GetAudioChannelMapping(port_id)
+
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 

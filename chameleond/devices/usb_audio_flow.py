@@ -285,6 +285,11 @@ class InputUSBAudioFlow(USBAudioFlow):
     """Returns the human readable string for the connector type."""
     return 'USBIn'
 
+  def GetAudioChannelMapping(self):
+    """Obtains the channel mapping."""
+    data_format = self._usb_ctrl.GetSupportedCaptureDataFormat()
+    return list(range(data_format.channel))
+
 
 class OutputUSBAudioFlow(USBAudioFlow):
   """Subclass of USBAudioFlow that handles output audio data."""

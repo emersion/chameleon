@@ -652,6 +652,32 @@ class FlowManager(object):
     return self.flows[port_id].CacheFrameThumbnail(frame_index, ratio)
 
   @_FlowMethod
+  @_AudioMethod()
+  def GetAudioChannelMapping(self, port_id):
+    """Obtains the channel mapping for an audio port.
+
+    Args:
+      port_id: The ID of the audio port.
+
+    Returns:
+      An array of integers. There is one element per Chameleon channel.
+      For audio input ports, each element indicates which input channel the
+      capture channel is mapped to. For audio output ports, each element
+      indicates which output channel the playback channel is mapped to. As a
+      special case, -1 means the channel isn't mapped.
+
+    Raises:
+      FlowManagerError: no audio capture in progress
+    """
+    if self._selected_input != port_id:
+      raise FlowManagerError(
+          'The input is selected to %r not %r' % (self._selected_input, port_id))
+    if ids.IsOutputPort(port_id):
+      raise FlowManagerError(
+          'Output ports don\'t support GetAudioChannelMapping yet')
+    return self.flows[port_id].GetAudioChannelMapping()
+
+  @_FlowMethod
   @_AudioMethod(input_only=True)
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.

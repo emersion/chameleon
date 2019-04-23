@@ -207,6 +207,10 @@ class InputCodecFlow(CodecFlow):
     """Resets the audio route."""
     self._audio_route_manager.ResetRouteToDumper()
 
+  def GetAudioChannelMapping(self):
+    """Obtains the channel mapping."""
+    return [1, 0, -1, -1, -1, -1, -1, -1]
+
 
 class OutputCodecFlow(CodecFlow):
   """CodecFlow for output port.

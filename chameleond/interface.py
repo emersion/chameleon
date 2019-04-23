@@ -526,6 +526,30 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DetectResolution')
 
+  def GetAudioChannelMapping(self, port_id):
+    """Obtains the channel mapping for an audio port.
+
+    Audio channels are not guaranteed to not be swapped. Clients can use the
+    channel mapping to match a wire channel to a Chameleon channel.
+
+    This function may only be called when audio capture or playback is in
+    progress.
+
+    Args:
+      port_id: The ID of the audio port.
+
+    Returns:
+      An array of integers. There is one element per Chameleon channel.
+      For audio input ports, each element indicates which input channel the
+      capture channel is mapped to. For audio output ports, each element
+      indicates which output channel the playback channel is mapped to. As a
+      special case, -1 means the channel isn't mapped.
+
+    Raises:
+      FlowManagerError: no audio capture in progress
+    """
+    raise NotImplementedError('GetAudioChannelMapping')
+
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 

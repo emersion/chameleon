@@ -24,6 +24,9 @@ class DpRx(i2c.I2cSlave):
   _DELAY_VIDEO_MODE_PROBE = 1.0
   _TIMEOUT_VIDEO_STABLE_PROBE = 5
 
+  _DELAY_AUDIO_STABLE_PROBE = 0.5
+  _TIMEOUT_AUDIO_STABLE_PROBE = 5
+
   _AUDIO_RESET_DELAY = 0.001
   _VIDEO_RESET_DELAY = 0.001
 
@@ -46,6 +49,9 @@ class DpRx(i2c.I2cSlave):
 
   _REG_VIDEO_FLAG = 0xa9
   _BIT_INTERLACED = 1 << 2
+
+  _REG_CHANNELS = 0x89
+  _MASK_CHANNELS = 0b111
 
   def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
@@ -179,6 +185,12 @@ class DpRx(i2c.I2cSlave):
       return
     self.SetAndClear(self._REG_FUNC_RESET, self._BIT_RESET_AUDIO,
                      self._AUDIO_RESET_DELAY)
+
+  def GetAudioChannels(self):
+    """Returns the number of received audio channels."""
+    common.WaitForCondition(self.IsAudioInputStable, True,
+        self._DELAY_AUDIO_STABLE_PROBE, self._TIMEOUT_AUDIO_STABLE_PROBE)
+    return (self.Get(self._REG_CHANNELS) & self._MASK_CHANNELS) + 1
 
 
 class HdmiRx(i2c.I2cSlave):
@@ -475,6 +487,11 @@ class HdmiRx(i2c.I2cSlave):
     self.SetMask(self._REG_AUDIO_VIDEO_RESET, self._BIT_REG_AUDIO_RESET)
     time.sleep(self._AUDIO_RESET_DELAY)
     self.ClearMask(self._REG_AUDIO_VIDEO_RESET, self._BIT_REG_AUDIO_RESET)
+
+  def GetAudioChannels(self):
+    """Returns the number of received audio channels."""
+    # Unfortunately the receiver doesn't expose the number of channels
+    return 8
 
 
 class VgaRx(i2c.I2cSlave):
