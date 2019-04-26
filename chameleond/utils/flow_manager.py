@@ -149,7 +149,10 @@ class FlowManager(object):
       if self.HasAudioSupport(port_id):
         # Stops all audio capturing.
         if ids.IsInputPort(port_id) and self.flows[port_id].is_capturing_audio:
-          self.flows[port_id].StopCapturingAudio()
+          try:
+            self.flows[port_id].StopCapturingAudio()
+          except Exception as e:
+            logging.error('Failed to stop capturing audio: %s', str(e))
 
         self.flows[port_id].ResetRoute()
 
