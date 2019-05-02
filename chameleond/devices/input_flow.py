@@ -495,12 +495,14 @@ class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
       AudioCaptureManagerError: If captured time or page exceeds the limit.
       AudioCaptureManagerError: If there is no captured data.
     """
-    data_format = self._audio_capture_manager.StopCapturingAudio()
-    self.ResetRoute()
-    if self._audio_recorded_file:
-      return self._audio_recorded_file.name, data_format
-    else:
-      return None, None
+    try:
+      data_format = self._audio_capture_manager.StopCapturingAudio()
+      if self._audio_recorded_file:
+        return self._audio_recorded_file.name, data_format
+      else:
+        return None, None
+    finally:
+      self.ResetRoute()
 
   def ResetRoute(self):
     """Resets the audio route."""
