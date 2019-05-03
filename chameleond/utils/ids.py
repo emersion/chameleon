@@ -111,6 +111,7 @@ EDID_ID_DISABLE = -1
 RN42_SET = frozenset([
     'A9054Z4Q',
     'A600CXAC', # chromeos1-dev-host1-chameleon
+    'A600YVW9', # chromeos1-dev-host5-chameleon
     'A600YVZB', # shijinabraham@'s desk
     #Add new RN42 serial numbers and location above this line
 ])
@@ -119,7 +120,8 @@ RN42_SET = frozenset([
 RN52_SET = frozenset([
     'AK0557CM',
     'AK0557AI',
-    'A5043N39', # chromeos-dev-host1-chamelon
+    'A5043N39', # chromeos1-dev-host1-chameleon
+    'AK0557D6', # chromeos1-dev-host5-chameleon
     'AH03PZDC', # shijinabraham@'s desk
     #Add new RN52 serial numbers and location above this line
 ])
