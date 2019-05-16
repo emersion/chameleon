@@ -551,6 +551,14 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('GetVideoParams')
 
+  def TriggerLinkFailure(self, port_id):
+    """Trigger a link failure on the port.
+
+    Args:
+      port_id: The ID of the input port.
+    """
+    raise NotImplementedError('TriggerLinkFailure')
+
   def GetAudioChannelMapping(self, port_id):
     """Obtains the channel mapping for an audio port.
 

@@ -425,6 +425,9 @@ class FpgaInputFlow(chameleon_device.Flow):
       'vactive': height
     }
 
+  def TriggerLinkFailure(self):
+    raise NotImplementedError('TriggerLinkFailure')
+
 
 class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
   """An abstraction of an input flow which supports audio."""
@@ -776,6 +779,12 @@ class DpInputFlow(FpgaInputFlowWithAudio):
     """
     return audio.AudioDataFormat(file_type='raw', sample_format='S32_LE',
         channel=8, rate=self._rx.GetAudioRate())
+
+  def TriggerLinkFailure(self):
+    """Trigger a link failure."""
+    self._rx.SetLinkFailure()
+    # Send a short pulse (0.5 <= width_ms <= 1.0). See DP spec section 3.3.
+    self.FireHpdPulse(1000, 1000, 1, 1)
 
 
 class HdmiInputFlow(FpgaInputFlowWithAudio):

@@ -926,6 +926,14 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._flow_manager.GetAudioFormat(port_id).AsDict()
 
+  def TriggerLinkFailure(self, port_id):
+    """Trigger a link failure on the port.
+
+    Args:
+      port_id: The ID of the input port.
+    """
+    self._flow_manager.TriggerLinkFailure(port_id)
+
   def StartCapturingAudio(self, port_id, has_file=True):
     """Starts capturing audio.
 

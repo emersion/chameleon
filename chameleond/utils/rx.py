@@ -39,6 +39,7 @@ class DpRx(i2c.I2cSlave):
 
   _REG_FUNC_RESET = 0xEA
   _REG_PLL_RESET = 0xB3  # This is at bank 1
+  _BIT_RESET_SOFTWARE = 1 << 0
   _BIT_RESET_VIDEO = 1 << 1
   _BIT_RESET_AUDIO = 1 << 2
 
@@ -66,6 +67,9 @@ class DpRx(i2c.I2cSlave):
 
   _REG_CHANNELS = 0x89
   _MASK_CHANNELS = 0b111
+
+  _REG_LINK_STATUS_UPDATED = 0xCE
+  _BIT_LINK_STATUS_UPDATED = 1 << 7
 
   _REG_SAMPLE_RATE = 0xFB
   _MASK_SAMPLE_RATE = 0b1111
@@ -250,6 +254,17 @@ class DpRx(i2c.I2cSlave):
     logging.info('Reset DP audio logic')
     self.SetAndClear(self._REG_FUNC_RESET, self._BIT_RESET_AUDIO,
                      self._AUDIO_RESET_DELAY)
+
+  def SetLinkFailure(self):
+    """Make the receiver advertise a link failure.
+
+    Note that this resets the receiver.
+    """
+    # Resetting the chip will reset DPCD 202H (LANE0_1_STATUS), 203H
+    # (LANE2_3_STATUS) and 205H (SINK_STATUS) to zero.
+    self.SetAndClear(self._REG_FUNC_RESET, self._BIT_RESET_SOFTWARE,
+                     self._AUDIO_RESET_DELAY)
+    self.Set(self._BIT_LINK_STATUS_UPDATED, self._REG_LINK_STATUS_UPDATED)
 
   def GetAudioChannels(self):
     """Returns the number of received audio channels."""

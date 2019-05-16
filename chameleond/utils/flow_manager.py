@@ -668,6 +668,16 @@ class FlowManager(object):
     return self.flows[port_id].CacheFrameThumbnail(frame_index, ratio)
 
   @_FlowMethod
+  @_VideoMethod
+  def TriggerLinkFailure(self, port_id):
+    """Trigger a link failure on the port.
+
+    Args:
+      port_id: The ID of the input port.
+    """
+    self.flows[port_id].TriggerLinkFailure()
+
+  @_FlowMethod
   @_AudioMethod()
   def GetAudioChannelMapping(self, port_id):
     """Obtains the channel mapping for an audio port.
