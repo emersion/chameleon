@@ -70,7 +70,8 @@ INPUT_PORTS = [DP1, DP2, HDMI, VGA, MIC, LINEIN, USB_AUDIO_IN]
 OUTPUT_PORTS = [LINEOUT, USB_AUDIO_OUT]
 
 # Ports that support audio/video
-AUDIO_PORTS = [DP1, DP2, HDMI, MIC, LINEIN, LINEOUT, USB_AUDIO_IN, USB_AUDIO_OUT]
+AUDIO_PORTS = [DP1, DP2, HDMI, MIC, LINEIN, LINEOUT, USB_AUDIO_IN,
+               USB_AUDIO_OUT]
 VIDEO_PORTS = [DP1, DP2, HDMI, VGA]
 
 # Ports that support USB audio
@@ -120,6 +121,7 @@ RN42_SET = frozenset([
     'A503SAQO', # chromeos15-row1-rack5-host5-chameleon
     'A600YW2F', # chromeos15-row1-rack5-host6-chameleon
     'A503SANM', # chromeos15-row1-rack5-host7-chameleon
+    'A600YVUV', # chromeos15-row4-rack12-host3-chameleon
     #Add new RN42 serial numbers and location above this line
 ])
 
@@ -130,5 +132,6 @@ RN52_SET = frozenset([
     'A5043N39', # chromeos1-dev-host1-chameleon
     'AK0557D6', # chromeos1-dev-host5-chameleon
     'AH03PZDC', # shijinabraham@'s desk
+    'AH03PZEO'  # chromeos15-row4-rack12-host3-chameleon
     #Add new RN52 serial numbers and location above this line
 ])
