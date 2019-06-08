@@ -111,9 +111,12 @@ EDID_ID_DISABLE = -1
 # List of known RN42 serial numbers
 RN42_SET = frozenset([
     'A9054Z4Q',
-    'A600CXAC', # chromeos1-dev-host1-chameleon
-    'A600YVW9', # chromeos1-dev-host5-chameleon
     'A600YVZB', # shijinabraham@'s desk
+    'A600CXAC', # chromeos1-dev-host1-chameleon
+    'AK05MKYX', # chromeos1-dev-host2-chameleon
+    'AK05MKZ6', # chromeos1-dev-host3-chameleon
+    'A600YVW9', # chromeos1-dev-host5-chameleon
+    'AK05MKZ8', # chromeos1-dev-host6-chameleon
     'AK05MKYW', # chromeos15-row1-rack1-host6-chameleon
     'A600YVS7', # chromeos15-row1-rack4-host1-chameleon
     'A600YVWY', # chromeos15-row1-rack4-host5-chameleon
@@ -133,9 +136,12 @@ RN42_SET = frozenset([
 RN52_SET = frozenset([
     'AK0557CM',
     'AK0557AI',
-    'A5043N39', # chromeos1-dev-host1-chameleon
-    'AK0557D6', # chromeos1-dev-host5-chameleon
     'AH03PZDC', # shijinabraham@'s desk
+    'A5043N39', # chromeos1-dev-host1-chameleon
+    'AH03PZFV', # chromeos1-dev-host2-chameleon
+    'AH03PZHG', # chromeos1-dev-host3-chameleon
+    'AK0557D6', # chromeos1-dev-host5-chameleon
+    'AK0557CV', # chromeos1-dev-host6-chameleon
     'AK0557A1', # chromeos15-row1-rack1-host6-chameleon
     'AK055797', # chromeos15-row1-rack4-host1-chameleon
     'AH03PZHI', # chromeos15-row1-rack4-host5-chameleon
