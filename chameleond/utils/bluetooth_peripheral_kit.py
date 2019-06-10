@@ -10,6 +10,7 @@ import serial
 import time
 
 import serial_utils
+import usb_powercycle_util
 
 class PeripheralKitException(Exception):
   """A dummpy exception class for the PeripheralKit class."""
@@ -200,6 +201,8 @@ class PeripheralKit(object):
     """Check the USB serial connection between to the kit."""
     if self.KNOWN_DEVICE_SET:
       devices = serial_utils.FindTtyListByUsbVidPid(self.USB_VID, self.USB_PID)
+      if devices is None:
+        return False
       for device in devices:
         if device['serial'] in self.KNOWN_DEVICE_SET:
           tty = device['port']
@@ -296,6 +299,18 @@ class PeripheralKit(object):
       A kit-specifc exception if something goes wrong.
     """
     raise NotImplementedError("Not Implemented")
+
+  def PowerCycle(self):
+    """Power cycle the USB port where kit is attached.
+
+    Power cycle the USB port where kit is connected. This is
+    required to reset some kits, since rebooting the chameleond
+    host might not power down the kits.
+
+    Returns:
+      True if the USB port is power cycled.
+    """
+    return usb_powercycle_util.PowerCycleUSBPort(self.USB_VID, self.USB_PID)
 
   def GetAdvertisedName(self):
     """Get the name advertised by the kit.
