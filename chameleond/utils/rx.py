@@ -195,8 +195,6 @@ class DpRx(i2c.I2cSlave):
     dump audio data again.
     """
     logging.info('Reset DP audio logic')
-    if self.IsAudioInputStable():
-      return
     self.SetAndClear(self._REG_FUNC_RESET, self._BIT_RESET_AUDIO,
                      self._AUDIO_RESET_DELAY)
 
@@ -529,9 +527,12 @@ class HdmiRx(i2c.I2cSlave):
     For some ChromeOS boards, receiver judges HDMI audio data stop as an error.
     In error state, receiver does not dump data anymore. Reset audio logic so
     receiver can dump new data.
+
+    Additionally, capturing audio with a set of audio parameters and then
+    capturing audio again with a different set of parameters does not work
+    properly in some cases. When this happens IsAudioInputStable returns True
+    but the receiver doesn't dump any data.
     """
-    if self.IsAudioInputStable():
-      return
     logging.info('Reset HDMI audio logic')
     self._ClearInterrupt()
     self.SetAndClear(self._REG_AUDIO_VIDEO_RESET, self._BIT_AUDIO_RESET,
