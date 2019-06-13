@@ -413,6 +413,18 @@ class FpgaInputFlow(chameleon_device.Flow):
     """
     raise NotImplementedError('IsVideoInputEncrypted')
 
+  def GetVideoParams(self):
+    """Gets video parameters.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    (width, height) = self.GetResolution()
+    return {
+      'hactive': width,
+      'vactive': height
+    }
+
 
 class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
   """An abstraction of an input flow which supports audio."""
@@ -639,6 +651,20 @@ class DpInputFlow(FpgaInputFlowWithAudio):
     """Gets the resolution of the video flow."""
     if self.WaitVideoOutputStable():
       return self._rx.GetFrameResolution()
+    else:
+      raise InputFlowError(
+          'Frame resolution not stable. Rx:%r, FPGA:%r',
+          self._rx.GetFrameResolution(),
+          self._frame_manager.ComputeResolution())
+
+  def GetVideoParams(self):
+    """Gets video parameters.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    if self.WaitVideoOutputStable():
+      return self._rx.GetVideoParams()
     else:
       raise InputFlowError(
           'Frame resolution not stable. Rx:%r, FPGA:%r',
@@ -939,6 +965,15 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
     """Gets the resolution of the video flow."""
     self.WaitVideoOutputStable()
     return self._rx.GetFrameResolution()
+
+  def GetVideoParams(self):
+    """Gets video parameters.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    self.WaitVideoOutputStable()
+    return self._rx.GetVideoParams()
 
   def SetContentProtection(self, enabled):
     """Sets the content protection state.

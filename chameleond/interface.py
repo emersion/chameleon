@@ -526,6 +526,31 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('DetectResolution')
 
+  def GetVideoParams(self, port_id):
+    """Gets video parameters.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+      Possible keys are:
+        clock (float): pixel clock in MHz
+        htotal (int)
+        hactive (int)
+        hsync_width (int): width from start edge to end edge
+        hsync_offset (int): offset from start edge to active edge
+        hsync_polarity (int): 0 for negative, 1 for positive
+        vtotal (int)
+        vactive (int)
+        vsync_width (int): width from start edge to end edge
+        vsync_offset (int): offset from start edge to active edge
+        vsync_polarity (int): 0 for negative, 1 for positive
+        bpc (int): bits per component
+        interlaced (bool)
+    """
+    raise NotImplementedError('GetVideoParams')
+
   def GetAudioChannelMapping(self, port_id):
     """Obtains the channel mapping for an audio port.
 

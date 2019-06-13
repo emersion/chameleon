@@ -868,6 +868,17 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._flow_manager.DetectResolution(port_id)
 
+  def GetVideoParams(self, port_id):
+    """Gets video parameters.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    return self._flow_manager.GetVideoParams(port_id)
+
   def HasAudioBoard(self):
     """Returns True if there is an audio board.
 

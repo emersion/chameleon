@@ -42,10 +42,24 @@ class DpRx(i2c.I2cSlave):
   _BIT_RESET_VIDEO = 1 << 1
   _BIT_RESET_AUDIO = 1 << 2
 
+  _REG_HTOTAL_H = 0x98
+  _REG_HTOTAL_L = 0x97
+  _REG_HSYNC_OFFSET_H = 0x9A
+  _REG_HSYNC_OFFSET_L = 0x99
   _REG_HACTIVE_H = 0x9C
   _REG_HACTIVE_L = 0x9B
+  _REG_HSYNC_WIDTH_H = 0xA4
+  _REG_HSYNC_WIDTH_L = 0xA3
+  _REG_HSYNC_POLARITY = 0xA4
+  _REG_VTOTAL_H = 0x9E
+  _REG_VTOTAL_L = 0x9D
+  _REG_VSYNC_OFFSET_H = 0xA0
+  _REG_VSYNC_OFFSET_L = 0x9F
   _REG_VACTIVE_H = 0xA2
   _REG_VACTIVE_L = 0xA1
+  _REG_VSYNC_WIDTH_H = 0xA6
+  _REG_VSYNC_WIDTH_L = 0xA5
+  _REG_VSYNC_POLARITY = 0xA6
 
   _REG_VIDEO_FLAG = 0xa9
   _BIT_INTERLACED = 1 << 2
@@ -66,6 +80,45 @@ class DpRx(i2c.I2cSlave):
     0b0011: 32000,
     0b0000: 0, # Not indicated
   }
+
+  def GetVideoParams(self):
+    """Gets video parameters.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    htotal_h = self.Get(self._REG_HTOTAL_H)
+    htotal_l = self.Get(self._REG_HTOTAL_L)
+    hactive_h = self.Get(self._REG_HACTIVE_H)
+    hactive_l = self.Get(self._REG_HACTIVE_L)
+    hsync_offset_h = self.Get(self._REG_HSYNC_OFFSET_H)
+    hsync_offset_l = self.Get(self._REG_HSYNC_OFFSET_L)
+    hsync_width_h = self.Get(self._REG_HSYNC_WIDTH_H)
+    hsync_width_l = self.Get(self._REG_HSYNC_WIDTH_L)
+    hsync_polarity = self.Get(self._REG_HSYNC_POLARITY)
+    vtotal_h = self.Get(self._REG_VTOTAL_H)
+    vtotal_l = self.Get(self._REG_VTOTAL_L)
+    vactive_h = self.Get(self._REG_VACTIVE_H)
+    vactive_l = self.Get(self._REG_VACTIVE_L)
+    vsync_offset_h = self.Get(self._REG_VSYNC_OFFSET_H)
+    vsync_offset_l = self.Get(self._REG_VSYNC_OFFSET_L)
+    vsync_width_h = self.Get(self._REG_VSYNC_WIDTH_H)
+    vsync_width_l = self.Get(self._REG_VSYNC_WIDTH_L)
+    vsync_polarity = self.Get(self._REG_VSYNC_POLARITY)
+    return {
+      'clock': self.GetPixelClock(),
+      'htotal': htotal_h << 8 | htotal_l,
+      'hactive': hactive_h << 8 | hactive_l,
+      'hsync_offset': hsync_offset_h << 8 | hsync_offset_l,
+      'hsync_width': (hsync_width_h & 0x7F) << 8 | hsync_width_l,
+      'hsync_polarity': (~hsync_polarity >> 7) & 1,
+      'vtotal': vtotal_h << 8 | vtotal_l,
+      'vactive': vactive_h << 8 | vactive_l,
+      'vsync_offset': vsync_offset_h << 8 | vsync_offset_l,
+      'vsync_width': (vsync_width_h & 0x7F) << 8 | vsync_width_l,
+      'vsync_polarity': (~vsync_polarity >> 7) & 1,
+      'interlaced': self.IsInterlaced(),
+    }
 
   def Initialize(self, dual_pixel_mode):
     """Runs the initialization sequence for the chip."""
@@ -269,10 +322,21 @@ class HdmiRx(i2c.I2cSlave):
   _REG_CLK_CONFIG = 0x54
   _MASK_RCLK_SELECT = 0x03
 
+  _REG_HTOTAL_H = 0x9d
+  _REG_HTOTAL_L = 0x9c
   _REG_HACTIVE_H = 0x9f
   _REG_HACTIVE_L = 0x9e
+  _REG_HSYNC_WIDTH_H = 0xa1
+  _REG_HSYNC_WIDTH_L = 0xa0
+  _REG_HSYNC_OFFSET_H = 0xa1
+  _REG_HSYNC_OFFSET_L = 0xa2
   _REG_VACTIVE_H = 0xa4
   _REG_VACTIVE_L = 0xa5
+  _REG_VTOTAL_H = 0xa4
+  _REG_VTOTAL_L = 0xa3
+  _REG_VSYNC_WIDTH = 0xa6
+  _REG_VSYNC_OFFSET = 0xa7
+  _REG_SYNC_POLARITY = 0xa8
 
   _DELAY_SOFTWARE_RESET = 0.3
 
@@ -289,6 +353,41 @@ class HdmiRx(i2c.I2cSlave):
     0b0011: 32000,
     0b0000: 0, # Not indicated
   }
+
+  def GetVideoParams(self):
+    """Gets video parameters.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    htotal_h = self.Get(self._REG_HTOTAL_H)
+    htotal_l = self.Get(self._REG_HTOTAL_L)
+    hactive_h = self.Get(self._REG_HACTIVE_H)
+    hactive_l = self.Get(self._REG_HACTIVE_L)
+    hsync_offset_h = self.Get(self._REG_HSYNC_OFFSET_H)
+    hsync_offset_l = self.Get(self._REG_HSYNC_OFFSET_L)
+    hsync_width_h = self.Get(self._REG_HSYNC_WIDTH_H)
+    hsync_width_l = self.Get(self._REG_HSYNC_WIDTH_L)
+    vtotal_h = self.Get(self._REG_VTOTAL_H)
+    vtotal_l = self.Get(self._REG_VTOTAL_L)
+    vactive_h = self.Get(self._REG_VACTIVE_H)
+    vactive_l = self.Get(self._REG_VACTIVE_L)
+    vsync_offset = self.Get(self._REG_VSYNC_OFFSET)
+    vsync_width = self.Get(self._REG_VSYNC_WIDTH)
+    sync_polarity = self.Get(self._REG_SYNC_POLARITY)
+    return {
+      'htotal': (htotal_h & 0x3f) << 8 | htotal_l,
+      'hactive': (hactive_h & 0x3f) << 8 | hactive_l,
+      'hsync_offset': (hsync_offset_h & 0xf0) << 4 | hsync_offset_l,
+      'hsync_width': (hsync_width_h & 0x01) | hsync_width_l,
+      'hsync_polarity': (sync_polarity >> 2) & 1,
+      'vtotal': (vtotal_h & 0x0f) << 8 | vtotal_l,
+      'vactive': (vactive_h & 0xf0) << 4 | vactive_l,
+      'vsync_offset': vsync_offset & 0x3f,
+      'vsync_width': vsync_width & 0x0f,
+      'vsync_polarity': (sync_polarity >> 3) & 1,
+      'interlaced': self.IsInterlaced(),
+    }
 
   def __init__(self, i2c_bus, slave):
     """Constructs a HdmiRx object.

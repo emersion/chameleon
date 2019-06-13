@@ -636,6 +636,19 @@ class FlowManager(object):
     return resolution
 
   @_FlowMethod
+  @_VideoMethod
+  def GetVideoParams(self, port_id):
+    """Gets video parameters.
+
+    Args:
+      port_id: The ID of the video input port.
+
+    Returns:
+      A dict containing video parameters. Fields are omitted if unknown.
+    """
+    return self.flows[port_id].GetVideoParams()
+
+  @_FlowMethod
   def ReadCapturedFrame(self, port_id, frame_index):
     """Reads the content of the captured frame from the buffer."""
     return self.flows[port_id].ReadCapturedFrame(frame_index)
