@@ -155,7 +155,7 @@ class DpRx(i2c.I2cSlave):
     pclk_count = (self.Get(self._REG_PCLK_COUNT_LOW) +
                   ((self.Get(self._REG_PCLK_COUNT_HIGH) & 0x0F) << 8))
     if pclk_count:
-      return 27 * 1024 / pclk_count
+      return 27 * 1024 / float(pclk_count)
     else:
       # report None if no reading obtained from rx
       return None
@@ -447,7 +447,7 @@ class HdmiRx(i2c.I2cSlave):
   def GetPixelClock(self):
     """Returns the pixel clock of the input signal in MHz."""
     pclk_div = self.Get(self._REG_PIXEL_CLOCK_DIV)
-    return self._pclk_base / pclk_div
+    return self._pclk_base / float(pclk_div)
 
   def IsResetNeeded(self):
     """Returns if the RX needs reset by checking the interrupt values."""
