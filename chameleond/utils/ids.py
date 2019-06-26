@@ -119,6 +119,8 @@ RN42_SET = frozenset([
     'A600YVW9', # chromeos1-dev-host5-chameleon
     'AK05MKZ8', # chromeos1-dev-host6-chameleon
     'AK05MKYW', # chromeos15-row1-rack1-host6-chameleon
+    'AK05MKYV', # chromeos15-row1-rack3-host2-chameleon
+    'AK05MKYS', # chromeos15-row1-rack3-host3-chameleon
     'A600YVS7', # chromeos15-row1-rack4-host1-chameleon
     'A600YVWY', # chromeos15-row1-rack4-host5-chameleon
     'A503SAS5', # chromeos15-row1-rack5-host1-chameleon
@@ -129,6 +131,7 @@ RN42_SET = frozenset([
     'A600YW2F', # chromeos15-row1-rack5-host6-chameleon
     'A503SANM', # chromeos15-row1-rack5-host7-chameleon
     'AK05MKZ9', # chromeos15-row1-rack11-host1-chameleon
+    'AK05MKYL', # chromeos15-row2-rack9-host2-chameleon
     'A600YVUV', # chromeos15-row4-rack12-host3-chameleon
     #Add new RN42 serial numbers and location above this line
 ])
@@ -144,6 +147,8 @@ RN52_SET = frozenset([
     'AK0557D6', # chromeos1-dev-host5-chameleon
     'AK0557CV', # chromeos1-dev-host6-chameleon
     'AK0557A1', # chromeos15-row1-rack1-host6-chameleon
+    'AH03PZDI', # chromeos15-row1-rack3-host2-chameleon
+    'AH03PZEM', # chromeos15-row1-rack3-host3-chameleon
     'AK055797', # chromeos15-row1-rack4-host1-chameleon
     'AH03PZHI', # chromeos15-row1-rack4-host5-chameleon
     'AH03PZF9', # chromeos15-row1-rack5-host1-chameleon
@@ -154,6 +159,7 @@ RN52_SET = frozenset([
     'AH03PZDB', # chromeos15-row1-rack5-host6-chameleon
     'AK05579P', # chromeos15-row1-rack5-host7-chameleon
     'AK0557BH', # chromeos15-row1-rack11-host1-chameleon
+    'AK05579H',# chromeos15-row2-rack9-host2-chameleon
     'AH03PZEO'  # chromeos15-row4-rack12-host3-chameleon
     #Add new RN52 serial numbers and location above this line
 ])
