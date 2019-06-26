@@ -93,8 +93,6 @@ class ChameleondDriver(ChameleondInterface):
     self._usb_printer_ctrl = lazy(usb_printer_control.USBPrinterController)()
     self._bluetooth_hid_ctrl = lazy(usb.USBController)(
         bluetooth_hid_flow.BluetoothHIDMouseFlow.DRIVER)
-    self._bluetooth_hog_ctrl = lazy(usb.USBController)(
-        bluetooth_hid_flow.BluetoothHOGMouseFlow.DRIVER)
     self._bluetooth_a2dp_sink_ctrl = lazy(usb.USBController)(
         bluetooth_a2dp.BluetoothA2DPSinkFlow.DRIVER)
     # See explanation for using DRIVER_MODULE in bluetooth_nrf52.py
@@ -117,8 +115,6 @@ class ChameleondDriver(ChameleondInterface):
     self.audio_board = self._device_manager.GetChameleonDevice(ids.AUDIO_BOARD)
     self.bluetooth_mouse = self._device_manager.GetChameleonDevice(
         ids.BLUETOOTH_HID_MOUSE)
-    self.bluetooth_hog_mouse = self._device_manager.GetChameleonDevice(
-        ids.BLUETOOTH_HOG_MOUSE)
     self.avsync_probe = self._device_manager.GetChameleonDevice(
         ids.AVSYNC_PROBE)
     self.motor_board = self._device_manager.GetChameleonDevice(ids.MOTOR_BOARD)
@@ -136,9 +132,6 @@ class ChameleondDriver(ChameleondInterface):
         ids.BLUETOOTH_HID_MOUSE:
             bluetooth_hid_flow.BluetoothHIDMouseFlow(
                 ids.BLUETOOTH_HID_MOUSE, self._bluetooth_hid_ctrl),
-        ids.BLUETOOTH_HOG_MOUSE:
-            bluetooth_hid_flow.BluetoothHOGMouseFlow(
-                ids.BLUETOOTH_HOG_MOUSE, self._bluetooth_hog_ctrl),
         ids.BLUETOOTH_A2DP_SINK:
             bluetooth_a2dp.BluetoothA2DPSinkFlow(
                 ids.BLUETOOTH_A2DP_SINK, self._bluetooth_a2dp_sink_ctrl),

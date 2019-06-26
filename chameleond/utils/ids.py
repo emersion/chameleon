@@ -92,7 +92,8 @@ BLUETOOTH_HOG_PORTS = [BLUETOOTH_HOG_KEYBOARD,
                        BLUETOOTH_HOG_GAMEPAD,
                        BLUETOOTH_HOG_MOUSE,
                        BLUETOOTH_HOG_COMBO,
-                       BLUETOOTH_HOG_JOYSTICK]
+                       BLUETOOTH_HOG_JOYSTICK,
+                       BLE_MOUSE]
 
 # Convenience methods
 IsInputPort = lambda port_id: port_id in INPUT_PORTS

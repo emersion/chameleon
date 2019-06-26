@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2018 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -41,7 +42,7 @@ class BluetoothA2DPSinkFlow(
   DRIVER = RN52.DRIVER
 
   def __init__(self, port_id, usb_ctrl):
-    """Initializes a BluetoothHOGMouseFlow object.
+    """Initializes a BluetoothA2DPSinkFlow object.
 
     Args:
       port_id: the port id that represents the type of port used.

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2017 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -272,8 +273,8 @@ class PeripheralKit(object):
     """Reboot (or partially reset) the kit.
 
     Rebooting or resetting the kit is required to make some settings take
-    effect after they are changed. On some kits, like the Bluefruit LE Friend,
-    this may result in a partial reset that clears pairing/bonding data.
+    effect after they are changed. On some kits, this may result in a
+    partial reset that clears pairing/bonding data.
 
     Returns:
       True if the kit rebooted successfully.
