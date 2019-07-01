@@ -134,24 +134,31 @@ def FindTtyByUsbVidPid(usb_vid, usb_pid, driver_name=None):
   Returns:
     matched /dev/tty path. Return None if no port has been detected.
   """
-  for candidate in glob.glob('/dev/tty*'):
-    device_path = '/sys/class/tty/%s/device' % os.path.basename(candidate)
-    driver_path = os.path.realpath(os.path.join(device_path, 'driver'))
+  try:
+    import pyudev
+  except ImportError:
+    logging.error("Failed to import pyudev")
+    return None
 
-    # If driver_name is given, check if driver_name exists at the tail of
-    # driver_path.
-    if driver_name and not driver_path.endswith(driver_name):
+  port = None
+  context = pyudev.Context()
+  for device in context.list_devices(subsystem='tty'):
+    if 'ID_VENDOR' not in device:
       continue
+    if usb_vid is not None:
+      if device['ID_VENDOR_ID'] != usb_vid:
+        continue
+    if usb_pid is not None:
+      if device['ID_MODEL_ID'] != usb_pid:
+        continue
+    if driver_name is not None:
+      if device['ID_USB_DRIVER'] != driver_name:
+        continue
+    port = device.device_node
+    break
 
-    real_device_path = os.path.realpath(device_path)
-    vid_path = os.path.join(real_device_path, '../../idVendor')
-    found_vid = ReadSysfsFile(vid_path)
-    pid_path = os.path.join(real_device_path, '../../idProduct')
-    found_pid = ReadSysfsFile(pid_path)
-    if found_vid == usb_vid and found_pid == usb_pid:
-      logging.info('Found USB serial tty: %s', candidate)
-      return candidate
-  return None
+  logging.info('Found USB serial tty: %s', port)
+  return port
 
 
 def FindTtyListByUsbVidPid(usb_vid, usb_pid):

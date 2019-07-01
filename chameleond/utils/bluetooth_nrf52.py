@@ -41,8 +41,8 @@ class nRF52(PeripheralKit):
   # but looking in builtins requires searching by 'cdc-acm'.
   DRIVER_MODULE = 'cdc-acm'
   BAUDRATE = 115200
-  USB_VID = '1d6b'
-  USB_PID = '0002'
+  USB_VID = '1366'
+  USB_PID = '1015'
 
   # A newline can just be a '\n' to denote the end of a command
   NEWLINE = '\n'
