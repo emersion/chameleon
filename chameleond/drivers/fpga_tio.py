@@ -20,6 +20,7 @@ from chameleond.devices import bluetooth_hid_flow
 from chameleond.devices import codec_flow
 from chameleond.devices import input_flow
 from chameleond.devices import motor_board
+from chameleond.devices import raspi_bluetooth_flow
 from chameleond.devices import usb_audio_flow
 from chameleond.devices import usb_hid_flow
 from chameleond.devices import usb_printer_device
@@ -102,6 +103,8 @@ class ChameleondDriver(ChameleondInterface):
 
     if platform == 'chromeos':
       self._devices = self.init_devices_for_chromeos()
+    elif platform == 'raspi':
+      self._devices = self.init_devices_for_raspi()
     else:
       self._devices = self.init_devices_for_fpga()
 
@@ -172,6 +175,12 @@ class ChameleondDriver(ChameleondInterface):
         ids.USB_PRINTER: usb_printer_device.USBPrinter(self._usb_printer_ctrl),
     }
 
+    return devices
+
+  def init_devices_for_raspi(self):
+    devices = {
+        ids.BLUETOOTH_HID_KEYBOARD: raspi_bluetooth_flow.RaspiFlow(),
+    }
     return devices
 
   def Reset(self):
@@ -533,7 +542,7 @@ class ChameleondDriver(ChameleondInterface):
       DriverError if there is no output from the monitoring process.
     """
 
-    if self._process.poll() == None:
+    if self._process.poll() is None:
       self._process.terminate()
       raise DriverError('The monitoring process has not finished.')
 
