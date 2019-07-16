@@ -428,6 +428,17 @@ class FpgaInputFlow(chameleon_device.Flow):
   def TriggerLinkFailure(self):
     raise NotImplementedError('TriggerLinkFailure')
 
+  def GetLastInfoFrame(self, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    raise NotImplementedError('GetLastInfoFrame')
+
 
 class FpgaInputFlowWithAudio(FpgaInputFlow):  # pylint: disable=W0223
   """An abstraction of an input flow which supports audio."""
@@ -669,6 +680,19 @@ class DpInputFlow(FpgaInputFlowWithAudio):
     if not self.WaitVideoInputStable():
       raise InputFlowError('Video input not stable')
     return self._rx.GetVideoParams()
+
+  def GetLastInfoFrame(self, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    if not self.WaitVideoInputStable():
+      raise InputFlowError('Video input is not stable')
+    return self._rx.GetLastInfoFrame(infoframe_type)
 
   def _SetPixelMode(self):
     """Sets the pixel mode based on the pixel clock of the input signal.
@@ -980,6 +1004,19 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
     if not self.WaitVideoInputStable():
       raise InputFlowError('Video input not stable')
     return self._rx.GetVideoParams()
+
+  def GetLastInfoFrame(self, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    if not self.WaitVideoInputStable():
+      raise InputFlowError('Video input is not stable')
+    return self._rx.GetLastInfoFrame(infoframe_type)
 
   def SetContentProtection(self, enabled):
     """Sets the content protection state.

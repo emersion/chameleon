@@ -85,6 +85,71 @@ class DpRx(i2c.I2cSlave):
     0b0000: 0, # Not indicated
   }
 
+  _INFOFRAME_REGS = {
+    'avi': {
+      'version_length_hi': 0x43,
+      'length_lo': 0x42,
+      'payload': range(0x44, 0x44 + 13),
+    },
+    'spd': {
+      'version_length_hi': 0x53,
+      'length_lo': 0x52,
+      'payload': [None] * 24 + [0x54], # the receiver only exposes the last byte
+    },
+    'audio': {
+      'version_length_hi': 0x57,
+      'length_lo': 0x56,
+      'payload': range(0x58, 0x58 + 5),
+    },
+    'mpeg': {
+      'version_length_hi': 0x5F,
+      'length_lo': 0x5E,
+      'payload': range(0x60, 0x60 + 5),
+    },
+  }
+
+  def _ReadPayload(self, regs):
+    """Reads a binary payload stored in a set of registers.
+
+    Args:
+      regs: addresses of 1-byte I2C registers. None can be used to zero-fill a
+        byte.
+
+    Returns:
+      A byte array containing the payload.
+    """
+    payload = []
+    for reg in regs:
+      if reg != None:
+        payload.append(self.Get(reg))
+      else:
+        payload.append(0)
+    return bytearray(payload)
+
+  def GetLastInfoFrame(self, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    if infoframe_type not in self._INFOFRAME_REGS:
+      raise RxError('Unsupported InfoFrame type for DP: %s' % infoframe_type)
+
+    regs = self._INFOFRAME_REGS[infoframe_type]
+    version_length_hi = self.Get(regs['version_length_hi'])
+    length_lo = self.Get(regs['length_lo'])
+    version = (version_length_hi >> 2) & 0xF
+    length = (version_length_hi & 0x3) << 8 | length_lo
+    payload = self._ReadPayload(regs['payload'][:length])
+    return {
+      'version': version,
+      'length': length,
+      'payload': payload,
+    }
+
   def GetVideoParams(self):
     """Gets video parameters.
 
@@ -369,6 +434,84 @@ class HdmiRx(i2c.I2cSlave):
     0b0000: 0, # Not indicated
   }
 
+  # All InfoFrame registers are in bank 2
+  _INFOFRAME_REGS = {
+    'spd': {
+      'version': 0x10,
+      'length': None, # the receiver doesn't expose the total length
+      'payload': [None] * 24 + [0x11], # the receiver only exposes the last byte
+    },
+    'avi': {
+      'version': 0x13,
+      'length': 0x12,
+      'payload': range(0x15, 0x15 + 15),
+    },
+    'audio': {
+      'version': 0x43,
+      'length': 0x4A,
+      'payload': range(0x45, 0x45 + 5),
+    },
+    'mpeg': {
+      'version': 0x4B,
+      'length': 0x4C,
+      'payload': range(0x4E, 0x4E + 5),
+    },
+    'vendor': {
+      'version': 0x91,
+      'length': 0x92,
+      'payload': range(0x94, 0x94 + 6),
+    },
+  }
+
+  def _ReadPayload(self, regs):
+    """Reads a binary payload stored in a set of registers.
+
+    Args:
+      regs: addresses of 1-byte I2C registers. None can be used to zero-fill a
+        byte.
+
+    Returns:
+      A byte array containing the payload.
+    """
+    payload = []
+    for reg in regs:
+      if reg != None:
+        payload.append(self.Get(reg))
+      else:
+        payload.append(0)
+    return bytearray(payload)
+
+  def GetLastInfoFrame(self, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    if infoframe_type not in self._INFOFRAME_REGS:
+      raise RxError('Unsupported InfoFrame type for HDMI: %s' % infoframe_type)
+
+    regs = self._INFOFRAME_REGS[infoframe_type]
+    self._SwitchBank(2)
+    version = self.Get(regs['version'])
+    if regs['length'] != None:
+      length = self.Get(regs['length'])
+      payload_regs = regs['payload'][:length]
+    else:
+      # For some InfoFrame types the receiver doesn't expose the total length.
+      # In this case, just send the whole payload.
+      length = None
+      payload_regs = regs['payload']
+    payload = self._ReadPayload(payload_regs)
+    self._SwitchBank(0)
+    return {
+      'version': version,
+      'length': length,
+      'payload': payload,
+    }
+
   def GetVideoParams(self):
     """Gets video parameters.
 
@@ -562,6 +705,14 @@ class HdmiRx(i2c.I2cSlave):
     """Returns the pixel clock of the input signal in MHz."""
     pclk_div = self.Get(self._REG_PIXEL_CLOCK_DIV)
     return self._pclk_base / float(pclk_div)
+
+  def _SwitchBank(self, bank):
+    """Switch register bank.
+
+    Reg1XX means bank 1, Reg2XX means bank 2. Other registers are in bank 0.
+    """
+    assert bank >= 0 and bank <= 2
+    self.Set(bank, 0x0F)
 
   def IsResetNeeded(self):
     """Returns if the RX needs reset by checking the interrupt values."""

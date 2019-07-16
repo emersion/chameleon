@@ -559,6 +559,23 @@ class ChameleondInterface(object):
     """
     raise NotImplementedError('TriggerLinkFailure')
 
+  def GetLastInfoFrame(self, port_id, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      port_id: The ID of the video input port
+      infoframe_type (string): the InfoFrame type (one of 'avi', 'audio',
+        'mpeg', 'vendor', 'spd')
+
+    Returns:
+      A dict containing:
+        version: the version of the InfoFrame
+        length: the number of bytes in the payload (omitted if unknown)
+        payload: a byte-array of the InfoFrame payload (this may be shorter
+          than length depending on the receiver capabilities)
+    """
+    raise NotImplementedError('GetLastInfoFrame')
+
   def GetAudioChannelMapping(self, port_id):
     """Obtains the channel mapping for an audio port.
 

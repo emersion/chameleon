@@ -649,6 +649,20 @@ class FlowManager(object):
     return self.flows[port_id].GetVideoParams()
 
   @_FlowMethod
+  @_VideoMethod
+  def GetLastInfoFrame(self, port_id, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      port_id: The ID of the video input port
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    return self.flows[port_id].GetLastInfoFrame(infoframe_type)
+
+  @_FlowMethod
   def ReadCapturedFrame(self, port_id, frame_index):
     """Reads the content of the captured frame from the buffer."""
     return self.flows[port_id].ReadCapturedFrame(frame_index)

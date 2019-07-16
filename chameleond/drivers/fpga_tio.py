@@ -873,6 +873,22 @@ class ChameleondDriver(ChameleondInterface):
     """
     return self._flow_manager.GetVideoParams(port_id)
 
+  def GetLastInfoFrame(self, port_id, infoframe_type):
+    """Obtains the last received InfoFrame of the specified type.
+
+    Args:
+      port_id: The ID of the video input port
+      infoframe_type (string): the InfoFrame type
+
+    Returns:
+      A dict containing the InfoFrame.
+    """
+    infoframe = self._flow_manager.GetLastInfoFrame(port_id, infoframe_type)
+    # Wrap the binary blob in an xmlrpclib object so that it can be serialized
+    # in the XML-RPC reply.
+    infoframe['payload'] = xmlrpclib.Binary(infoframe['payload'])
+    return infoframe
+
   def HasAudioBoard(self):
     """Returns True if there is an audio board.
 
