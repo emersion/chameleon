@@ -268,3 +268,18 @@ def PowerCycleUSBPort(usb_vid, usb_pid):
       logging.info('PowerCycleUSBPort: power cycle port_id %s success', port_id)
   logging.info('PowerCycleUSBPort returns %s', status)
   return status
+
+
+#
+# This is used while updating chameleond manually
+#
+if __name__ == '__main__':
+  import sys
+  if len(sys.argv) != 3:
+    print 'invoke with python powertest.py <vid> <pid>'
+  else:
+    VID = sys.argv[1]
+    PID = sys.argv[2]
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.info("Resetting %s %s", VID, PID)
+    PowerCycleUSBPort(VID, PID)
