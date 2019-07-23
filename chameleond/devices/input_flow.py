@@ -663,13 +663,9 @@ class DpInputFlow(FpgaInputFlowWithAudio):
     Returns:
       A dict containing video parameters. Fields are omitted if unknown.
     """
-    if self.WaitVideoOutputStable():
-      return self._rx.GetVideoParams()
-    else:
-      raise InputFlowError(
-          'Frame resolution not stable. Rx:%r, FPGA:%r',
-          self._rx.GetFrameResolution(),
-          self._frame_manager.ComputeResolution())
+    if not self.WaitVideoInputStable():
+      raise InputFlowError('Video input not stable')
+    return self._rx.GetVideoParams()
 
   def _SetPixelMode(self):
     """Sets the pixel mode based on the pixel clock of the input signal.
@@ -972,7 +968,8 @@ class HdmiInputFlow(FpgaInputFlowWithAudio):
     Returns:
       A dict containing video parameters. Fields are omitted if unknown.
     """
-    self.WaitVideoOutputStable()
+    if not self.WaitVideoInputStable():
+      raise InputFlowError('Video input not stable')
     return self._rx.GetVideoParams()
 
   def SetContentProtection(self, enabled):
