@@ -8,6 +8,7 @@ import functools
 import glob
 import logging
 import os
+import time
 import xmlrpclib
 
 import chameleon_common  # pylint: disable=W0611
@@ -1197,6 +1198,10 @@ class ChameleondDriver(ChameleondInterface):
 
   def ResetBluetoothRef(self):
     """Reset BTREF"""
+    # Reset the RN52 and wait for it to reset
+    RN52_RESET_WAIT_SECS = 3
+    self.bluetooth_a2dp_sink.PowerCycle()
+    time.sleep(RN52_RESET_WAIT_SECS)
     # Reloads serial port driver if needed
     self._bluetooth_a2dp_sink_ctrl.EnableDriver()
     # Reads peripheral configuration settings
