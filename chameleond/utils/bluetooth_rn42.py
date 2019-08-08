@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2016 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -544,7 +545,21 @@ class RN42(PeripheralKit):
     result = self.SerialSendReceive(self.CMD_SET_PIN_CODE + pin,
                                     msg='setting pin code')
     time.sleep(self.SET_PIN_CODE_SLEEP_SECS)
-    return result
+    # Sometimes SetPinCode seems to return empty string instead of AOK
+    # But the pin seems to get set anyhow.
+    # Handle this by checking the pin
+    if not bool(result):
+      logging.info("Got return '%s' in SetPinCode", result)
+      actual_pin = self.GetPinCode()
+      if actual_pin != pin:
+        logging.error("Pincode set %s does not match returned %s",
+                      pin, actual_pin)
+        return False
+      else:
+        logging.info('Pincode matches.')
+        return True
+    else:
+      return bool(result)
 
   def GetServiceProfile(self):
     """Get the service profile.
