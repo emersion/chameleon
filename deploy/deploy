@@ -19,6 +19,36 @@ LIGHTTPD_NAME='lighttpd'
 update-rc.d -f ${LIGHTTPD_NAME} remove
 update-rc.d -f ${UPDATER_NAME} remove
 
+validate_package_installation() {
+    PACKAGE_NAME=$1
+
+    if ! dpkg-query -l ${PACKAGE_NAME} > /dev/null; then
+        printf "Installing package %s...\n" ${PACKAGE_NAME}
+
+        eval "apt-get update > /dev/null 2>&1"
+        eval "apt-get -y install ${PACKAGE_NAME} > /dev/null 2>&1"
+
+        printf "Package %s installed\n" ${PACKAGE_NAME}
+
+    else
+        printf "Package %s already installed\n" ${PACKAGE_NAME}
+
+    fi
+}
+
+provide_daemon_symlinks(){
+    ALT_CHAMELEON_DIR='/usr/local/bin'
+    SCRIPT_NAME="run_$1"
+
+    if [ ! -e "${CHAMELEOND_DIR}/${SCRIPT_NAME}" ] && \
+       [ -e "${ALT_CHAMELEON_DIR}/${SCRIPT_NAME}" ]; then
+        printf "Creating symlink for script %s\n" ${SCRIPT_NAME}
+
+        (cd ${CHAMELEOND_DIR} &&\
+            ln -s "${ALT_CHAMELEON_DIR}/${SCRIPT_NAME}" "${SCRIPT_NAME}")
+    fi
+}
+
 install_daemon_and_config () {
     DAEMON_NAME=$1
     CONFIG_FILE="/etc/default/${DAEMON_NAME}"
@@ -102,6 +132,40 @@ if ! diff -q "${FPGA_DIR}/${file}" "${FPGA_BOOT_PART}"; then
     dd if="${FPGA_DIR}/${file}" of="${FPGA_BOOT_PART}" bs=512
     sync
     need_reboot=1
+fi
+
+# Some custom actions if chameleon is raspberry pi
+if cat /proc/device-tree/model | grep -qi 'raspberry pi'; then
+    # Install required packages
+    validate_package_installation "bluetooth"
+    validate_package_installation "python-bluez"
+    validate_package_installation "bluez"
+    validate_package_installation "python-pyudev"
+
+    # Update bluetooth rules
+    OLD_EXEC="ExecStart=/usr/lib/bluetooth/bluetoothd"
+    NEW_EXEC="ExecStart=/usr/lib/bluetooth/bluetoothd -d -P input"
+    BT_LOC="/etc/systemd/system/bluetooth.target.wants/bluetooth.service"
+
+    if ! cat ${BT_LOC} | grep -qi "${NEW_EXEC}"; then
+        eval "sed -i \"s#${OLD_EXEC}#${NEW_EXEC}#g\" ${BT_LOC}"
+    fi
+
+    # Create symlinks if daemons were installed in /usr/local/bin instead of
+    # /usr/bin where chameleond expects them. This seems to be least invasive
+    # way to resolve disagreement without either breaking fizz or fpga device
+    provide_daemon_symlinks "${CHAMELEOND_NAME}"
+    provide_daemon_symlinks "${DISPLAYD_NAME}"
+    provide_daemon_symlinks "${STREAM_SERVER_NAME}"
+    provide_daemon_symlinks "${SCHEDULER_NAME}"
+
+    # Create new dbus service conf if it doesn't exist
+    DEST_KBD_CONF="/etc/dbus-1/system.d/org.chromium.autotest.btkbservice.conf"
+    if [ ! -e DEST_KBD_CONF ]; then
+        SRC_KBD_CONF=$(eval "find . -name *btkbservice.conf | head -n 1")
+
+        eval "cp ${SRC_KBD_CONF} ${DEST_KBD_CONF}"
+    fi
 fi
 
 if [[ -n "${need_reboot}" ]]; then

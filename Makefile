@@ -81,7 +81,7 @@ ifeq ($(PLATFORM), Chrome OS)
 else
 	@BUNDLE_VERSION=$(BUNDLE_VERSION) CHAMELEON_BOARD=$(CHAMELEON_BOARD) \
 	deploy/deploy
-	@echo Installing chameleon package on fpga platform is completed.
+	@echo Installing chameleon package on non-chrome os platform is completed.
 endif
 
 CHAMELEON_USER ?= root

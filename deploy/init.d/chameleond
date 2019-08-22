@@ -24,6 +24,16 @@ DAEMON_USER='root'
 PIDFILE="/var/run/${DAEMON_NAME}.pid"
 LOGFILE="/var/log/${DAEMON_NAME}_init"
 
+RPI_INFO_FILE="/proc/device-tree/model"
+
+RETRY_PERIOD=10
+
+# Some custom settings if chameleon is raspberry pi
+if [ -f ${RPI_INFO_FILE} ] && cat ${RPI_INFO_FILE} | grep -qi 'raspberry' ; then
+    DAEMON_ARGS="${DAEMON_ARGS} platform=raspi"
+    RETRY_PERIOD=2
+fi
+
 is_already_running () {
     start-stop-daemon --stop --test --quiet --pidfile "${PIDFILE}"
 }
@@ -51,7 +61,7 @@ do_start () {
 
 do_stop () {
     if is_already_running; then
-        start-stop-daemon --stop --pidfile "${PIDFILE}" --retry 10
+        start-stop-daemon --stop --pidfile "${PIDFILE}" --retry ${RETRY_PERIOD}
         rm -f "${PIDFILE}"
     else
         echo "${DAEMON_NAME} is already stopped"
