@@ -113,6 +113,7 @@ EDID_ID_DISABLE = -1
 RN42_SET = frozenset([
     'A9054Z4Q',
     'AK05MK4Q', # vaandres@ located at desk
+    'AK05ML26', # ibezmenov@'s desk
     'A600YVZB', # shijinabraham@'s desk
     'A600CXAC', # chromeos1-dev-host1-chameleon
     'AK05MKYX', # chromeos1-dev-host2-chameleon
@@ -152,6 +153,7 @@ RN52_SET = frozenset([
     'AK0557CM',
     'AK0557AI',
     'AH03PORA', # vaandres@ located at desk
+    'AK05578J', # ibezmenov@'s desk
     'AH03PZDC', # shijinabraham@'s desk
     'A5043N39', # chromeos1-dev-host1-chameleon
     'AH03PZFV', # chromeos1-dev-host2-chameleon
